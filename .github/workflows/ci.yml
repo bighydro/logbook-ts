@@ -1,0 +1,63 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["20", "22"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "${{ matrix.node }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: the built binary verifies the vendored sample
+        run: node dist/bin.js verify tests/fixtures/sample-logbook
+
+  conformance:
+    # SPEC section 6, against the fixture as published at the spec's own tag.
+    runs-on: ubuntu-latest
+    env:
+      SPEC_TAG: v0.3.0
+      EXPECTED_HEAD: 53d39fdad121ce8e448221bbdaa9c86396c16347d050bf630035d6f1d37088e6
+      EXPECTED_LINES: "16"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "22", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: clone the spec at the tag
+        run: git clone --depth 1 --branch "$SPEC_TAG" https://github.com/bighydro/logbook spec
+      - name: verify prints the expected head
+        run: |
+          set -euo pipefail
+          out=$(node dist/bin.js verify spec/conformance/sample-logbook)
+          echo "$out"
+          test "$out" = "valid — ${EXPECTED_LINES} lines, head ${EXPECTED_HEAD}"
+          test "$(jq -r .head spec/conformance/expected.json)" = "$EXPECTED_HEAD"
+          test "$(jq -r .seq spec/conformance/expected.json)" = "$EXPECTED_LINES"
+      - name: appending one note to a copy still verifies
+        run: |
+          set -euo pipefail
+          cp -R spec/conformance/sample-logbook copy
+          node dist/bin.js add copy "second implementation, same chain"
+          out=$(node dist/bin.js verify copy)
+          echo "$out"
+          case "$out" in "valid — $((EXPECTED_LINES + 1)) lines, head "*) ;; *) echo "unexpected: $out"; exit 1;; esac
+      - name: a tampered copy is refused
+        run: |
+          set -euo pipefail
+          sed -i 's/"accuracy_m": 12/"accuracy_m": 13/' copy/logbook/2026/03.jsonl
+          if node dist/bin.js verify copy; then echo "tampering was not detected"; exit 1; fi
