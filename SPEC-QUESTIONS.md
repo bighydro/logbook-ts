@@ -30,3 +30,22 @@ The Python source was not read. Each entry says what is unclear, what this imple
 13. **Conformance README item 3 versus SPEC §6.** `conformance/README.md` adds a third condition (editing any byte, or deleting any line, must fail) that SPEC §6 does not list. Both are tested here; suggest folding item 3 into §6.
 
 14. **`lineage` for a record that has never been migrated.** §1 says `lineage` is present only after a migration. Does a writer that rewrites `logbook.json` (as `add` does) have to preserve every unknown top-level key? §2 says readers preserve unknown *line* fields; nothing says so for `logbook.json`. This implementation preserves everything it does not own.
+
+## Found while implementing `show` (RFC 0003, RFC 0006, RFC 0008, RFC 0009)
+
+15. **The label of an alias line that ends a walk.** RFC 0006 rule 6 says the line the walk stops on decides "its `entity` and `label`, or none when it has none", and the payload table lets `label` accompany `alias_of`. When the walk stops *on* an alias line (fourth hop, cycle) or at a ref with no line standing, is the alias line's own `label` a name for the ref, or does a ref name nothing until an entity line is reached? This implementation names nothing: an alias line "names no entity", and its label is treated as a hint written at resolution time, not a resolution. Suggest one sentence either way.
+
+16. **Where a retraction line appears in a day listing.** RFC 0003 rule 3 says a retraction "is not an event of its own day: it appears where the line it hides was". `show` here therefore omits `retraction` lines from the day of their `at` and prints `[retracted: <reason>]` in place of the hidden line's summary. A reader who lists the day a retraction was written sees nothing of it, which is what the rule says but may surprise. Is that intended, or should the retraction also be listed (marked) on its own day?
+
+17. **Which files hold a local day.** SPEC §2 makes placement "a writer's obligation, not a validity condition": a line may sit in a month file other than its `at` month and still verify. A reader that streams only the month files a day can touch (the UTC days around it, so three months at most at a boundary) misses such a line; a reader that scans every file for every day does not scale. `show` here reads the month files around the day and every file once for resolutions and retractions. Should the spec say that readers MAY rely on placement, so that a misplaced line is a writer's bug rather than a reader's?
+
+18. **Sorting by `at` with mixed precision.** §2 permits fractional seconds. Sorting the strings puts `07:30:00.5Z` before `07:30:00Z` (`.` sorts before `Z`), so `show` sorts by the parsed instant and breaks ties by `seq`. A line whose `at` does not parse is not on any day and is skipped silently; `verify` is where it should be reported (see 7).
+
+19. **Older payload shapes in the conformance sample.** `conformance/sample-logbook` predates RFC 0008 and RFC 0009: its `message` line has `chat: "Ines"` (a string, not `{id, type, name}`) and `direction: "in"` (not `from_me`), and its `event` lines have `attendees: ["ines@example.org"]` (strings, not `{ref, name, response}`). `show` here accepts both shapes, reading a string chat as its name and a string attendee as an `email` ref. Should the sample be regenerated to the RFC shapes, or the RFCs say what a reader does with a string?
+
+20. **The end of a collapsed run of points.** The reference CLI collapses consecutive location points to `n points HH:MM–HH:MM`. This implementation ends the range at the last point's `end` when it has one (RFC 0001 says `end` is null, but the sample's second point carries one), otherwise at its `at`. Worth stating in the CLI's documentation so the two implementations print the same text.
+
+21. **`show` on a `logbook/0.1` record.** §3.1 says an implementation MUST refuse to *verify or write* a 0.1 record. Reading does not touch a hash, so a 0.1 record could be shown as it is. This implementation refuses anyway, so that every command has the same answer to a record it does not carry. Should reading be allowed?
+
+22. **The timezone database.** `show` needs one to turn `at` into a local clock time. This implementation uses the ICU that ships inside Node (`Intl.DateTimeFormat`), which is a built-in and not a dependency, and refuses a zone name ICU does not know. The spec says `tz` is "an IANA name" but names no edition; a zone renamed between editions (`Europe/Kiev` / `Europe/Kyiv`) will be known to some readers and not others.
+

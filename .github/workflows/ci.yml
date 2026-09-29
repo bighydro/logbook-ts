@@ -23,6 +23,8 @@ jobs:
       - run: pnpm build
       - name: the built binary verifies the vendored sample
         run: node dist/bin.js verify tests/fixtures/sample-logbook
+      - name: the built binary shows a day of the show fixture
+        run: node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
