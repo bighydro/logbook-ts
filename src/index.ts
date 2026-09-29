@@ -1,9 +1,13 @@
 export { contentHash, contentOf, hashLine, lineHash, sha256Hex, ZERO_HASH } from "./chain.js";
 export { main } from "./cli.js";
 export { canonicalize, JcsError } from "./jcs.js";
+export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lines.js";
+export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
+export { checkTimezone, isDay, type ShowOptions, type ShowResult, showDay } from "./show.js";
 export {
   type AddOptions,
   addNote,
+  formatRefusal,
   LogbookError,
   readMeta,
   rfc3339,

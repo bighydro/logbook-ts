@@ -1,14 +1,8 @@
-import {
-  appendFileSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { hashLine, ZERO_HASH } from "./chain.js";
 import { canonicalize } from "./jcs.js";
+import { eachLine, monthFiles, parseLine } from "./lines.js";
 import { FORMAT, type Line, type Meta, type VerifyResult } from "./types.js";
 import { uuidV7 } from "./uuid.js";
 
@@ -18,8 +12,6 @@ export class LogbookError extends Error {
 
 const META_FILE = "logbook.json";
 const LOG_DIR = "logbook";
-const YEAR = /^\d{4}$/;
-const MONTH_FILE = /^(0[1-9]|1[0-2])\.jsonl$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 
 /** Read and minimally check `logbook.json`. Throws LogbookError if it is missing or not JSON. */
@@ -43,7 +35,8 @@ export function readMeta(root: string): Meta {
   return parsed as Meta;
 }
 
-function formatError(meta: Meta): string | undefined {
+/** Why this record is refused, or undefined when its format is the one carried here. */
+export function formatRefusal(meta: Meta): string | undefined {
   if (meta.format === FORMAT) return undefined;
   const found = typeof meta.format === "string" ? meta.format : "missing";
   return `logbook.json: format is ${found}; this implementation carries ${FORMAT} only (SPEC §3.1); migrate the record first`;
@@ -57,42 +50,12 @@ interface Located {
 /** Every line from every `logbook/<YYYY>/<MM>.jsonl`, in file order, with parse errors reported. */
 function readAllLines(root: string, errors: string[]): Located[] {
   const found: Located[] = [];
-  const logDir = join(root, LOG_DIR);
-  let years: string[];
-  try {
-    years = readdirSync(logDir);
-  } catch {
-    return found; // no record yet: an empty logbook
-  }
-  for (const year of years.filter((y) => YEAR.test(y)).sort()) {
-    const yearDir = join(logDir, year);
-    let months: string[];
-    try {
-      months = readdirSync(yearDir);
-    } catch {
-      continue; // a file named like a year, not a folder
-    }
-    for (const month of months.filter((m) => MONTH_FILE.test(m)).sort()) {
-      const file = join(yearDir, month);
-      const text = readFileSync(file, "utf-8");
-      const rows = text.split("\n");
-      for (let i = 0; i < rows.length; i++) {
-        const raw = (rows[i] as string).replace(/\r$/, "");
-        if (raw === "") continue;
-        const where = `${join(LOG_DIR, year, month)} line ${i + 1}`;
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw);
-        } catch (err) {
-          errors.push(`${where}: not JSON (${(err as Error).message})`);
-          continue;
-        }
-        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-          errors.push(`${where}: not a JSON object`);
-          continue;
-        }
-        found.push({ line: parsed as Line, where });
-      }
+  for (const month of monthFiles(root)) {
+    for (const { raw, row } of eachLine(month.file)) {
+      const where = `${month.rel} line ${row}`;
+      const parsed = parseLine(raw, where);
+      if ("error" in parsed) errors.push(parsed.error);
+      else found.push({ line: parsed.line, where });
     }
   }
   return found;
@@ -128,7 +91,7 @@ function envelopeErrors(line: Line): string[] {
  */
 export function verifyLogbook(root: string): VerifyResult {
   const meta = readMeta(root);
-  const refusal = formatError(meta);
+  const refusal = formatRefusal(meta);
   if (refusal) return { valid: false, lines: 0, head: ZERO_HASH, errors: [refusal] };
 
   const errors: string[] = [];
@@ -204,7 +167,7 @@ export interface AddOptions {
 export function addNote(root: string, text: string, options: AddOptions = {}): Line {
   if (text.trim() === "") throw new LogbookError("nothing to add: the note is empty");
   const meta = readMeta(root);
-  const refusal = formatError(meta);
+  const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
   if (typeof meta.timezone !== "string" || meta.timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing");

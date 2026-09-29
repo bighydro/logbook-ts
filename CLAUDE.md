@@ -28,4 +28,4 @@ Plain English names inside the code: Logbook, Line, Meta, Note — no metaphors.
 - Atomic replace: write a sibling temp file, then `renameSync` over the target. Never write into the target in place.
 - Temp folders in tests: `mkdtempSync(join(tmpdir(), …))`, removed in `afterEach` with `rmSync(…, { recursive: true, force: true })`.
 - Filesystems: macOS and Windows are case-insensitive by default. Never rely on case to tell files apart.
-- Timezones: the `tz` written by `add` is the string in `logbook.json`; nothing here needs a zone database.
+- Timezones: the `tz` written by `add` is the string in `logbook.json`. `show` converts `at` to a local clock through Node's built-in `Intl.DateTimeFormat` (ICU ships inside Node; it is not a dependency); nothing else needs a zone database.
