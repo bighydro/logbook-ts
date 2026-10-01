@@ -279,6 +279,7 @@ describe("showDay", () => {
       text: "2026-03-20: nothing logged\n",
       timezone: "Europe/Oslo",
       rows: 0,
+      detail: { day: "2026-03-20", timezone: "Europe/Oslo", hero: [], rows: [] },
     });
   });
 });
@@ -500,6 +501,147 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
     expect([...showDays(SHOW, { profiles: ["resolution/v1"] })].map((d) => d.day)).toEqual([
       "2026-03-15",
       "2026-03-16",
+    ]);
+  });
+});
+
+describe("logbook-ts show --json prints each day as one JSON object", () => {
+  type Row = {
+    time: string;
+    until?: string;
+    kind: string;
+    source: string;
+    summary: string;
+    retraction?: { seq: number };
+    lines: Array<{ seq: number; id: string }>;
+  };
+  type Day = {
+    day: string;
+    timezone: string;
+    hero: Array<{ photo: string; lane: string; line: string }>;
+    rows: Row[];
+    note?: string;
+  };
+  const parse = (out: string): Day[] =>
+    out
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Day);
+
+  it("carries the rows in the order printed, each with its summary and the lines behind it", () => {
+    const { code, out, err } = run(["show", SHOW, "--day", "2026-03-14", "--json"]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.endsWith("\n")).toBe(true);
+    const days = parse(out);
+    expect(days).toHaveLength(1);
+    const day = days[0] as Day;
+    expect(day.day).toBe("2026-03-14");
+    expect(day.timezone).toBe("Europe/Oslo");
+    expect(day.hero).toEqual([]);
+    expect(day.note).toBeUndefined();
+    expect(day.rows).toHaveLength(9);
+    const run_ = day.rows[0] as Row;
+    expect(run_).toMatchObject({
+      time: "08:12",
+      until: "09:40",
+      kind: "location",
+      source: "sim-phone",
+      summary: "3 points",
+    });
+    expect(run_.lines.map((l) => l.seq)).toEqual([1, 2, 3]);
+    expect(run_.lines[0]).toMatchObject({
+      kind: "location",
+      payload: { schema: "location/v1", lat: 59.911 },
+    });
+    const message = day.rows[3] as Row;
+    expect(message).toMatchObject({
+      time: "12:05",
+      kind: "message",
+      source: "whatsapp",
+      summary: "Ola Nordmann in Sailing club: Regatta moved to Sunday",
+    });
+    expect(message.until).toBeUndefined();
+    expect(message.lines.map((l) => l.seq)).toEqual([6]);
+    const hidden = day.rows[8] as Row;
+    expect(hidden).toMatchObject({
+      time: "22:30",
+      kind: "note",
+      source: "manual",
+      summary: "retracted #11: typo",
+    });
+    expect(hidden.retraction?.seq).toBe(19);
+    expect(hidden.lines.map((l) => l.seq)).toEqual([11]);
+    // The text output is the same rows, one per line, under the heading.
+    const text = run(["show", SHOW, "--day", "2026-03-14"]).out.split("\n").filter(Boolean);
+    expect(text).toHaveLength(1 + day.rows.length);
+    for (const [i, row] of day.rows.entries()) {
+      const time = row.until === undefined ? row.time : `${row.time}–${row.until}`;
+      expect(text[i + 1]).toContain(`  ${time}  `);
+      expect(text[i + 1]?.endsWith(row.summary)).toBe(true);
+    }
+  });
+
+  it("carries the hero photos and the day's notes file", () => {
+    const [first] = parse(run(["show", SAMPLE, "--day", "2026-03-01", "--json"]).out) as [Day];
+    expect(first.hero).toEqual([
+      { photo: "IMG_0001.jpg", lane: "memory", line: "00000000-0000-4000-8000-000000000031" },
+    ]);
+    const [seventh] = parse(run(["show", SAMPLE, "--day", "2026-03-07", "--json"]).out) as [Day];
+    expect(seventh.note).toBe("A good week. The decision is made; now live it.\n");
+    expect(seventh.rows.map((r) => r.kind)).toEqual(["event", "note"]);
+  });
+
+  it("gives a folded calendar entry every source and every line", () => {
+    const [day] = parse(run(["show", PROFILES, "--day", "2026-03-04", "--json"]).out) as [Day];
+    const folded = day.rows.find((r) => r.source.includes("+")) as Row;
+    expect(folded.source).toBe("ios-calendar+ics");
+    expect(folded.lines.map((l) => l.seq)).toEqual([52, 53]);
+    expect(folded.summary).toBe(
+      "Boat survey — Tromsø marina · by Ola Nordmann · with Ola Nordmann, Ines Holm",
+    );
+  });
+
+  it("prints one object per day of a range, nothing for an empty range, and an empty day for --day", () => {
+    const days = parse(
+      run(["show", SHOW, "--since", "2026-03-15", "--until", "2026-04-01", "--json"]).out,
+    );
+    expect(days.map((d) => d.day)).toEqual(["2026-03-15", "2026-03-16", "2026-04-01"]);
+    expect(
+      run(["show", SHOW, "--since", "2026-03-17", "--until", "2026-03-20", "--json"]).out,
+    ).toBe("");
+    expect(run(["show", SHOW, "--day", "2026-03-20", "--json"]).out).toBe(
+      '{"day":"2026-03-20","timezone":"Europe/Oslo","hero":[],"rows":[]}\n',
+    );
+  });
+
+  it("summarises raw with --raw and filters with --profile like the text does", () => {
+    const [raw] = parse(run(["show", SHOW, "--day", "2026-03-14", "--json", "--raw"]).out) as [Day];
+    expect(raw.rows[3]?.summary).toBe(
+      "236000000000001@lid in Sailing club: Regatta moved to Sunday",
+    );
+    const [notes] = parse(
+      run(["show", SHOW, "--day", "2026-03-14", "--json", "--profile", "note"]).out,
+    ) as [Day];
+    expect(notes.rows.map((r) => r.summary)).toEqual([
+      "Regatta Sunday. … (+1 line)",
+      "retracted #11: typo",
+    ]);
+  });
+
+  it("exits 2 with usage when --json is given a value", () => {
+    const { code, err } = run(["show", SHOW, "--day", "2026-03-14", "--json=yes"]);
+    expect(code).toBe(2);
+    expect(err).toMatch(/usage/i);
+  });
+
+  it("is the `detail` of a showDay result and of every day showDays yields", () => {
+    const result = showDay(SHOW, { day: "2026-04-01" });
+    expect(result.detail.rows.map((r) => r.summary)).toEqual(["1 point", "April"]);
+    expect(result.detail.rows[0]?.lines[0]?.at).toBe("2026-03-31T22:30:00Z");
+    expect([...showDays(SHOW, { since: "2026-03-16" })].map((d) => d.detail.day)).toEqual([
+      "2026-03-16",
+      "2026-04-01",
     ]);
   });
 });

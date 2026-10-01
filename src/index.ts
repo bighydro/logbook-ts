@@ -5,8 +5,11 @@ export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lin
 export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
 export {
   checkTimezone,
+  type DayDetail,
   type DayShown,
   isDay,
+  type ShownHero,
+  type ShownRow,
   type ShowOptions,
   type ShowRange,
   type ShowRangeOptions,
