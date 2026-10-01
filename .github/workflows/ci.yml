@@ -23,8 +23,10 @@ jobs:
       - run: pnpm build
       - name: the built binary verifies the vendored sample
         run: node dist/bin.js verify tests/fixtures/sample-logbook
-      - name: the built binary shows a day of the show fixture
-        run: node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
+      - name: the built binary shows a day of each show fixture
+        run: |
+          node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
+          node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-04
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
@@ -63,3 +65,51 @@ jobs:
           set -euo pipefail
           sed -i 's/"accuracy_m": 12/"accuracy_m": 13/' copy/logbook/2026/03.jsonl
           if node dist/bin.js verify copy; then echo "tampering was not detected"; exit 1; fi
+
+  conformance-main:
+    # The fixture as it stands on the spec repo's main: verify must print whatever expected.json
+    # there says, and the vendored copy must still be that fixture, so a regenerated sample is
+    # noticed here and pulled, not discovered later.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "22", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: clone the spec at main
+        run: git clone --depth 1 https://github.com/bighydro/logbook spec
+      - name: verify prints the head in conformance/expected.json at main
+        run: |
+          set -euo pipefail
+          expected="valid — $(jq -r .seq spec/conformance/expected.json) lines, head $(jq -r .head spec/conformance/expected.json)"
+          out=$(node dist/bin.js verify spec/conformance/sample-logbook)
+          echo "$out"
+          test "$out" = "$expected"
+      - name: the vendored fixture is the one on main
+        run: |
+          set -euo pipefail
+          if ! diff -r spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
+            echo "::error::conformance/ moved on bighydro/logbook main; copy sample-logbook and expected.json into tests/fixtures and update the conformance job's SPEC_TAG, EXPECTED_HEAD and EXPECTED_LINES"
+            exit 1
+          fi
+
+  cross-impl:
+    # The reference implementation (Python) and this one must print the same day: tests/cross-impl.test.ts
+    # runs `logbook show` of a clone of bighydro/logbook at main on every expected-show fixture and
+    # diffs it against ours and against the vendored expected-show files.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "22", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: clone the reference at main
+        run: git clone --depth 1 https://github.com/bighydro/logbook ref
+      - uses: astral-sh/setup-uv@v7
+      - name: install the reference
+        run: uv sync --project ref
+      - name: both implementations print the same day
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts
