@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
 import { showDay, showDays } from "../src/show.js";
 import { addNote, verifyLogbook } from "../src/store.js";
@@ -38,7 +38,7 @@ describe("the show fixtures", () => {
     expect(verifyLogbook(SHOW).errors).toEqual([]);
     expect(verifyLogbook(SHOW).lines).toBe(20);
     expect(verifyLogbook(PROFILES).errors).toEqual([]);
-    expect(verifyLogbook(PROFILES).lines).toBe(76);
+    expect(verifyLogbook(PROFILES).lines).toBe(77);
   });
 });
 
@@ -592,10 +592,10 @@ describe("logbook-ts show --json prints each day as one JSON object", () => {
     expect(seventh.rows.map((r) => r.kind)).toEqual(["event", "note"]);
   });
 
-  it("gives a folded calendar entry every source and every line", () => {
+  it("gives a folded calendar entry every line behind it", () => {
     const [day] = parse(run(["show", PROFILES, "--day", "2026-03-04", "--json"]).out) as [Day];
-    const folded = day.rows.find((r) => r.source.includes("+")) as Row;
-    expect(folded.source).toBe("ios-calendar+ics");
+    const folded = day.rows.find((r) => r.source.startsWith("×")) as Row;
+    expect(folded.source).toBe("×2 sources");
     expect(folded.lines.map((l) => l.seq)).toEqual([52, 53]);
     expect(folded.summary).toBe(
       "Boat survey — Tromsø marina · by Ola Nordmann · with Ola Nordmann, Ines Holm",
@@ -642,6 +642,147 @@ describe("logbook-ts show --json prints each day as one JSON object", () => {
     expect([...showDays(SHOW, { since: "2026-03-16" })].map((d) => d.detail.day)).toEqual([
       "2026-03-16",
       "2026-04-01",
+    ]);
+  });
+});
+
+describe("folding one calendar entry that several sources carry, as the reference does", () => {
+  // Learned by running the reference on probe records (SPEC-QUESTIONS 28): the same start and end,
+  // one title (case, accents and whitespace aside) or one flight in the title, two or more sources.
+  let seq = 40;
+  beforeEach(() => {
+    seq = 40;
+  });
+  const event = (
+    at: string,
+    end: string | null,
+    source: string,
+    title: string | undefined,
+    extra: Record<string, unknown> = {},
+  ) =>
+    JSON.stringify({
+      id: `00000000-0000-4000-8000-0000000009${String(++seq).padStart(2, "0")}`,
+      seq,
+      at,
+      end,
+      tz: "Europe/Oslo",
+      source,
+      kind: "event",
+      tier: 1,
+      payload: {
+        schema: "event/v1",
+        raw_id: String(seq),
+        ...(title === undefined ? {} : { title }),
+        ...extra,
+      },
+      recorded_at: at,
+      prev: "0".repeat(64),
+      hash: "0".repeat(64),
+    });
+  const pair = (
+    day: string,
+    a: string | undefined,
+    b: string | undefined,
+    endB = `2026-03-${day}T09:00:00Z`,
+  ) => [
+    event(`2026-03-${day}T08:00:00Z`, `2026-03-${day}T09:00:00Z`, "ios-calendar", a),
+    event(`2026-03-${day}T08:00:00Z`, endB, "ics", b),
+  ];
+  const rows = (root: string, day: string) =>
+    run(["show", root, "--day", `2026-03-${day}`])
+      .out.split("\n")
+      .slice(1, -1);
+
+  it("folds on case, accents and whitespace, an empty title, a flight in the title, and both ends null", () => {
+    const root = copySample();
+    writeLines(root, [
+      ...readLines(root),
+      ...pair("20", "Boat survey", "boat  SURVEY "),
+      ...pair("21", "Zürich trip", "Zurich trip"),
+      ...pair("22", "", undefined),
+      ...pair("23", "Flight to Zürich (LX 561)", "Flug LX561 nach Zürich"),
+      event("2026-03-24T08:00:00Z", null, "ios-calendar", "Dentist"),
+      event("2026-03-24T08:00:00Z", null, "ics", "Dentist"),
+    ]);
+    expect(rows(root, "20")).toEqual(["  09:00  event      ×2 sources     Boat survey"]);
+    expect(rows(root, "21")).toEqual(["  09:00  event      ×2 sources     Zürich trip"]);
+    expect(rows(root, "22")).toEqual(["  09:00  event      ×2 sources     "]);
+    expect(rows(root, "23")).toEqual([
+      "  09:00  event      ×2 sources     Flight to Zürich (LX 561)",
+    ]);
+    expect(rows(root, "24")).toEqual(["  09:00  event      ×2 sources     Dentist"]);
+  });
+
+  it("does not fold on a different end, a letter that is not an accent, one source twice, or a retracted line", () => {
+    const root = copySample();
+    writeLines(root, [
+      ...readLines(root),
+      ...pair("20", "Lunch", "Lunch", "2026-03-20T09:30:00Z"),
+      ...pair("21", "Tromsø marina", "Tromso marina"),
+      event("2026-03-22T08:00:00Z", "2026-03-22T09:00:00Z", "ics", "Twice"),
+      event("2026-03-22T08:00:00Z", "2026-03-22T09:00:00Z", "ics", "Twice"),
+      ...pair("23", "Gone", "Gone"),
+      JSON.stringify({
+        id: "00000000-0000-4000-8000-000000000999",
+        seq: 99,
+        at: "2026-03-25T00:00:00Z",
+        end: null,
+        tz: "Europe/Oslo",
+        source: "manual",
+        kind: "retraction",
+        tier: 2,
+        payload: {
+          schema: "retraction/v1",
+          supersedes: "00000000-0000-4000-8000-000000000948",
+          seq: 48,
+          reason: "dup",
+        },
+        recorded_at: "2026-03-25T00:00:00Z",
+        prev: "0".repeat(64),
+        hash: "0".repeat(64),
+      }),
+    ]);
+    expect(rows(root, "20")).toEqual([
+      "  09:00  event      ios-calendar   Lunch",
+      "  09:00  event      ics            Lunch",
+    ]);
+    expect(rows(root, "21")).toEqual([
+      "  09:00  event      ios-calendar   Tromsø marina",
+      "  09:00  event      ics            Tromso marina",
+    ]);
+    expect(rows(root, "22")).toEqual([
+      "  09:00  event      ics            Twice",
+      "  09:00  event      ics            Twice",
+    ]);
+    expect(rows(root, "23")).toEqual([
+      "  09:00  event      ios-calendar   Gone",
+      "  09:00  retracted #48: dup",
+    ]);
+  });
+
+  it("counts distinct sources, folds a repeated source in, and prints the first line's summary", () => {
+    const root = copySample();
+    const at = "2026-03-20T08:00:00Z";
+    const end = "2026-03-20T09:00:00Z";
+    writeLines(root, [
+      ...readLines(root),
+      event(at, end, "ics", "Coffee"),
+      event(at, end, "ios-calendar", "Coffee", {
+        attendees: [{ ref: { kind: "email", value: "b@example.org" }, name: "B" }],
+      }),
+      event(at, end, "gcal", "coffee"),
+      event(at, end, "ics", "Coffee"),
+    ]);
+    expect(rows(root, "20")).toEqual(["  09:00  event      ×3 sources     Coffee"]);
+    const [day] = run(["show", root, "--day", "2026-03-20", "--json"]).out.split("\n");
+    const parsed = JSON.parse(day as string) as {
+      rows: Array<{ source: string; lines: Array<{ source: string }> }>;
+    };
+    expect(parsed.rows[0]?.lines.map((l) => l.source)).toEqual([
+      "ics",
+      "ios-calendar",
+      "gcal",
+      "ics",
     ]);
   });
 });

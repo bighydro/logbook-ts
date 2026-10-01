@@ -1,6 +1,6 @@
 // Regenerates this fixture from the list below. Run after `pnpm build`:
 //   node tests/fixtures/profiles-sample/make.mjs
-// One line of every payload profile the RFCs define as of openlogbook main (2026-10-01), in the
+// One line of every payload profile the RFCs define as of openlogbook main (2026-10-01, dae84b0), in the
 // shapes the RFC examples give, so that `show` can be checked against the reference implementation
 // on the same record (tests/cross-impl.test.ts). Everything is synthetic: a person in Oslo who does
 // not exist, example.org addresses, airline XY, reserved phone ranges, MMSI 999000001.
@@ -247,8 +247,11 @@ const lines = [
     attendees: [{ ref: ola, name: "Ola Nordmann", response: "accepted" }, { ref: ines, name: "Ines", response: "tentative" }],
     status: "confirmed", notes: "Bring the survey form.",
   }),
-  line("2026-03-04T08:33:00Z", "2026-03-04T09:15:00Z", "ics", "event", 1, {
+  line("2026-03-04T08:30:00Z", "2026-03-04T09:15:00Z", "ics", "event", 1, {
     schema: "event/v1", raw_id: "survey@2026-02-27T16:05:00Z", title: "Boat survey — Tromsø Marina", all_day: false,
+  }),
+  line("2026-03-04T08:30:00Z", "2026-03-04T09:20:00Z", "gcal", "event", 1, {
+    schema: "event/v1", raw_id: "survey@gcal", title: "Boat survey — Tromsø marina", all_day: false,
   }),
   line("2026-03-03T23:00:00Z", "2026-03-04T23:00:00Z", "ios-calendar", "event", 1, {
     schema: "event/v1", raw_id: "allday@2026-02-27T16:05:00Z", title: "Boat show", all_day: true, location: "Lillestrøm",
@@ -260,7 +263,7 @@ const lines = [
     schema: "event/v1", raw_id: "edited@2026-03-01T10:00:00Z", title: "Call with the broker", all_day: false,
   }),
   line("2026-03-04T14:00:00Z", "2026-03-04T15:00:00Z", "ios-calendar", "event", 1, {
-    schema: "event/v1", raw_id: "edited@2026-03-02T10:00:00Z", title: "Call with the broker (moved)", all_day: false, supersedes: id(58),
+    schema: "event/v1", raw_id: "edited@2026-03-02T10:00:00Z", title: "Call with the broker (moved)", all_day: false, supersedes: id(59),
   }),
   line("2026-03-04T10:00:00Z", null, "immich", "photo", 1, {
     schema: "photo/v1", asset_id: "5d3e0000", library: "immich", file_name: "IMG_0001.HEIC", media: "image",
@@ -294,7 +297,7 @@ const lines = [
     origin: id(7), certainty: "inferred",
   }),
   line("2026-03-04T20:12:00Z", null, "manual", "commitment-close", 2, {
-    schema: "commitment-close/v1", closes: id(63), outcome: "kept", evidence: [id(9)],
+    schema: "commitment-close/v1", closes: id(64), outcome: "kept", evidence: [id(9)],
   }),
   line("2026-03-04T02:00:00Z", null, "logbook", "crossing", 1, {
     schema: "crossing/v1", destination: "hermes", bundle_id: "019cadd3-6bc0-7dcd-9133-043f5aabf2b0",
@@ -311,7 +314,7 @@ const lines = [
     schema: "wind/v1", speed_mps: 7.5, direction_deg: 240, gust: true, note: "it's blowing", tags: ["a", "b"], nested: { x: null, y: [1, 2.5] },
   }),
   line("2026-03-04T21:15:00Z", null, "manual", "note", 2, { schema: "note/v1", text: "wrong" }),
-  line("2026-03-04T22:00:00Z", null, "manual", "retraction", 2, { schema: "retraction/v1", supersedes: id(71), seq: 71, reason: "" }),
+  line("2026-03-04T22:00:00Z", null, "manual", "retraction", 2, { schema: "retraction/v1", supersedes: id(72), seq: 72, reason: "" }),
 
   // --- 2026-03-05: the people, named -------------------------------------------------------------
   line("2026-03-05T09:00:00Z", null, "ios-contacts", "resolution", 2, {
