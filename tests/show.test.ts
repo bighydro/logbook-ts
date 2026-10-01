@@ -399,3 +399,107 @@ describe("showDays streams", () => {
     expect(days.next().done).toBe(true);
   });
 });
+
+describe("logbook-ts show --profile keeps only the lines of the given payload schemas", () => {
+  it("filters a day to one schema, before runs are collapsed and entries folded", () => {
+    expect(run(["show", SHOW, "--day", "2026-03-14", "--profile", "message/v1"]).out).toBe(
+      [
+        "2026-03-14",
+        "  12:05  message    whatsapp       Ola Nordmann in Sailing club: Regatta moved to Sunday",
+        "  12:07  message    whatsapp       Kari M: Hei, lunch?",
+        "  12:09  message    whatsapp       me → Kari: On my way",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("takes a profile without its version as every version of it, and a retracted line still shows its mark", () => {
+    expect(run(["show", SHOW, "--day", "2026-03-14", "--profile", "note"]).out).toBe(
+      [
+        "2026-03-14",
+        "  21:30  note       manual         Regatta Sunday. … (+1 line)",
+        "  22:30  retracted #11: typo",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("takes several profiles, repeated or comma-separated", () => {
+    const expected = [
+      "2026-03-14",
+      "  08:12–09:40  location   sim-phone      3 points",
+      "  21:30  note       manual         Regatta Sunday. … (+1 line)",
+      "  22:00  location   sim-phone      1 point",
+      "  22:30  retracted #11: typo",
+      "",
+    ].join("\n");
+    expect(
+      run(["show", SHOW, "--day", "2026-03-14", "--profile", "location/v1", "--profile", "note/v1"])
+        .out,
+    ).toBe(expected);
+    expect(run(["show", SHOW, "--day", "2026-03-14", "--profile=location/v1,note/v1"]).out).toBe(
+      expected,
+    );
+  });
+
+  it("applies to a range, and a day with no matching line is left out", () => {
+    // With the other rows filtered away the four points are one unbroken run (SPEC §3.2).
+    expect(run(["show", SHOW, "--since", "2026-03-14", "--profile", "location/v1"]).out).toBe(
+      [
+        "2026-03-14",
+        "  08:12–22:00  location   sim-phone      4 points",
+        "",
+        "2026-04-01",
+        "  00:30  location   sim-phone      1 point",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reports nothing logged when no line of the day or range matches", () => {
+    expect(run(["show", SHOW, "--day", "2026-03-14", "--profile", "mail/v1"]).out).toBe(
+      "2026-03-14: nothing logged\n",
+    );
+    expect(run(["show", SHOW, "--since", "2026-03-15", "--profile", "mail/v1"]).out).toBe(
+      "2026-03-15–2026-04-01: nothing logged\n",
+    );
+  });
+
+  it("filters the hero line with the rows: only keepers that pass are heroes", () => {
+    expect(run(["show", SAMPLE, "--day", "2026-03-01", "--profile", "keeper/v1"]).out).toBe(
+      [
+        "2026-03-01",
+        "  hero  IMG_0001.jpg",
+        "  10:12  keeper     keeper-inference hero photo (memory): IMG_0001.jpg",
+        "",
+      ].join("\n"),
+    );
+    expect(run(["show", SAMPLE, "--day", "2026-03-01", "--profile", "photo/v1"]).out).toBe(
+      [
+        "2026-03-01",
+        "  10:12  photo      sim-camera     camera=SimPhone 3, file=IMG_0001.jpg, lat=59.913, lon=10.742",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("exits 2 with usage when --profile has no value", () => {
+    for (const argv of [
+      ["show", SHOW, "--day", "2026-03-14", "--profile"],
+      ["show", SHOW, "--day", "2026-03-14", "--profile="],
+      ["show", SHOW, "--day", "2026-03-14", "--profile", "note/v1,"],
+    ]) {
+      const { code, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(err).toMatch(/usage/i);
+    }
+  });
+
+  it("is the `profiles` option of showDay and showDays", () => {
+    expect(showDay(SHOW, { day: "2026-03-14", profiles: ["note"] }).rows).toBe(2);
+    expect([...showDays(SHOW, { profiles: ["resolution/v1"] })].map((d) => d.day)).toEqual([
+      "2026-03-15",
+      "2026-03-16",
+    ]);
+  });
+});

@@ -9,11 +9,13 @@ export interface Io {
 export const USAGE = `usage:
   logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>"
   logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
-  logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]
+  logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>]
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
-                                      logbook.json; --raw prints refs as given and bodies whole)
-  logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--tz <zone>] [--raw]
+                                      logbook.json; --raw prints refs as given and bodies whole;
+                                      --profile keeps lines of that payload schema only, "note/v1"
+                                      or "note" for any version, repeatable or comma-separated)
+  logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--tz <zone>] [--raw] [--profile <schema>]
                                       the same for every day of the range that has a line, oldest
                                       first, streamed; a missing bound is the record's first or
                                       last day
@@ -85,8 +87,9 @@ export function main(argv: string[], io: Io): number {
 type ShowFlags = ShowRangeOptions & { day?: string };
 
 /**
- * `--day D`, `--since D`, `--until D`, `--tz Z` (each also as `--flag=value`) and `--raw`;
- * undefined on anything else, a bad day, a range that runs backwards, or `--day` with a bound.
+ * `--day D`, `--since D`, `--until D`, `--tz Z`, `--profile P[,P…]` (each also as `--flag=value`,
+ * `--profile` repeatable) and `--raw`; undefined on anything else, a bad day, an empty profile, a
+ * range that runs backwards, or `--day` with a bound.
  */
 function parseShowFlags(args: string[]): ShowFlags | undefined {
   const days: Record<"--day" | "--since" | "--until", string | undefined> = {
@@ -96,6 +99,7 @@ function parseShowFlags(args: string[]): ShowFlags | undefined {
   };
   let timezone: string | undefined;
   let raw = false;
+  const profiles: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
     const eq = arg.indexOf("=");
@@ -113,6 +117,15 @@ function parseShowFlags(args: string[]): ShowFlags | undefined {
       case "--tz":
         timezone = take();
         break;
+      case "--profile": {
+        const given = take();
+        if (given === undefined) return undefined;
+        for (const profile of given.split(",")) {
+          if (profile === "") return undefined;
+          profiles.push(profile);
+        }
+        break;
+      }
       case "--raw":
         if (eq !== -1) return undefined;
         raw = true;
@@ -127,6 +140,7 @@ function parseShowFlags(args: string[]): ShowFlags | undefined {
   if (day === undefined && since === undefined && until === undefined) return undefined;
   if (since !== undefined && until !== undefined && since > until) return undefined;
   const flags: ShowFlags = { raw };
+  if (profiles.length) flags.profiles = profiles;
   if (day !== undefined) flags.day = day;
   if (since !== undefined) flags.since = since;
   if (until !== undefined) flags.until = until;

@@ -22,6 +22,8 @@ export interface ShowOptions {
   timezone?: string;
   /** Print every ref as the source gave it, and the whole text of a note or a mail. */
   raw?: boolean;
+  /** Keep only lines of these payload schemas (`note/v1`, or `note` for every version). */
+  profiles?: string[];
 }
 
 /** A range of local days; a missing bound is the record's first or last day. */
@@ -30,6 +32,7 @@ export interface ShowRangeOptions {
   until?: string;
   timezone?: string;
   raw?: boolean;
+  profiles?: string[];
 }
 
 export interface ShowResult {
@@ -164,6 +167,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
   checkTimezone(timezone);
   const local = localizer(timezone);
 
+  const keep = profileFilter(options.profiles);
   const files = monthFiles(root);
   const { resolver, supersededFlights, first, last } = judgements(files);
   const since = options.since ?? (first === undefined ? undefined : local(first)?.day);
@@ -178,8 +182,24 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
   const days =
     since === undefined || until === undefined || since > until
       ? (function* () {})()
-      : streamDays(root, files, since, until, local, timezone, ctx);
+      : streamDays(root, files, since, until, local, timezone, ctx, keep);
   return { timezone, since, until, days };
+}
+
+/**
+ * Whether a line's `payload.schema` is one of the profiles asked for: the schema itself, or its
+ * name before `/v` when the profile was given without a version. No profiles keeps every line.
+ */
+function profileFilter(profiles: string[] | undefined): (line: Line) => boolean {
+  if (profiles === undefined || profiles.length === 0) return () => true;
+  const wanted = new Set(profiles);
+  return (line) => {
+    const schema = line.payload?.schema;
+    if (typeof schema !== "string") return false;
+    if (wanted.has(schema)) return true;
+    const slash = schema.indexOf("/v");
+    return slash !== -1 && wanted.has(schema.slice(0, slash));
+  };
 }
 
 function* streamDays(
@@ -190,6 +210,7 @@ function* streamDays(
   local: Localize,
   timezone: string,
   ctx: RenderContext,
+  keep: (line: Line) => boolean,
 ): Generator<DayShown> {
   // A local day's lines sit in the month files of the UTC days around it (SPEC §2, §3.2).
   const firstMonth = monthKey(dayMs(since) - DAY_MS);
@@ -217,7 +238,7 @@ function* streamDays(
       if ("error" in parsed) continue; // verify reports it; show reads what it can
       const { line } = parsed;
       if (line.kind === "retraction") continue; // shown where the line it hides is (RFC 0003 rule 3)
-      if (typeof line.at !== "string") continue;
+      if (typeof line.at !== "string" || !keep(line)) continue;
       const at = local(line.at);
       if (at === undefined || at.day < since || at.day > until) continue;
       const entries = open.get(at.day) ?? [];
