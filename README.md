@@ -4,7 +4,7 @@
 
 The Logbook spec says it should be small enough to implement in an afternoon, and that two independent
 implementations must agree before v1.0 is frozen. This is the second one. It was written from
-[SPEC.md](https://github.com/bighydro/logbook/blob/v0.3.0/SPEC.md) alone: no Python was read, and every
+[SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 prints a day exactly as the reference implementation (openlogbook, main as of 2026-10-01) does, matched
 against the reference's output on synthetic records, never its source, and checked by a
@@ -59,7 +59,8 @@ SPEC §6, the conformance rule, and one reader.
 |---|---|
 | `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or the errors on stderr and exits 1. Refuses any `format` other than `logbook/0.2`. |
 | `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify. |
-| `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]` | Prints one local day of the record as the reference does: the day, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
+| `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
+| `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
 
 The hash is SPEC §3 to the letter:
 
@@ -80,7 +81,9 @@ dependency. The output is, row for row, what `logbook show` of the reference imp
 on the same record: a heading with the day, then `  HH:MM  kind  source  summary` with the kind
 padded to ten columns and the source to fourteen, then, when `notes/<YYYY>/<day>.md` exists,
 `  — note —` and the file two spaces in. A day with no lines prints `<day>: nothing logged`. Rows
-are ordered by the instant `at` denotes, then by `seq` (SPEC §3.2).
+are ordered by the instant `at` denotes, then by `seq` (SPEC §3.2). A day with a `keeper/v1` line
+standing (RFC 0024) has a `  hero  IMG_0001.jpg` line under its heading, the `memory` lane first and
+every other lane as `(art)`, as the reference prints it.
 
 The summary depends on the kind; names come from the record's own `resolution/v1` lines (below):
 
@@ -112,20 +115,53 @@ ref nothing resolves. When no resolution names a ref, the name the source itself
 chat's name, then the raw value. `--raw` prints every ref exactly as the source gave it, the whole
 text of a note, and a mail's body under its row.
 
-`show` streams: every month file is read once through a fixed buffer for the resolution, retraction
-and flight lines, and only the month files around the day are read for its lines. Nothing is loaded
-whole and nothing is written; no index is built.
+### A range, a profile, JSON
 
-Two synthetic records (the same imaginary person in Oslo) are the fixtures: `tests/fixtures/show-sample`
+Neither SPEC §3.2 nor the reference has these; they are this implementation's, and written down in
+SPEC-QUESTIONS.md (41).
+
+- `--since YYYY-MM-DD` and `--until YYYY-MM-DD` list a range of local days, inclusive, oldest first,
+  each day as `--day` prints it and a blank line between; a day with no line is left out, and an empty
+  range prints `<since>–<until>: nothing logged`. A missing bound is the record's first or last listed
+  day. `--day` cannot be combined with a bound.
+- `--profile <schema>` keeps only the lines whose `payload.schema` is one of the schemas given
+  (`note/v1`; `note` means every version; repeat the flag or separate with commas). It applies as lines
+  are read, before runs of points are collapsed and calendar entries folded, so four points with nothing
+  listed between them are one run; resolutions and retractions still come from the whole record.
+- `--json` prints each day as one JSON object on one line: `day`, `timezone`, `hero` (`photo`, `lane`,
+  `line`), `rows` and, when the day has a notes file, `note`. A row is `{time, until?, kind, source,
+  summary, retraction?, lines}`: `summary` is the text column exactly (names resolved, or raw with
+  `--raw`; `retracted #11: typo` for a hidden line, with the retraction line beside it), `until` the end
+  of a run of points, `source` every source of a folded entry, `lines` the full lines behind the row —
+  one, the points of a run, the entries folded. An empty day under `--day` is `{"day": …, "hero": [],
+  "rows": []}`; an empty range prints nothing.
+
+```bash
+node dist/bin.js show tests/fixtures/show-sample --since 2026-03-15 --profile resolution/v1
+node dist/bin.js show tests/fixtures/sample-logbook --day 2026-03-08 --json | jq '.rows[] | [.time, .kind, .summary]'
+```
+
+`show` streams: every month file is read once through a fixed buffer for the resolution, retraction
+and flight lines and the record's first and last day; then only the month files the day or range can
+touch are read, in order, each line going to its local day, and a day is printed as soon as the last
+file that can hold one of its lines has been read. What is held at any moment is the lines of the days
+still open — at most a month's worth of the range — so memory does not grow with the record. Nothing
+is loaded whole and nothing is written; no index is built.
+
+Two synthetic records (the same imaginary person in Oslo) and the conformance sample are the fixtures: `tests/fixtures/show-sample`
 has a run of points, an alias hop, a retracted resolution, a retracted note and a line at 22:30 UTC that
 is the next day in Oslo; `tests/fixtures/profiles-sample` has one line of every profile the RFCs define
 (flight, call, transcript, mail, voice-memo, highlight, task, browse, watch, listen, trip, transaction,
 health-sample, location with a subject, event, photo, message, note, commitment, crossing, resolution)
-in the RFC examples' shapes. `make.mjs` beside each regenerates it. Beside each, `expected-show/` holds
-what `logbook show` of the reference printed for every day, with and without `--raw`; the unit tests
-check our output against those files, and `tests/cross-impl.test.ts` checks both against the reference
-itself (see Developing). `tests/fixtures/capture-expected-show.mjs` re-captures them from the reference;
-they are never edited by hand.
+in the RFC examples' shapes; `tests/fixtures/sample-logbook` is `conformance/sample-logbook` of the spec
+repo at v0.5.0 (31 lines, one of every profile), vendored unchanged. `make.mjs` beside each synthetic
+record regenerates it. Beside each, `expected-show/` holds what `logbook show` of the reference printed
+for every day, with and without `--raw` (for the conformance sample, the six days the reference reads as
+SPEC §3.2 says: not 2026-03-01, where it ends a run at the last point's `at` and prints a stored `1e+20`,
+and not 2026-03-06, where it raises on a string `chat`; SPEC-QUESTIONS 40); the unit tests check our
+output against those files, and `tests/cross-impl.test.ts` checks both against the reference itself (see
+Developing). `tests/fixtures/capture-expected-show.mjs` re-captures them from the reference; they are
+never edited by hand.
 
 ```bash
 node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
@@ -152,11 +188,14 @@ by instant, not by the text of `at`.
 ## As a library
 
 ```ts
-import { addNote, buildResolver, canonicalize, hashLine, showDay, verifyLogbook } from "logbook-ts";
+import { addNote, buildResolver, canonicalize, hashLine, showDay, showDays, verifyLogbook } from "logbook-ts";
 
 const result = verifyLogbook("/path/to/root"); // { valid, lines, head, errors }
 const line = addNote("/path/to/root", "a note"); // the Line that was written
-const day = showDay("/path/to/root", { day: "2026-03-14", timezone: "Europe/Oslo" }); // { text, timezone, rows }
+const day = showDay("/path/to/root", { day: "2026-03-14", timezone: "Europe/Oslo" }); // { text, timezone, rows, detail }
+for (const shown of showDays("/path/to/root", { since: "2026-03-01", profiles: ["note"] })) {
+  shown.detail.rows; // what --json prints: [{ time, kind, source, summary, lines }, …], a day at a time
+}
 buildResolver(lines).name({ kind: "email", value: "ines@example.org" }); // "Ines Holm-Berg" or undefined
 canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
 ```
