@@ -1,0 +1,3 @@
+2026-03-02
+  13:10  transaction sim-bank       amount=-14.5, currency=EUR, merchant=Bakeri Nord
+  13:15  photo      sim-camera     camera=SimPhone 3, file=IMG_0002.jpg

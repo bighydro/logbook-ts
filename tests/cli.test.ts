@@ -62,11 +62,11 @@ describe("logbook-ts add", () => {
     const { code, out, err } = run(["add", root, "a note from the CLI"]);
     expect(code).toBe(0);
     expect(err).toBe("");
-    expect(out).toMatch(/^added seq 17 /);
+    expect(out).toMatch(/^added seq 32 /);
     const result = verifyLogbook(root);
     expect(result.valid).toBe(true);
-    expect(result.lines).toBe(17);
-    expect(run(["verify", root]).out).toBe(`valid — 17 lines, head ${result.head}\n`);
+    expect(result.lines).toBe(32);
+    expect(run(["verify", root]).out).toBe(`valid — 32 lines, head ${result.head}\n`);
   });
 
   it("joins extra words so the text need not be quoted", () => {
@@ -88,7 +88,7 @@ describe("logbook-ts add", () => {
     const { code, err } = run(["add", root, "nope"]);
     expect(code).toBe(1);
     expect(err).toMatch(/logbook\/0\.1/);
-    expect(readLines(root)).toHaveLength(16);
+    expect(readLines(root)).toHaveLength(31);
   });
 });
 

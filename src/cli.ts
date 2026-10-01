@@ -1,4 +1,4 @@
-import { isDay, type ShowOptions, showDay } from "./show.js";
+import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
 import { addNote, LogbookError, verifyLogbook } from "./store.js";
 
 export interface Io {
@@ -9,10 +9,18 @@ export interface Io {
 export const USAGE = `usage:
   logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>"
   logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
-  logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]
+  logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
-                                      logbook.json; --raw prints refs as given and bodies whole)
+                                      logbook.json; --raw prints refs as given and bodies whole;
+                                      --profile keeps lines of that payload schema only, "note/v1"
+                                      or "note" for any version, repeatable or comma-separated;
+                                      --json prints the day as one JSON object, every row with its
+                                      summary and the lines behind it)
+  logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--tz <zone>] [--raw] [--profile <schema>] [--json]
+                                      the same for every day of the range that has a line, oldest
+                                      first, streamed, one object per line with --json; a missing
+                                      bound is the record's first or last day
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
@@ -49,8 +57,25 @@ export function main(argv: string[], io: Io): number {
         if (root === undefined) return usage(io);
         const flags = parseShowFlags(rest);
         if (flags === undefined) return usage(io);
-        const result = showDay(root, flags);
-        io.stdout(result.text);
+        const { day, json, ...range } = flags;
+        const print = (result: ShowResult, first: boolean): void => {
+          if (json) io.stdout(`${JSON.stringify(result.detail)}\n`);
+          else io.stdout(first ? result.text : `\n${result.text}`);
+        };
+        if (day !== undefined) {
+          print(showDay(root, { day, ...range }), true);
+          return 0;
+        }
+        const shown = showRange(root, range);
+        let count = 0;
+        for (const result of shown.days) {
+          print(result, count === 0);
+          count += 1;
+        }
+        if (count === 0 && !json) {
+          const span = [shown.since, shown.until].filter((d) => d !== undefined);
+          io.stdout(`${span.length ? `${[...new Set(span)].join("–")}: ` : ""}nothing logged\n`);
+        }
         return 0;
       }
       default:
@@ -65,11 +90,23 @@ export function main(argv: string[], io: Io): number {
   }
 }
 
-/** `--day D`, `--day=D`, `--tz Z`, `--tz=Z`, `--raw`; undefined on anything else or a bad day. */
-function parseShowFlags(args: string[]): ShowOptions | undefined {
-  let day: string | undefined;
+type ShowFlags = ShowRangeOptions & { day?: string; json?: boolean };
+
+/**
+ * `--day D`, `--since D`, `--until D`, `--tz Z`, `--profile P[,P…]` (each also as `--flag=value`,
+ * `--profile` repeatable), `--raw` and `--json`; undefined on anything else, a bad day, an empty
+ * profile, a range that runs backwards, or `--day` with a bound.
+ */
+function parseShowFlags(args: string[]): ShowFlags | undefined {
+  const days: Record<"--day" | "--since" | "--until", string | undefined> = {
+    "--day": undefined,
+    "--since": undefined,
+    "--until": undefined,
+  };
   let timezone: string | undefined;
   let raw = false;
+  let json = false;
+  const profiles: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
     const eq = arg.indexOf("=");
@@ -77,21 +114,50 @@ function parseShowFlags(args: string[]): ShowOptions | undefined {
     const take = (): string | undefined => (eq === -1 ? args[++i] : arg.slice(eq + 1));
     switch (name) {
       case "--day":
-        day = take();
+      case "--since":
+      case "--until": {
+        const value = take();
+        if (value === undefined || !isDay(value)) return undefined;
+        days[name] = value;
         break;
+      }
       case "--tz":
         timezone = take();
         break;
+      case "--profile": {
+        const given = take();
+        if (given === undefined) return undefined;
+        for (const profile of given.split(",")) {
+          if (profile === "") return undefined;
+          profiles.push(profile);
+        }
+        break;
+      }
       case "--raw":
         if (eq !== -1) return undefined;
         raw = true;
+        break;
+      case "--json":
+        if (eq !== -1) return undefined;
+        json = true;
         break;
       default:
         return undefined;
     }
   }
-  if (day === undefined || !isDay(day) || timezone === "") return undefined;
-  return timezone === undefined ? { day, raw } : { day, timezone, raw };
+  const { "--day": day, "--since": since, "--until": until } = days;
+  if (timezone === "") return undefined;
+  if (day !== undefined && (since !== undefined || until !== undefined)) return undefined;
+  if (day === undefined && since === undefined && until === undefined) return undefined;
+  if (since !== undefined && until !== undefined && since > until) return undefined;
+  const flags: ShowFlags = { raw };
+  if (json) flags.json = true;
+  if (profiles.length) flags.profiles = profiles;
+  if (day !== undefined) flags.day = day;
+  if (since !== undefined) flags.since = since;
+  if (until !== undefined) flags.until = until;
+  if (timezone !== undefined) flags.timezone = timezone;
+  return flags;
 }
 
 function usage(io: Io): number {

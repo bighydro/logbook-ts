@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import {
+  keeperPhoto,
   payloadOf,
   points,
   type RenderContext,
@@ -12,7 +13,7 @@ import {
 } from "./render.js";
 import { buildResolver, type Resolver } from "./resolve.js";
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
-import type { Line } from "./types.js";
+import type { JsonValue, Line } from "./types.js";
 
 export interface ShowOptions {
   /** The local day, `YYYY-MM-DD`. */
@@ -21,6 +22,54 @@ export interface ShowOptions {
   timezone?: string;
   /** Print every ref as the source gave it, and the whole text of a note or a mail. */
   raw?: boolean;
+  /** Keep only lines of these payload schemas (`note/v1`, or `note` for every version). */
+  profiles?: string[];
+}
+
+/** A range of local days; a missing bound is the record's first or last day. */
+export interface ShowRangeOptions {
+  since?: string;
+  until?: string;
+  timezone?: string;
+  raw?: boolean;
+  profiles?: string[];
+}
+
+/** One row of a day: a line, a run of points, a folded calendar entry, or a hidden line's mark. */
+export interface ShownRow {
+  /** Local `HH:MM` of the row's first line. */
+  time: string;
+  /** Local `HH:MM` a run of points ends at; absent on every other row. */
+  until?: string;
+  kind: string;
+  /** The line's source, or every source of a folded entry joined with `+`. */
+  source: string;
+  /** The text column: the summary, with refs rendered as names (or raw), or `retracted #seq: reason`. */
+  summary: string;
+  /** The retraction that hides this row's line, when one does. */
+  retraction?: Line;
+  /** The lines behind the row, in order: one, the points of a run, or the entries folded. */
+  lines: Line[];
+}
+
+/** A hero photo of the day: a keeper line standing (RFC 0024 rule 4). */
+export interface ShownHero {
+  /** The photo as the keeper names it: `file_name`, else `asset_id`, else the photo line's id, else `?`. */
+  photo: string;
+  /** The keeper's `lane` as written; null when it has none. */
+  lane: JsonValue;
+  /** The keeper line's id. */
+  line: string;
+}
+
+/** A day as `show --json` prints it: what the text shows, with the lines behind every row. */
+export interface DayDetail {
+  day: string;
+  timezone: string;
+  hero: ShownHero[];
+  rows: ShownRow[];
+  /** The text of `notes/<YYYY>/<day>.md`, when the file exists. */
+  note?: string;
 }
 
 export interface ShowResult {
@@ -30,10 +79,27 @@ export interface ShowResult {
   timezone: string;
   /** Rows printed. */
   rows: number;
+  /** The same day, structured. */
+  detail: DayDetail;
+}
+
+/** One day of a range, as `show` prints it. Only days with a line are produced. */
+export interface DayShown extends ShowResult {
+  day: string;
+}
+
+export interface ShowRange {
+  timezone: string;
+  /** The bounds as resolved; undefined when the record has no dated line to take one from. */
+  since: string | undefined;
+  until: string | undefined;
+  /** The days with lines, oldest first, each produced once every file that can hold it is read. */
+  days: Generator<DayShown>;
 }
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DASH = "–";
+const DAY_MS = 86_400_000;
 /** Two calendar entries from different sources this close, with one title, are one entry. */
 const FOLD_WINDOW_MS = 5 * 60_000;
 /** An airline designator in a calendar title: `LX 561`, `XY561`. */
@@ -52,9 +118,17 @@ export function checkTimezone(timezone: string): void {
 export function isDay(day: string): boolean {
   const m = DAY.exec(day);
   if (!m) return false;
-  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return new Date(utc).toISOString().slice(0, 10) === day;
+  return new Date(dayMs(day)).toISOString().slice(0, 10) === day;
 }
+
+/** Midnight UTC of a `YYYY-MM-DD`, in ms. */
+function dayMs(day: string): number {
+  const m = DAY.exec(day) as RegExpExecArray;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** `YYYY-MM` of an instant, in UTC: the month file a line written there belongs to. */
+const monthKey = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
 
 interface Local {
   day: string;
@@ -86,17 +160,6 @@ function localizer(timezone: string): Localize {
   };
 }
 
-/** The `YYYY-MM` keys whose files can hold a line of this local day: the UTC days around it. */
-function candidateMonths(day: string): Set<string> {
-  const m = DAY.exec(day) as RegExpExecArray;
-  const base = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  const months = new Set<string>();
-  for (const offset of [-1, 0, 1]) {
-    months.add(new Date(base + offset * 86_400_000).toISOString().slice(0, 7));
-  }
-  return months;
-}
-
 interface Entry {
   line: Line;
   ms: number;
@@ -106,11 +169,38 @@ interface Entry {
 /**
  * One local day of the record, printed as the reference implementation prints it: the day, then
  * one row per line — local time, kind, source, a one-line summary — in the order of `at`, then
- * the day's notes file. Reads the month files around the day, and streams every file once for
- * the resolution, retraction and flight lines; nothing is loaded whole and nothing is written.
+ * the day's notes file. `<day>: nothing logged` when it has no line.
  */
 export function showDay(root: string, options: ShowOptions): ShowResult {
   if (!isDay(options.day)) throw new LogbookError(`not a day: ${options.day}`);
+  const { day, ...rest } = options;
+  const range = showRange(root, { ...rest, since: day, until: day });
+  for (const shown of range.days) return shown;
+  return {
+    text: `${day}: nothing logged\n`,
+    timezone: range.timezone,
+    rows: 0,
+    detail: { day, timezone: range.timezone, hero: [], rows: [] },
+  };
+}
+
+/** The days of a range that have lines, oldest first; see `showRange`. */
+export function* showDays(root: string, options: ShowRangeOptions): Generator<DayShown> {
+  yield* showRange(root, options).days;
+}
+
+/**
+ * A range of local days, streamed: every file is read once for the judgements the whole record
+ * holds (resolutions, retractions, superseded flights) and for its first and last day; then only
+ * the month files the range can touch are read, in order, each line going to its local day, and a
+ * day is produced as soon as every file that can hold one of its lines has been read. What is held
+ * at any moment is the lines of the days still open — at most a month's worth of the range, never
+ * the record — so the memory does not grow with the record.
+ */
+export function showRange(root: string, options: ShowRangeOptions): ShowRange {
+  for (const bound of [options.since, options.until]) {
+    if (bound !== undefined && !isDay(bound)) throw new LogbookError(`not a day: ${bound}`);
+  }
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
@@ -121,78 +211,191 @@ export function showDay(root: string, options: ShowOptions): ShowResult {
   checkTimezone(timezone);
   const local = localizer(timezone);
 
+  const keep = profileFilter(options.profiles);
   const files = monthFiles(root);
-  const { resolver, supersededFlights } = judgements(files);
-  const months = candidateMonths(options.day);
-  const entries: Entry[] = [];
-  for (const month of files) {
-    if (!months.has(`${month.year}-${month.month}`)) continue;
-    for (const { raw, row } of eachLine(month.file)) {
-      const parsed = parseLine(raw, `${month.rel} line ${row}`);
-      if ("error" in parsed) continue; // verify reports it; show reads what it can
-      const { line } = parsed;
-      if (line.kind === "retraction") continue; // shown where the line it hides is (RFC 0003 rule 3)
-      if (typeof line.at !== "string") continue;
-      const at = local(line.at);
-      if (at === undefined || at.day !== options.day) continue;
-      entries.push({ line, ms: Date.parse(line.at), local: at });
-    }
-  }
-  entries.sort((a, b) => a.ms - b.ms || a.line.seq - b.line.seq);
-
-  if (entries.length === 0) {
-    return { text: `${options.day}: nothing logged\n`, timezone, rows: 0 };
-  }
+  const { resolver, supersededFlights, first, last } = judgements(files);
+  const since = options.since ?? (first === undefined ? undefined : local(first)?.day);
+  const until = options.until ?? (last === undefined ? undefined : local(last)?.day);
   const ctx: RenderContext = {
     resolver,
     raw: options.raw === true,
     clock: (at) => local(at)?.clock,
     supersededFlights,
   };
-  const rows = toRows(entries, local, ctx);
-  const lines = [options.day, ...rows, ...notesFile(root, options.day)];
-  return { text: `${lines.join("\n")}\n`, timezone, rows: rows.length };
+  // A bound past the record's other end (or a record with no dated line) is an empty range, not an error.
+  const days =
+    since === undefined || until === undefined || since > until
+      ? (function* () {})()
+      : streamDays(root, files, since, until, local, timezone, ctx, keep);
+  return { timezone, since, until, days };
 }
 
-/** The judgements the whole record holds: who a ref is, which lines are hidden, which flights replaced. */
+/**
+ * Whether a line's `payload.schema` is one of the profiles asked for: the schema itself, or its
+ * name before `/v` when the profile was given without a version. No profiles keeps every line.
+ */
+function profileFilter(profiles: string[] | undefined): (line: Line) => boolean {
+  if (profiles === undefined || profiles.length === 0) return () => true;
+  const wanted = new Set(profiles);
+  return (line) => {
+    const schema = line.payload?.schema;
+    if (typeof schema !== "string") return false;
+    if (wanted.has(schema)) return true;
+    const slash = schema.indexOf("/v");
+    return slash !== -1 && wanted.has(schema.slice(0, slash));
+  };
+}
+
+function* streamDays(
+  root: string,
+  files: MonthFile[],
+  since: string,
+  until: string,
+  local: Localize,
+  timezone: string,
+  ctx: RenderContext,
+  keep: (line: Line) => boolean,
+): Generator<DayShown> {
+  // A local day's lines sit in the month files of the UTC days around it (SPEC §2, §3.2).
+  const firstMonth = monthKey(dayMs(since) - DAY_MS);
+  const lastMonth = monthKey(dayMs(until) + DAY_MS);
+  /** The last month file that can hold a line of this local day. */
+  const closes = (day: string): string => monthKey(dayMs(day) + DAY_MS);
+  const open = new Map<string, Entry[]>();
+
+  const flush = function* (through: string | undefined): Generator<DayShown> {
+    const ready = [...open.keys()]
+      .filter((day) => through === undefined || closes(day) <= through)
+      .sort();
+    for (const day of ready) {
+      const entries = open.get(day) as Entry[];
+      open.delete(day);
+      yield renderDay(root, day, entries, local, timezone, ctx);
+    }
+  };
+
+  for (const month of files) {
+    const key = `${month.year}-${month.month}`;
+    if (key < firstMonth || key > lastMonth) continue;
+    for (const { raw, row } of eachLine(month.file)) {
+      const parsed = parseLine(raw, `${month.rel} line ${row}`);
+      if ("error" in parsed) continue; // verify reports it; show reads what it can
+      const { line } = parsed;
+      if (line.kind === "retraction") continue; // shown where the line it hides is (RFC 0003 rule 3)
+      if (typeof line.at !== "string" || !keep(line)) continue;
+      const at = local(line.at);
+      if (at === undefined || at.day < since || at.day > until) continue;
+      const entries = open.get(at.day) ?? [];
+      entries.push({ line, ms: Date.parse(line.at), local: at });
+      open.set(at.day, entries);
+    }
+    yield* flush(key);
+  }
+  yield* flush(undefined);
+}
+
+function renderDay(
+  root: string,
+  day: string,
+  entries: Entry[],
+  local: Localize,
+  timezone: string,
+  ctx: RenderContext,
+): DayShown {
+  entries.sort((a, b) => a.ms - b.ms || a.line.seq - b.line.seq);
+  const hero = heroes(entries, ctx);
+  const built = toRows(entries, local, ctx);
+  const note = notesFile(root, day);
+  const text = [
+    day,
+    ...heroLine(hero),
+    ...built.flatMap(({ row, under }) => [rowText(row), ...under]),
+    ...(note === undefined ? [] : ["  — note —", ...splitLines(note).map((r) => `  ${r}`)]),
+  ];
+  const detail: DayDetail = { day, timezone, hero, rows: built.map((b) => b.row) };
+  if (note !== undefined) detail.note = note;
+  return { day, text: `${text.join("\n")}\n`, timezone, rows: built.length, detail };
+}
+
+/** The day's keeper lines standing (RFC 0024 rule 4), the `memory` lane first, then the rest. */
+function heroes(entries: Entry[], ctx: RenderContext): ShownHero[] {
+  const keepers = entries.filter(
+    (e) => e.line.kind === "keeper" && ctx.resolver.retractedBy(e.line.id) === undefined,
+  );
+  const hero = (e: Entry): ShownHero => {
+    const p = payloadOf(e.line);
+    return { photo: keeperPhoto(p), lane: p.lane ?? null, line: e.line.id };
+  };
+  return [
+    ...keepers.filter((e) => payloadOf(e.line).lane === "memory").map(hero),
+    ...keepers.filter((e) => payloadOf(e.line).lane !== "memory").map(hero),
+  ];
+}
+
+/** `  hero  <photo>[, <photo> (art)]…`, as the reference prints it: every lane but `memory` is `(art)`. */
+function heroLine(hero: ShownHero[]): string[] {
+  if (hero.length === 0) return [];
+  const items = hero.map((h) => (h.lane === "memory" ? h.photo : `${h.photo} (art)`));
+  return [`  hero  ${items.join(", ")}`];
+}
+
+/**
+ * The judgements the whole record holds — who a ref is, which lines are hidden, which flights
+ * replaced — and the first and last instant a listed line has, read in one pass over every file.
+ */
 function judgements(files: MonthFile[]): {
   resolver: Resolver;
   supersededFlights: Map<string, number>;
+  first: string | undefined;
+  last: string | undefined;
 } {
   const judged: Line[] = [];
   const supersededFlights = new Map<string, number>();
+  let first: { at: string; ms: number } | undefined;
+  let last: { at: string; ms: number } | undefined;
   for (const month of files) {
     for (const { raw, row } of eachLine(month.file)) {
       const parsed = parseLine(raw, `${month.rel} line ${row}`);
       if ("error" in parsed) continue;
       const { line } = parsed;
       if (line.kind === "resolution" || line.kind === "retraction") judged.push(line);
-      else if (line.kind === "flight") {
+      if (line.kind === "retraction") continue;
+      if (line.kind === "flight") {
         const earlier = payloadOf(line).supersedes;
         if (typeof earlier === "string") supersededFlights.set(earlier, line.seq);
       }
+      if (typeof line.at !== "string") continue;
+      const ms = Date.parse(line.at);
+      if (Number.isNaN(ms)) continue;
+      if (first === undefined || ms < first.ms) first = { at: line.at, ms };
+      if (last === undefined || ms > last.ms) last = { at: line.at, ms };
     }
   }
-  return { resolver: buildResolver(judged), supersededFlights };
+  return { resolver: buildResolver(judged), supersededFlights, first: first?.at, last: last?.at };
 }
 
-/** `notes/<YYYY>/<day>.md`, when the day has one: a heading, then its lines two spaces in. */
-function notesFile(root: string, day: string): string[] {
+/** The text of `notes/<YYYY>/<day>.md`, when the day has one. */
+function notesFile(root: string, day: string): string | undefined {
   const file = join(root, "notes", day.slice(0, 4), `${day}.md`);
-  if (!existsSync(file)) return [];
-  return ["  — note —", ...splitLines(readFileSync(file, "utf-8")).map((row) => `  ${row}`)];
+  return existsSync(file) ? readFileSync(file, "utf-8") : undefined;
 }
 
-function toRows(entries: Entry[], local: Localize, ctx: RenderContext): string[] {
-  const rows: string[] = [];
+/** A row and the lines printed under it (a mail's body with `--raw`), which the JSON leaves out. */
+interface Built {
+  row: ShownRow;
+  under: string[];
+}
+
+function toRows(entries: Entry[], local: Localize, ctx: RenderContext): Built[] {
+  const rows: Built[] = [];
   const folded = foldEvents(entries, ctx);
   const remaining = entries.filter((e) => !folded.hidden.has(e.line.id));
   let i = 0;
   while (i < remaining.length) {
     const entry = remaining[i] as Entry;
-    const sources = folded.sources.get(entry.line.id);
+    const fold = folded.groups.get(entry.line.id);
     let run = i + 1;
-    if (isPoint(entry, ctx) && sources === undefined) {
+    if (isPoint(entry, ctx) && fold === undefined) {
       const subject = subjectOf(entry);
       while (
         run < remaining.length &&
@@ -202,23 +405,30 @@ function toRows(entries: Entry[], local: Localize, ctx: RenderContext): string[]
       )
         run += 1;
       const last = remaining[run - 1] as Entry;
-      const until =
-        (typeof last.line.end === "string" ? local(last.line.end)?.clock : undefined) ??
-        last.local.clock;
-      const time = run - i > 1 ? `${entry.local.clock}${DASH}${until}` : entry.local.clock;
-      rows.push(
-        row(time, String(entry.line.kind), String(entry.line.source), points(run - i, subject)),
-      );
+      const row: ShownRow = {
+        time: entry.local.clock,
+        kind: String(entry.line.kind),
+        source: String(entry.line.source),
+        summary: points(run - i, subject),
+        lines: remaining.slice(i, run).map((e) => e.line),
+      };
+      if (run - i > 1) {
+        row.until =
+          (typeof last.line.end === "string" ? local(last.line.end)?.clock : undefined) ??
+          last.local.clock;
+      }
+      rows.push({ row, under: [] });
     } else {
       const retraction = ctx.resolver.retractedBy(entry.line.id);
-      if (retraction !== undefined) rows.push(`  ${entry.local.clock}  ${retracted(retraction)}`);
-      else {
-        const source = sources ?? String(entry.line.source);
-        rows.push(
-          row(entry.local.clock, String(entry.line.kind), source, summarize(entry.line, ctx)),
-        );
-        rows.push(...underneath(entry.line, ctx));
-      }
+      const row: ShownRow = {
+        time: entry.local.clock,
+        kind: String(entry.line.kind),
+        source: fold?.sources ?? String(entry.line.source),
+        summary: retraction === undefined ? summarize(entry.line, ctx) : retracted(retraction),
+        lines: [entry.line, ...(fold?.lines ?? [])],
+      };
+      if (retraction !== undefined) row.retraction = retraction;
+      rows.push({ row, under: retraction === undefined ? underneath(entry.line, ctx) : [] });
     }
     i = run;
   }
@@ -226,9 +436,11 @@ function toRows(entries: Entry[], local: Localize, ctx: RenderContext): string[]
 }
 
 /** `  HH:MM  kind       source         text` — the kind to ten columns, the source to fourteen. */
-function row(time: string, kind: string, source: string, text: string): string {
+function rowText(row: ShownRow): string {
+  const time = row.until === undefined ? row.time : `${row.time}${DASH}${row.until}`;
+  if (row.retraction !== undefined) return `  ${time}  ${row.summary}`;
   const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - [...s].length));
-  return `  ${time}  ${pad(kind, 10)} ${pad(source, 14)} ${text}`;
+  return `  ${time}  ${pad(row.kind, 10)} ${pad(row.source, 14)} ${row.summary}`;
 }
 
 function isPoint(entry: Entry, ctx: RenderContext): boolean {
@@ -251,6 +463,12 @@ function eventKeys(entry: Entry): { title: string; flight: string | undefined } 
   };
 }
 
+/** A folded entry: the sources joined for the source column, and the lines folded into the first. */
+interface Fold {
+  sources: string;
+  lines: Line[];
+}
+
 /**
  * One calendar entry that several sources carry prints once: `event/v1` lines with one title (case
  * and spacing aside), or naming the same flight, from different sources, starting within five
@@ -259,9 +477,9 @@ function eventKeys(entry: Entry): { title: string; flight: string | undefined } 
 function foldEvents(
   entries: Entry[],
   ctx: RenderContext,
-): { hidden: Set<string>; sources: Map<string, string> } {
+): { hidden: Set<string>; groups: Map<string, Fold> } {
   const hidden = new Set<string>();
-  const sources = new Map<string, string>();
+  const groups = new Map<string, Fold>();
   const events = entries.filter(
     (e) => e.line.kind === "event" && ctx.resolver.retractedBy(e.line.id) === undefined,
   );
@@ -270,6 +488,7 @@ function foldEvents(
     if (hidden.has(first.line.id)) continue;
     const key = eventKeys(first);
     const group = [String(first.line.source)];
+    const lines: Line[] = [];
     for (let j = i + 1; j < events.length; j++) {
       const other = events[j] as Entry;
       if (other.ms - first.ms > FOLD_WINDOW_MS) break;
@@ -281,8 +500,9 @@ function foldEvents(
       if (!same) continue;
       hidden.add(other.line.id);
       group.push(String(other.line.source));
+      lines.push(other.line);
     }
-    if (group.length > 1) sources.set(first.line.id, group.join("+"));
+    if (group.length > 1) groups.set(first.line.id, { sources: group.join("+"), lines });
   }
-  return { hidden, sources };
+  return { hidden, groups };
 }

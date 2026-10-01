@@ -1,0 +1,15 @@
+2026-03-08
+  07:00  location   ais            solvind: 1 point
+  07:30  health     apple-health   device=SimWatch, raw_id=steps:2026-03-08T06:30:00Z:SimWatch, source_name=Sim Watch, type=steps, unit=count, value=250
+  08:05  call       ios-calls      ← +4790000001, 7 min, cellular
+  09:00  browse     safari         Oslofjord: a winter guide
+  09:30  watch      google-takeout Splicing a three-strand rope
+  10:00  task       google-takeout Buy the long rope
+  10:30  mail       mail           ✉ Mooring for the weekend — Ines → Kari (1 attachment)
+  11:00  listen     shazam         Fjordsang
+  11:30  trip       easypark       Storgata 1-36, parking, easypark, 58 NOK
+  12:00  transaction sim-bank       account=acct_0000000000000001, amount=-42.5, category=restaurants, currency=NOK, date=2026-03-08, merchant=Bakeri Nord, provider=sim-bank, raw_id=00000000-0000-4000-8000-00000000d001, status=posted
+  14:10  flight     sim-flights    SIM 124 CPH → OSL, arrives 15:24, A320 ZZ-ABC, tracked
+  16:00  highlight  apple-books    “They sailed west until the coast was a line and then was nothing.” — The Long Ships · the moment the book turns
+  17:00  voice-memo voice-memos    Idea for the talk (1:42), not stored
+  20:00  crossing   logbook        crossed to hermes: 8 lines (tier 1: 8, tier 2: 6, tier 3: 2)

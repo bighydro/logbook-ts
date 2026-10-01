@@ -23,18 +23,20 @@ jobs:
       - run: pnpm build
       - name: the built binary verifies the vendored sample
         run: node dist/bin.js verify tests/fixtures/sample-logbook
-      - name: the built binary shows a day of each show fixture
+      - name: the built binary shows a day of each show fixture, a range, a profile and JSON
         run: |
           node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
           node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-04
+          node dist/bin.js show tests/fixtures/sample-logbook --since 2026-03-07 --profile note/v1,event/v1
+          node dist/bin.js show tests/fixtures/sample-logbook --day 2026-03-08 --json
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
     runs-on: ubuntu-latest
     env:
-      SPEC_TAG: v0.3.0
-      EXPECTED_HEAD: 53d39fdad121ce8e448221bbdaa9c86396c16347d050bf630035d6f1d37088e6
-      EXPECTED_LINES: "16"
+      SPEC_TAG: v0.5.0
+      EXPECTED_HEAD: 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
+      EXPECTED_LINES: "31"
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -90,15 +92,16 @@ jobs:
       - name: the vendored fixture is the one on main
         run: |
           set -euo pipefail
-          if ! diff -r spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
+          if ! diff -r --exclude=expected-show spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
             echo "::error::conformance/ moved on bighydro/logbook main; copy sample-logbook and expected.json into tests/fixtures and update the conformance job's SPEC_TAG, EXPECTED_HEAD and EXPECTED_LINES"
             exit 1
           fi
 
   cross-impl:
     # The reference implementation (Python) and this one must print the same day: tests/cross-impl.test.ts
-    # runs `logbook show` of a clone of bighydro/logbook at main on every expected-show fixture and
-    # diffs it against ours and against the vendored expected-show files.
+    # runs `logbook show` of a clone of bighydro/logbook at main on every expected-show fixture (the
+    # two synthetic records and the conformance sample) and diffs it against ours and against the
+    # vendored expected-show files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

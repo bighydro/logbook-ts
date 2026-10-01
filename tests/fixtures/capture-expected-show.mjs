@@ -2,6 +2,9 @@
 //   LOGBOOK_REF=/path/to/clone/of/bighydro/logbook node tests/fixtures/capture-expected-show.mjs show-sample [day ...]
 // Without days, the days already in expected-show/ are captured again. The reference runs on a
 // disposable copy of the fixture (it writes index.sqlite beside the record). Never edit the files by hand.
+// sample-logbook (the conformance sample) is captured on 2026-03-02 to 05, 07 and 08 only: on
+// 2026-03-01 the reference departs from SPEC §3.2 (SPEC-QUESTIONS 24, 25) and on 2026-03-06 it raises
+// (SPEC-QUESTIONS 27), so those two days cannot be diffed.
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
