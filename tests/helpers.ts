@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,4 +66,17 @@ export function cleanup(): void {
     const dir = made.pop();
     if (dir) rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** The `<day>.txt` and `<day>.raw.txt` files beside a fixture: `logbook show` of the reference on it. */
+export function expectedShows(root: string): Array<{ day: string; raw: boolean; text: string }> {
+  const dir = join(root, "expected-show");
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".txt"))
+    .sort()
+    .map((name) => ({
+      day: name.slice(0, 10),
+      raw: name.endsWith(".raw.txt"),
+      text: readFileSync(join(dir, name), "utf-8"),
+    }));
 }

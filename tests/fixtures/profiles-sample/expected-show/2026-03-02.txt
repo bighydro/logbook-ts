@@ -1,0 +1,19 @@
+2026-03-02
+  06:10  flight     flighty        XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot
+  06:12  flight     manual         superseded by #2
+  09:04  call       ios-calls      ← Ola Nordmann, 7 min, cellular
+  09:30  call       ios-calls      → Kari Moe, no answer, facetime-audio
+  09:40  call       ios-calls      → withheld, 30 s, whatsapp
+  10:00  transcript granola        Catch-up with Ines — Ines Holm, Ola Nordmann
+  11:15  mail       mail           ✉ Re: Mooring for the weekend — Ola Nordmann → Kari Nordmann (1 attachment)
+  11:40  mail       mail           ✉ Re: Mooring for the weekend — me → Ola Nordmann, Ines Holm, Per
+  12:00  mail       mail           ✉ (no subject) — ?
+  17:00  flight     flighty        XY 562 ZRH → OSL, cancelled, arrives 18:10, tracked
+  21:14  voice-memo voice-memos    Idea for the talk (1:42)
+  21:20  voice-memo voice-memos    Marina (0:05), not stored
+  21:25  voice-memo voice-memos    Evicted (1:00)
+  21:30  voice-memo voice-memos    No file, audio missing
+  22:14  highlight  apple-books    “They sailed west until the coast was a line and then was nothing.” — The Long Ships · the moment the book turns
+  22:20  highlight  apple-books    “Orm said nothing.” — The Long Ships
+  22:25  highlight  apple-books    bookmark — The Long Ships @ epubcfi(/6/20!/4/2)
+  22:30  highlight  apple-books    “A sample without a title.” — FFFF

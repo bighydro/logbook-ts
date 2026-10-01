@@ -1,0 +1,3 @@
+2026-04-01
+  00:30  location   sim-phone      1 point
+  08:00  note       manual         April

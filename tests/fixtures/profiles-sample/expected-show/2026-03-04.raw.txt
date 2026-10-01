@@ -1,0 +1,33 @@
+2026-03-04
+  00:00  event      ios-calendar   Boat show
+  03:00  crossing   logbook        crossed to hermes: 6 lines (tier 1: 2, tier 2: 4)
+  08:30–08:35  location   dawarich       2 points
+  08:40–08:45  location   ais            solvind: 2 points
+  08:50  location   dawarich       1 point
+  08:55  location   adsb           ln-xya: 1 point
+  09:30  event      ios-calendar+ics Boat survey — Tromsø marina · by ola@example.org · with ola@example.org, ines@example.org
+  11:00  photo      immich         albums=['Boat'], asset_id=5d3e0000, camera=SimPhone 3, faces=2, file_name=IMG_0001.HEIC, height=3024, lat=59.913, library=immich, live_photo=True, lon=10.742, media=image, people=['p_17', 'p_42'], provenance=camera, width=4032
+  11:00  photo      apple-photos   asset_id=7B0C-0000, favorite=True, file_name=img_0001.heic, library=apple-photos, media=image
+  11:30  photo      apple-photos   asset_id=7B0C-0001, duration_s=12.5, file_name=IMG_0002.MOV, library=apple-photos, media=video, provenance=camera
+  12:00  message    whatsapp       +4790000001: [image]
+  12:01  message    whatsapp       236000000000009@lid in 120363000000000001@g.us: ok
+  12:02  message    imessage       me → iMessage;-;+4790000002: see you
+  13:00  event      ios-calendar   Dentist
+  15:00  event      ios-calendar   Call with the broker
+  15:00  event      ios-calendar   Call with the broker (moved)
+  20:40  commitment manual         send Ola the mooring photos
+  20:45  commitment granola        Ines sends the Tromsø dates
+  21:12  commitment-close manual         closes=00000000-0000-4000-8000-000000000363, evidence=['00000000-0000-4000-8000-000000000309'], outcome=kept
+  22:00  note       manual         
+
+Decided: keep the boat one more season.
+Second line.
+Third.
+  22:05  note       google-takeout [ ] rope
+[x] jib
+  22:10  wind       sim-sensor     direction_deg=240, gust=True, nested={'x': None, 'y': [1, 2.5]}, note=it's blowing, speed_mps=7.5, tags=['a', 'b']
+  22:15  retracted #71: 
+  — note —
+  A long day at the marina.
+  
+  The survey went well.

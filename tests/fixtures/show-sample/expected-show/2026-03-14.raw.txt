@@ -1,0 +1,11 @@
+2026-03-14
+  08:12–09:40  location   sim-phone      3 points
+  10:00  event      sim-calendar   Coffee with Ines · with ines@example.org
+  10:30  photo      sim-camera     file=IMG_0101.jpg
+  12:05  message    whatsapp       236000000000001@lid in Sailing club: Regatta moved to Sunday
+  12:07  message    whatsapp       +4790000002: Hei, lunch?
+  12:09  message    whatsapp       me → Kari: On my way
+  21:30  note       manual         Regatta Sunday.
+Bring the jib.
+  22:00  location   sim-phone      1 point
+  22:30  retracted #11: typo
