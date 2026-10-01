@@ -1,13 +1,14 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
-import { showDay } from "../src/show.js";
-import { verifyLogbook } from "../src/store.js";
+import { showDay, showDays } from "../src/show.js";
+import { addNote, verifyLogbook } from "../src/store.js";
 import {
   cleanup,
   copySample,
   expectedShows,
   FIXTURES,
+  freshLogbook,
   readLines,
   SAMPLE,
   writeLines,
@@ -279,5 +280,122 @@ describe("showDay", () => {
       timezone: "Europe/Oslo",
       rows: 0,
     });
+  });
+});
+
+describe("logbook-ts show --since/--until lists a range of local days", () => {
+  const expected = (day: string) =>
+    expectedShows(SHOW).find((e) => e.day === day && !e.raw)?.text as string;
+
+  it("prints each day with lines as --day would, in order, a blank line between, and skips empty days", () => {
+    const { code, out, err } = run([
+      "show",
+      SHOW,
+      "--since",
+      "2026-03-15",
+      "--until",
+      "2026-04-01",
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    // 2026-03-17 to 2026-03-31 have nothing in Oslo and are not listed.
+    expect(out).toBe(
+      [expected("2026-03-15"), expected("2026-03-16"), expected("2026-04-01")].join("\n"),
+    );
+  });
+
+  it("assembles a day from two month files when it straddles the UTC month boundary", () => {
+    const { out } = run(["show", SHOW, "--since=2026-03-31", "--until=2026-04-01", "--tz=UTC"]);
+    expect(out).toBe(
+      [
+        "2026-03-31",
+        "  22:30  location   sim-phone      1 point",
+        "",
+        "2026-04-01",
+        "  06:00  note       manual         April",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("runs to the record's last day without --until, and from its first without --since", () => {
+    expect(run(["show", SHOW, "--since", "2026-03-16"]).out).toBe(
+      [expected("2026-03-16"), expected("2026-04-01")].join("\n"),
+    );
+    expect(run(["show", SHOW, "--until", "2026-03-14"]).out).toBe(expected("2026-03-14"));
+  });
+
+  it("says so when the whole range is empty", () => {
+    expect(run(["show", SHOW, "--since", "2026-03-17", "--until", "2026-03-20"]).out).toBe(
+      "2026-03-17–2026-03-20: nothing logged\n",
+    );
+    expect(run(["show", SHOW, "--since", "2027-01-01"]).out).toBe(
+      "2027-01-01–2026-04-01: nothing logged\n",
+    );
+  });
+
+  it("takes --raw as --day does", () => {
+    const raw = expectedShows(SHOW).find((e) => e.day === "2026-03-14" && e.raw)?.text as string;
+    expect(run(["show", SHOW, "--since", "2026-03-14", "--until", "2026-03-14", "--raw"]).out).toBe(
+      raw,
+    );
+  });
+
+  it("exits 2 with usage on a range that runs backwards, a malformed bound, or --day with a bound", () => {
+    for (const argv of [
+      ["show", SHOW, "--since", "2026-03-15", "--until", "2026-03-14"],
+      ["show", SHOW, "--since", "2026-3-15"],
+      ["show", SHOW, "--until", "2026-02-30"],
+      ["show", SHOW, "--day", "2026-03-14", "--since", "2026-03-14"],
+      ["show", SHOW, "--day", "2026-03-14", "--until", "2026-03-14"],
+      ["show", SHOW, "--since"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toMatch(/usage/i);
+    }
+  });
+});
+
+describe("showDays", () => {
+  it("yields one result per day with lines, in order, each with its text and row count", () => {
+    const days = [...showDays(SHOW, { since: "2026-03-14", until: "2026-04-01" })];
+    expect(days.map((d) => d.day)).toEqual([
+      "2026-03-14",
+      "2026-03-15",
+      "2026-03-16",
+      "2026-04-01",
+    ]);
+    expect(days.map((d) => d.rows)).toEqual([9, 4, 1, 2]);
+    expect(days[3]?.text).toBe(showDay(SHOW, { day: "2026-04-01" }).text);
+    expect(days[0]?.timezone).toBe("Europe/Oslo");
+    expect([...showDays(SHOW, { since: "2026-03-20", until: "2026-03-20" })]).toEqual([]);
+  });
+});
+
+describe("showDays streams", () => {
+  it("produces a day as soon as every month file that can hold it is read, before later files are opened", () => {
+    const root = freshLogbook("UTC");
+    addNote(root, "January", { now: new Date("2026-01-10T12:00:00Z") });
+    addNote(root, "March", { now: new Date("2026-03-10T12:00:00Z") });
+    const days = showDays(root, {});
+    expect(days.next().value?.text).toBe(
+      "2026-01-10\n  12:00  note       manual         January\n",
+    );
+    // January was produced before March's file was read: a line added to it now is still listed.
+    const march = join("logbook", "2026", "03.jsonl");
+    const [line] = readLines(root, march) as [string];
+    const late = {
+      ...(JSON.parse(line) as Record<string, unknown>),
+      id: "late",
+      seq: 3,
+      payload: { schema: "note/v1", text: "late" },
+    };
+    writeLines(root, [line, JSON.stringify(late)], march);
+    expect(days.next().value?.text).toBe(
+      "2026-03-10\n  12:00  note       manual         March\n  12:00  note       manual         late\n",
+    );
+    expect(days.next().done).toBe(true);
   });
 });

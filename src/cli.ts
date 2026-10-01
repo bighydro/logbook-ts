@@ -1,4 +1,4 @@
-import { isDay, type ShowOptions, showDay } from "./show.js";
+import { isDay, type ShowRangeOptions, showDay, showRange } from "./show.js";
 import { addNote, LogbookError, verifyLogbook } from "./store.js";
 
 export interface Io {
@@ -13,6 +13,10 @@ export const USAGE = `usage:
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
                                       logbook.json; --raw prints refs as given and bodies whole)
+  logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--tz <zone>] [--raw]
+                                      the same for every day of the range that has a line, oldest
+                                      first, streamed; a missing bound is the record's first or
+                                      last day
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
@@ -49,8 +53,21 @@ export function main(argv: string[], io: Io): number {
         if (root === undefined) return usage(io);
         const flags = parseShowFlags(rest);
         if (flags === undefined) return usage(io);
-        const result = showDay(root, flags);
-        io.stdout(result.text);
+        const { day, ...range } = flags;
+        if (day !== undefined) {
+          io.stdout(showDay(root, { day, ...range }).text);
+          return 0;
+        }
+        const shown = showRange(root, range);
+        let count = 0;
+        for (const result of shown.days) {
+          io.stdout(count === 0 ? result.text : `\n${result.text}`);
+          count += 1;
+        }
+        if (count === 0) {
+          const span = [shown.since, shown.until].filter((d) => d !== undefined);
+          io.stdout(`${span.length ? `${[...new Set(span)].join("–")}: ` : ""}nothing logged\n`);
+        }
         return 0;
       }
       default:
@@ -65,9 +82,18 @@ export function main(argv: string[], io: Io): number {
   }
 }
 
-/** `--day D`, `--day=D`, `--tz Z`, `--tz=Z`, `--raw`; undefined on anything else or a bad day. */
-function parseShowFlags(args: string[]): ShowOptions | undefined {
-  let day: string | undefined;
+type ShowFlags = ShowRangeOptions & { day?: string };
+
+/**
+ * `--day D`, `--since D`, `--until D`, `--tz Z` (each also as `--flag=value`) and `--raw`;
+ * undefined on anything else, a bad day, a range that runs backwards, or `--day` with a bound.
+ */
+function parseShowFlags(args: string[]): ShowFlags | undefined {
+  const days: Record<"--day" | "--since" | "--until", string | undefined> = {
+    "--day": undefined,
+    "--since": undefined,
+    "--until": undefined,
+  };
   let timezone: string | undefined;
   let raw = false;
   for (let i = 0; i < args.length; i++) {
@@ -77,8 +103,13 @@ function parseShowFlags(args: string[]): ShowOptions | undefined {
     const take = (): string | undefined => (eq === -1 ? args[++i] : arg.slice(eq + 1));
     switch (name) {
       case "--day":
-        day = take();
+      case "--since":
+      case "--until": {
+        const value = take();
+        if (value === undefined || !isDay(value)) return undefined;
+        days[name] = value;
         break;
+      }
       case "--tz":
         timezone = take();
         break;
@@ -90,8 +121,17 @@ function parseShowFlags(args: string[]): ShowOptions | undefined {
         return undefined;
     }
   }
-  if (day === undefined || !isDay(day) || timezone === "") return undefined;
-  return timezone === undefined ? { day, raw } : { day, timezone, raw };
+  const { "--day": day, "--since": since, "--until": until } = days;
+  if (timezone === "") return undefined;
+  if (day !== undefined && (since !== undefined || until !== undefined)) return undefined;
+  if (day === undefined && since === undefined && until === undefined) return undefined;
+  if (since !== undefined && until !== undefined && since > until) return undefined;
+  const flags: ShowFlags = { raw };
+  if (day !== undefined) flags.day = day;
+  if (since !== undefined) flags.since = since;
+  if (until !== undefined) flags.until = until;
+  if (timezone !== undefined) flags.timezone = timezone;
+  return flags;
 }
 
 function usage(io: Io): number {
