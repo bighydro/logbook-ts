@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import {
+  keeperPhoto,
   payloadOf,
   points,
   type RenderContext,
@@ -150,8 +151,26 @@ export function showDay(root: string, options: ShowOptions): ShowResult {
     supersededFlights,
   };
   const rows = toRows(entries, local, ctx);
-  const lines = [options.day, ...rows, ...notesFile(root, options.day)];
+  const lines = [options.day, ...heroLine(entries, ctx), ...rows, ...notesFile(root, options.day)];
   return { text: `${lines.join("\n")}\n`, timezone, rows: rows.length };
+}
+
+/**
+ * `  hero  <photo>[, <photo> (art)]…`: the day's keeper lines standing (RFC 0024 rule 4), the
+ * `memory` lane first and every other lane marked `(art)`, as the reference prints them. Nothing
+ * when the day has no keeper standing.
+ */
+function heroLine(entries: Entry[], ctx: RenderContext): string[] {
+  const keepers = entries.filter(
+    (e) => e.line.kind === "keeper" && ctx.resolver.retractedBy(e.line.id) === undefined,
+  );
+  const memory = keepers.filter((e) => payloadOf(e.line).lane === "memory");
+  const others = keepers.filter((e) => payloadOf(e.line).lane !== "memory");
+  const items = [
+    ...memory.map((e) => keeperPhoto(payloadOf(e.line))),
+    ...others.map((e) => `${keeperPhoto(payloadOf(e.line))} (art)`),
+  ];
+  return items.length ? [`  hero  ${items.join(", ")}`] : [];
 }
 
 /** The judgements the whole record holds: who a ref is, which lines are hidden, which flights replaced. */

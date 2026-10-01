@@ -21,13 +21,13 @@ pnpm install && pnpm build
 
 # the conformance sample from the spec repo: one week of a fictional person in Oslo
 node dist/bin.js verify tests/fixtures/sample-logbook
-#  valid — 16 lines, head 53d39fdad121ce8e448221bbdaa9c86396c16347d050bf630035d6f1d37088e6
+#  valid — 31 lines, head 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
 
 # append a note to a copy; the chain still verifies
 cp -R tests/fixtures/sample-logbook /tmp/mine
 node dist/bin.js add /tmp/mine "read the spec, wrote a second implementation"
 node dist/bin.js verify /tmp/mine
-#  valid — 17 lines, head <new hex>
+#  valid — 32 lines, head <new hex>
 
 # change one byte inside any line and it is no longer a logbook
 sed -i.bak 's/"accuracy_m": 12/"accuracy_m": 13/' /tmp/mine/logbook/2026/03.jsonl

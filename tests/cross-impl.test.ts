@@ -39,7 +39,10 @@ function referenceShow(copy: string, day: string, raw: boolean): string {
 }
 
 describe.skipIf(!ready)("the reference implementation and logbook-ts print the same day", () => {
-  for (const name of ["show-sample", "profiles-sample"]) {
+  // sample-logbook is diffed on the days the reference reads as the spec says: not 2026-03-01 (it ends
+  // the run of points at the last point's `at`, SPEC-QUESTIONS 25, and prints the stored `1e+20`,
+  // SPEC-QUESTIONS 24) and not 2026-03-06 (it raises on a string `chat`, SPEC-QUESTIONS 27).
+  for (const name of ["show-sample", "profiles-sample", "sample-logbook"]) {
     const root = join(FIXTURES, name);
     for (const { day, raw, text } of expectedShows(root)) {
       it(`${name} ${day}${raw ? " --raw" : ""}`, () => {

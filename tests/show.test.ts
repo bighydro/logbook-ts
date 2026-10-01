@@ -41,12 +41,90 @@ describe("the show fixtures", () => {
   });
 });
 
+describe("a day's hero line, as the reference prints it (RFC 0024 rule 4)", () => {
+  // Learned by running the reference on a probe record: memory keepers first, then every other
+  // lane as `(art)`; the photo's file_name, else its asset_id, else the photo line's id, else `?`;
+  // a retracted keeper is neither a hero nor a row.
+  const keeper = (at: string, seq: number, payload: Record<string, unknown>) =>
+    JSON.stringify({
+      id: `00000000-0000-4000-8000-0000000009${String(seq).padStart(2, "0")}`,
+      seq,
+      at,
+      end: null,
+      tz: "Europe/Oslo",
+      source: "manual",
+      kind: "keeper",
+      tier: 1,
+      payload: { schema: "keeper/v1", raw_id: String(seq), at, source: "manual", ...payload },
+      recorded_at: at,
+      prev: "0".repeat(64),
+      hash: "0".repeat(64),
+    });
+
+  it("lists the day's keepers, memory first, and names each photo as the reference does", () => {
+    const root = copySample();
+    writeLines(root, [
+      ...readLines(root),
+      keeper("2026-03-20T08:00:00Z", 40, {
+        lane: "art",
+        photo: { line: "L1", asset_id: "A1", file_name: "A.jpg" },
+      }),
+      keeper("2026-03-20T09:00:00Z", 41, {
+        lane: "memory",
+        photo: { line: "L2", asset_id: "ASSET-2", library: "immich" },
+      }),
+      keeper("2026-03-20T10:00:00Z", 42, { lane: "memory" }),
+      keeper("2026-03-20T11:00:00Z", 43, {
+        lane: "odd",
+        photo: { line: "L4", asset_id: "", file_name: "" },
+      }),
+      keeper("2026-03-20T12:00:00Z", 44, { photo: { file_name: 42 } }),
+      keeper("2026-03-20T13:00:00Z", 45, { lane: "memory", photo: "not an object" }),
+      keeper("2026-03-20T14:00:00Z", 46, { lane: "memory", photo: { file_name: "gone.jpg" } }),
+      JSON.stringify({
+        id: "00000000-0000-4000-8000-000000000947",
+        seq: 47,
+        at: "2026-03-21T00:00:00Z",
+        end: null,
+        tz: "Europe/Oslo",
+        source: "manual",
+        kind: "retraction",
+        tier: 2,
+        payload: {
+          schema: "retraction/v1",
+          supersedes: "00000000-0000-4000-8000-000000000946",
+          seq: 46,
+          reason: "no",
+        },
+        recorded_at: "2026-03-21T00:00:00Z",
+        prev: "0".repeat(64),
+        hash: "0".repeat(64),
+      }),
+    ]);
+    expect(run(["show", root, "--day", "2026-03-20"]).out).toBe(
+      [
+        "2026-03-20",
+        "  hero  ASSET-2, ?, ?, A.jpg (art), L4 (art), 42 (art)",
+        "  09:00  keeper     manual         hero photo (art): A.jpg",
+        "  10:00  keeper     manual         hero photo (memory): ASSET-2",
+        "  11:00  keeper     manual         hero photo (memory): ?",
+        "  12:00  keeper     manual         hero photo (odd): L4",
+        "  13:00  keeper     manual         hero photo (None): 42",
+        "  14:00  keeper     manual         hero photo (memory): ?",
+        "  15:00  retracted #46: no",
+        "",
+      ].join("\n"),
+    );
+  });
+});
+
 describe("logbook-ts show prints a day exactly as the reference implementation does", () => {
   // The expected files were written by `logbook show` of openlogbook (b60ae11, 2026-10-01) on a
   // copy of each fixture; tests/cross-impl.test.ts re-checks them against the reference itself.
   for (const [name, root] of [
     ["show-sample", SHOW],
     ["profiles-sample", PROFILES],
+    ["sample-logbook", SAMPLE],
   ] as const) {
     for (const { day, raw, text } of expectedShows(root)) {
       it(`${name} ${day}${raw ? " --raw" : ""}`, () => {
@@ -76,9 +154,12 @@ describe("logbook-ts show, beyond the reference", () => {
     expect(out).toBe(
       [
         "2026-03-01",
+        "  hero  IMG_0001.jpg",
+        // SPEC §3.2: the run ends at the last point's `end`; the reference prints 09:05 (SPEC-QUESTIONS 25).
         "  08:30–09:40  location   sim-phone      2 points",
         "  10:00  event      sim-calendar   Coffee with Ines · with ines@example.org",
         "  10:12  photo      sim-camera     camera=SimPhone 3, file=IMG_0001.jpg, lat=59.913, lon=10.742",
+        "  10:12  keeper     keeper-inference hero photo (memory): IMG_0001.jpg",
         "  22:00  note       manual         Ines is moving to Tromsø in May. Ask her about the northern lights trip.",
         // The sample stores `1e+20` and `120.0` as text; Python keeps that spelling, JSON.parse cannot (SPEC-QUESTIONS 24).
         "  23:30  sleep      sim-watch      calibration={'epsilon': 1e-06, 'gain': 1e+21, 'offset': 100000000000000000000}, hours=8.25, metric=sleep",

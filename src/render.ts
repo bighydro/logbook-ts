@@ -39,6 +39,8 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return trip(p);
     case "crossing":
       return crossing(p);
+    case "keeper":
+      return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}`;
     default:
       return fallback(line.kind, p);
   }
@@ -62,6 +64,29 @@ export function retracted(retraction: Line): string {
   const seq = retraction.payload?.seq;
   const reason = text(retraction.payload?.reason) ?? "";
   return `retracted #${Number.isInteger(seq) ? String(seq) : "?"}: ${reason}`;
+}
+
+/**
+ * How a keeper names its photo (RFC 0024), as the reference spells it: the photo's `file_name`,
+ * else its `asset_id`, else the photo line's id, else `?`; a `photo` that is not an object is `?`.
+ */
+export function keeperPhoto(p: Payload): string {
+  const photo = obj(p.photo);
+  if (photo === undefined) return "?";
+  for (const key of ["file_name", "asset_id", "line"]) {
+    const value = photo[key];
+    if (truthy(value)) return pyStr(value);
+  }
+  return "?";
+}
+
+/** Python's truth of a JSON value: null, false, 0, "", [] and {} are false. */
+function truthy(value: JsonValue | undefined): boolean {
+  if (value === undefined || value === null || value === false || value === 0 || value === "")
+    return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
 }
 
 export function payloadOf(line: Line): Payload {
