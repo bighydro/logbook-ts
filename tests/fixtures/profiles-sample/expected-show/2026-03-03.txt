@@ -1,0 +1,28 @@
+2026-03-03
+  00:00  transaction copilot        account=acct_0000000000000001, amount=-42.5, category=restaurants, currency=USD, date=2026-03-03, extra={'original_name': 'HARBOUR CAFE OSLO', 'recurring': False, 'type': 'regular'}, merchant=Harbour Cafe, provider=copilot, raw_id=6f1c2a9e-0000-4000-8000-000000000001, status=posted
+  00:30  health     apple-health   device=Watch7,1, raw_id=sleep:1042, stage=deep, type=sleep, unit=s, value=3600
+  08:00  health     apple-health   device=Watch7,1, extra={'samples': 3}, raw_id=steps:2026-03-03T07:00:00Z:Watch7,1, source_name=Apple Watch, type=steps, unit=count, value=250
+  08:20  health     apple-health   device=Watch7,1, raw_id=heart_rate:2001, type=heart_rate, unit=bpm, value=62
+  08:25  health     withings       device=Body+, raw_id=weight:3001, type=weight, unit=kg, value=78.4
+  08:26  health     withings       raw_id=blood_pressure:6001, type=blood_pressure, unit=mmHg, value=120
+  09:00  browse     google-takeout Van hire - Oslo
+  09:05  browse     google-takeout The bowline
+  09:10  browse     pocket         https://longreads.example.org/fjords?utm=1
+  09:15  browse     safari         https://example.org/
+  10:00  watch      google-takeout Splicing a three-strand rope
+  10:05  watch      google-takeout eye splice
+  10:10  watch      google-takeout Fjordsang
+  12:30  health     myfitnesspal   extra={'food': 'Fish soup', 'meal': 'Lunch'}, raw_id=energy_intake:5001, type=energy_intake, unit=kcal, value=650
+  13:10  task       google-takeout Buy the long rope
+  13:12  task       apple-reminders Call the surveyor
+  13:14  task       apple-reminders Old idea
+  15:05  trip       easypark       Storgata 1-36, parking, easypark
+  16:00  trip       uber           Oslo S → Aker Brygge, ride, uber, 189.00 NOK
+  17:00  trip       sbb            Zürich HB → Bern, transit, sbb, 58.00 CHF, 1 change
+  17:30  trip       uber           Storgata 1, ride, uber, cancelled
+  18:00  health     apple-health   device=Watch7,1, extra={'activity': 'Running', 'distance_m': 7200, 'energy_kcal': 480}, raw_id=workout:4001, type=workout, unit=s, value=2700
+  19:30  transaction splitwise      account=Sailing trip, amount=-30, category=Dining out, currency=NOK, extra={'cost': 90, 'members': [{'name': 'Kari Nordmann', 'owed': 30, 'paid': 90, 'ref': {'kind': 'email', 'value': 'kari.nordmann@example.org'}}, {'name': 'Ola Nordmann', 'owed': 30, 'paid': 0, 'ref': {'kind': 'email', 'value': 'ola@example.org'}}, {'name': 'Per', 'owed': 30, 'paid': 0, 'ref': {'kind': 'provider_id', 'value': '3'}}], 'owed_share': 30, 'paid_share': 90, 'payment': False}, merchant=Dinner at the marina, provider=splitwise, raw_id=1000000001
+  20:00  transaction copilot        amount=1200, currency=NOK, merchant=Refund, note=the deposit, provider=copilot, raw_id=6f1c2a9e-0000-4000-8000-000000000002, status=pending
+  21:15  listen     shazam         Fjordsang
+  21:30  listen     apple-podcasts Episode 12: The North Cape
+  21:45  listen     shazam         Untitled

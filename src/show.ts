@@ -1,30 +1,43 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
-import { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
+import {
+  payloadOf,
+  points,
+  type RenderContext,
+  retracted,
+  splitLines,
+  summarize,
+  underneath,
+} from "./render.js";
+import { buildResolver, type Resolver } from "./resolve.js";
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
-import type { JsonValue, Line, Payload } from "./types.js";
+import type { Line } from "./types.js";
 
 export interface ShowOptions {
   /** The local day, `YYYY-MM-DD`. */
   day: string;
   /** An IANA zone. Defaults to `timezone` in logbook.json. */
   timezone?: string;
-  /** Print every point and every ref as the source gave them. */
+  /** Print every ref as the source gave it, and the whole text of a note or a mail. */
   raw?: boolean;
 }
 
 export interface ShowResult {
-  /** One row per line, newline-terminated; or one sentence when the day has no lines. */
+  /** The day's heading and one row per line (a run of points, a folded entry: one row), newline-terminated. */
   text: string;
   /** The zone the times were printed in. */
   timezone: string;
-  /** Rows printed (a run of collapsed points counts once). */
+  /** Rows printed. */
   rows: number;
 }
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const SUMMARY_WIDTH = 80;
-const ELLIPSIS = "…";
 const DASH = "–";
+/** Two calendar entries from different sources this close, with one title, are one entry. */
+const FOLD_WINDOW_MS = 5 * 60_000;
+/** An airline designator in a calendar title: `LX 561`, `XY561`. */
+const DESIGNATOR = /\b([A-Z]{2})\s?(\d{1,4})\b/;
 
 /** Throws LogbookError unless the zone is one this Node's ICU knows. */
 export function checkTimezone(timezone: string): void {
@@ -91,9 +104,10 @@ interface Entry {
 }
 
 /**
- * The lines of one local day, as the reference CLI prints them: local time, kind, source, tier
- * and a short summary, sorted by `at`. Reads the month files around the day and streams every
- * file once for the resolution and retraction lines; nothing is loaded whole.
+ * One local day of the record, printed as the reference implementation prints it: the day, then
+ * one row per line — local time, kind, source, a one-line summary — in the order of `at`, then
+ * the day's notes file. Reads the month files around the day, and streams every file once for
+ * the resolution, retraction and flight lines; nothing is loaded whole and nothing is written.
  */
 export function showDay(root: string, options: ShowOptions): ShowResult {
   if (!isDay(options.day)) throw new LogbookError(`not a day: ${options.day}`);
@@ -108,7 +122,7 @@ export function showDay(root: string, options: ShowOptions): ShowResult {
   const local = localizer(timezone);
 
   const files = monthFiles(root);
-  const resolver = buildResolver(judgements(files));
+  const { resolver, supersededFlights } = judgements(files);
   const months = candidateMonths(options.day);
   const entries: Entry[] = [];
   for (const month of files) {
@@ -127,205 +141,148 @@ export function showDay(root: string, options: ShowOptions): ShowResult {
   entries.sort((a, b) => a.ms - b.ms || a.line.seq - b.line.seq);
 
   if (entries.length === 0) {
-    return { text: `no lines on ${options.day} in ${timezone}\n`, timezone, rows: 0 };
+    return { text: `${options.day}: nothing logged\n`, timezone, rows: 0 };
   }
-  const rows = toRows(entries, local, resolver, options.raw === true);
-  return { text: layout(rows), timezone, rows: rows.length };
+  const ctx: RenderContext = {
+    resolver,
+    raw: options.raw === true,
+    clock: (at) => local(at)?.clock,
+    supersededFlights,
+  };
+  const rows = toRows(entries, local, ctx);
+  const lines = [options.day, ...rows, ...notesFile(root, options.day)];
+  return { text: `${lines.join("\n")}\n`, timezone, rows: rows.length };
 }
 
-/** Every resolution and retraction line in the record, streamed. */
-function* judgements(files: MonthFile[]): Generator<Line> {
+/** The judgements the whole record holds: who a ref is, which lines are hidden, which flights replaced. */
+function judgements(files: MonthFile[]): {
+  resolver: Resolver;
+  supersededFlights: Map<string, number>;
+} {
+  const judged: Line[] = [];
+  const supersededFlights = new Map<string, number>();
   for (const month of files) {
     for (const { raw, row } of eachLine(month.file)) {
       const parsed = parseLine(raw, `${month.rel} line ${row}`);
       if ("error" in parsed) continue;
-      const { kind } = parsed.line;
-      if (kind === "resolution" || kind === "retraction") yield parsed.line;
+      const { line } = parsed;
+      if (line.kind === "resolution" || line.kind === "retraction") judged.push(line);
+      else if (line.kind === "flight") {
+        const earlier = payloadOf(line).supersedes;
+        if (typeof earlier === "string") supersededFlights.set(earlier, line.seq);
+      }
     }
   }
+  return { resolver: buildResolver(judged), supersededFlights };
 }
 
-interface RowText {
-  time: string;
-  kind: string;
-  source: string;
-  tier: string;
-  summary: string;
+/** `notes/<YYYY>/<day>.md`, when the day has one: a heading, then its lines two spaces in. */
+function notesFile(root: string, day: string): string[] {
+  const file = join(root, "notes", day.slice(0, 4), `${day}.md`);
+  if (!existsSync(file)) return [];
+  return ["  — note —", ...splitLines(readFileSync(file, "utf-8")).map((row) => `  ${row}`)];
 }
 
-function toRows(entries: Entry[], local: Localize, resolver: Resolver, raw: boolean): RowText[] {
-  const rows: RowText[] = [];
+function toRows(entries: Entry[], local: Localize, ctx: RenderContext): string[] {
+  const rows: string[] = [];
+  const folded = foldEvents(entries, ctx);
+  const remaining = entries.filter((e) => !folded.hidden.has(e.line.id));
   let i = 0;
-  while (i < entries.length) {
-    const entry = entries[i] as Entry;
+  while (i < remaining.length) {
+    const entry = remaining[i] as Entry;
+    const sources = folded.sources.get(entry.line.id);
     let run = i + 1;
-    if (
-      !raw &&
-      entry.line.kind === "location" &&
-      resolver.retractedBy(entry.line.id) === undefined
-    ) {
+    if (isPoint(entry, ctx) && sources === undefined) {
+      const subject = subjectOf(entry);
       while (
-        run < entries.length &&
-        (entries[run] as Entry).line.kind === "location" &&
-        resolver.retractedBy((entries[run] as Entry).line.id) === undefined
+        run < remaining.length &&
+        isPoint(remaining[run] as Entry, ctx) &&
+        (remaining[run] as Entry).line.source === entry.line.source &&
+        subjectOf(remaining[run] as Entry) === subject
       )
         run += 1;
-    }
-    if (run - i > 1) {
-      const points = entries.slice(i, run);
-      const last = points[points.length - 1] as Entry;
+      const last = remaining[run - 1] as Entry;
       const until =
         (typeof last.line.end === "string" ? local(last.line.end)?.clock : undefined) ??
         last.local.clock;
-      rows.push({
-        time: entry.local.clock,
-        kind: "location",
-        source: [...new Set(points.map((p) => String(p.line.source)))].join("+"),
-        tier: `tier ${Math.max(...points.map((p) => Number(p.line.tier)))}`,
-        summary: `${points.length} points ${entry.local.clock}${DASH}${until}`,
-      });
+      const time = run - i > 1 ? `${entry.local.clock}${DASH}${until}` : entry.local.clock;
+      rows.push(
+        row(time, String(entry.line.kind), String(entry.line.source), points(run - i, subject)),
+      );
     } else {
-      rows.push(row(entry, local, resolver, raw));
+      const retraction = ctx.resolver.retractedBy(entry.line.id);
+      if (retraction !== undefined) rows.push(`  ${entry.local.clock}  ${retracted(retraction)}`);
+      else {
+        const source = sources ?? String(entry.line.source);
+        rows.push(
+          row(entry.local.clock, String(entry.line.kind), source, summarize(entry.line, ctx)),
+        );
+        rows.push(...underneath(entry.line, ctx));
+      }
     }
     i = run;
   }
   return rows;
 }
 
-function row(entry: Entry, local: Localize, resolver: Resolver, raw: boolean): RowText {
-  const { line } = entry;
-  const end = typeof line.end === "string" ? local(line.end) : undefined;
-  const retraction = resolver.retractedBy(line.id);
-  let summary: string;
-  if (retraction) {
-    const reason = retraction.payload.reason;
-    summary =
-      typeof reason === "string" && reason !== "" ? `[retracted: ${reason}]` : "[retracted]";
-  } else {
-    summary = summarize(line, resolver, raw);
-  }
+/** `  HH:MM  kind       source         text` — the kind to ten columns, the source to fourteen. */
+function row(time: string, kind: string, source: string, text: string): string {
+  const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - [...s].length));
+  return `  ${time}  ${pad(kind, 10)} ${pad(source, 14)} ${text}`;
+}
+
+function isPoint(entry: Entry, ctx: RenderContext): boolean {
+  return entry.line.kind === "location" && ctx.resolver.retractedBy(entry.line.id) === undefined;
+}
+
+function subjectOf(entry: Entry): string | undefined {
+  const subject = payloadOf(entry.line).subject;
+  return typeof subject === "string" ? subject : undefined;
+}
+
+/** What two calendar titles must share to be one entry: the words, or the flight they name. */
+function eventKeys(entry: Entry): { title: string; flight: string | undefined } {
+  const raw = payloadOf(entry.line).title;
+  const title = typeof raw === "string" ? raw : "";
+  const m = DESIGNATOR.exec(title);
   return {
-    time: end ? `${entry.local.clock}${DASH}${end.clock}` : entry.local.clock,
-    kind: String(line.kind),
-    source: String(line.source),
-    tier: `tier ${String(line.tier)}`,
-    summary: oneLine(summary),
+    title: title.trim().toLowerCase().replace(/\s+/g, " "),
+    flight: m ? `${m[1]}${m[2]}` : undefined,
   };
 }
 
-function summarize(line: Line, resolver: Resolver, raw: boolean): string {
-  const p = line.payload ?? ({} as Payload);
-  switch (line.kind) {
-    case "location":
-      return `${String(p.lat)},${String(p.lon)}`;
-    case "message":
-      return message(p, resolver, raw);
-    case "event": {
-      const title = typeof p.title === "string" ? p.title : String(p.schema ?? "event");
-      const people = attendees(p.attendees, resolver, raw);
-      return people.length ? `${title} (${people.join(", ")})` : title;
+/**
+ * One calendar entry that several sources carry prints once: `event/v1` lines with one title (case
+ * and spacing aside), or naming the same flight, from different sources, starting within five
+ * minutes of the first, fold into the first's row with every source in its source column.
+ */
+function foldEvents(
+  entries: Entry[],
+  ctx: RenderContext,
+): { hidden: Set<string>; sources: Map<string, string> } {
+  const hidden = new Set<string>();
+  const sources = new Map<string, string>();
+  const events = entries.filter(
+    (e) => e.line.kind === "event" && ctx.resolver.retractedBy(e.line.id) === undefined,
+  );
+  for (let i = 0; i < events.length; i++) {
+    const first = events[i] as Entry;
+    if (hidden.has(first.line.id)) continue;
+    const key = eventKeys(first);
+    const group = [String(first.line.source)];
+    for (let j = i + 1; j < events.length; j++) {
+      const other = events[j] as Entry;
+      if (other.ms - first.ms > FOLD_WINDOW_MS) break;
+      if (hidden.has(other.line.id) || group.includes(String(other.line.source))) continue;
+      const otherKey = eventKeys(other);
+      const same =
+        otherKey.title === key.title ||
+        (key.flight !== undefined && otherKey.flight === key.flight);
+      if (!same) continue;
+      hidden.add(other.line.id);
+      group.push(String(other.line.source));
     }
-    case "note":
-      return typeof p.text === "string" ? p.text : String(p.schema ?? "note");
-    case "resolution":
-      return resolution(p);
-    default:
-      if (typeof p.text === "string") return p.text;
-      if (typeof p.title === "string") return p.title;
-      return String(p.schema ?? line.kind);
+    if (group.length > 1) sources.set(first.line.id, group.join("+"));
   }
-}
-
-function text(value: JsonValue | undefined): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-/** Who a ref is: the record's resolution, else the source's own name for it, else the ref itself. */
-function who(
-  ref: Ref | undefined,
-  sourceName: string | undefined,
-  resolver: Resolver,
-  raw: boolean,
-) {
-  if (ref === undefined) return sourceName;
-  if (raw) return ref.value;
-  return resolver.name(ref) ?? sourceName ?? ref.value;
-}
-
-function message(p: Payload, resolver: Resolver, raw: boolean): string {
-  const chat = p.chat;
-  const chatLabel =
-    typeof chat === "string"
-      ? chat
-      : chat !== null && typeof chat === "object" && !Array.isArray(chat)
-        ? (text(chat.name) ?? text(chat.id))
-        : undefined;
-  const direct =
-    chat !== null && typeof chat === "object" && !Array.isArray(chat) && chat.type === "direct";
-  const sender = p.sender;
-  const senderRef = asRef(sender);
-  const senderName =
-    sender !== null && typeof sender === "object" && !Array.isArray(sender)
-      ? text(sender.name)
-      : undefined;
-  let by: string | undefined;
-  if (p.from_me === true) by = "me";
-  else {
-    by = who(senderRef, raw ? undefined : senderName, resolver, raw);
-    if (by === undefined && direct && !raw) by = chatLabel;
-  }
-  const head = chatLabel ?? by ?? String(p.schema ?? "message");
-  const opener = by !== undefined && by !== chatLabel ? `${head} (${by})` : head;
-  const body = text(p.text);
-  return body === undefined ? opener : `${opener}: ${body}`;
-}
-
-function attendees(value: JsonValue | undefined, resolver: Resolver, raw: boolean): string[] {
-  if (!Array.isArray(value)) return [];
-  const names: string[] = [];
-  for (const item of value) {
-    if (typeof item === "string") {
-      names.push(who({ kind: "email", value: item }, undefined, resolver, raw) ?? item);
-    } else if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-      const ref = asRef(item.ref);
-      const name = who(ref, raw ? undefined : text(item.name), resolver, raw);
-      if (name !== undefined) names.push(name);
-    }
-  }
-  return names;
-}
-
-function resolution(p: Payload): string {
-  const ref = asRef(p.ref);
-  const subject = ref ? `${ref.kind} ${ref.value}` : "?";
-  const alias = asRef(p.alias_of);
-  if (alias) return `${subject} → alias of ${alias.kind} ${alias.value}`;
-  const entity = p.entity;
-  if (entity !== null && typeof entity === "object" && !Array.isArray(entity)) {
-    const type = text(entity.type) ?? "entity";
-    return `${subject} → ${type} ${text(p.label) ?? text(entity.id) ?? "?"}`;
-  }
-  return `${subject} → ${text(p.label) ?? "?"}`;
-}
-
-/** The first line, at most SUMMARY_WIDTH characters, with an ellipsis when cut. */
-function oneLine(value: string): string {
-  const first = value.split(/\r?\n/, 1)[0] as string;
-  const chars = [...first];
-  if (chars.length <= SUMMARY_WIDTH) return first;
-  return `${chars.slice(0, SUMMARY_WIDTH - 1).join("")}${ELLIPSIS}`;
-}
-
-function layout(rows: RowText[]): string {
-  const width = (pick: (r: RowText) => string) => Math.max(...rows.map((r) => [...pick(r)].length));
-  const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - [...s].length));
-  const time = width((r) => r.time);
-  const kind = width((r) => r.kind);
-  const source = width((r) => r.source);
-  return rows
-    .map(
-      (r) =>
-        `${pad(r.time, time)}  ${pad(r.kind, kind)}  ${pad(r.source, source)}  ${r.tier}  ${r.summary}\n`,
-    )
-    .join("");
+  return { hidden, sources };
 }

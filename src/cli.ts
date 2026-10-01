@@ -10,8 +10,9 @@ export const USAGE = `usage:
   logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>"
   logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
   logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]
-                                      print the day's lines: local time, kind, source, tier, summary
-                                      (--tz defaults to logbook.json; --raw keeps every point and ref)
+                                      print the day as the reference does: local time, kind, source,
+                                      summary, then the day's notes file (--tz defaults to
+                                      logbook.json; --raw prints refs as given and bodies whole)
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
