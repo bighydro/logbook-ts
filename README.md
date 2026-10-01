@@ -5,7 +5,10 @@
 The Logbook spec says it should be small enough to implement in an afternoon, and that two independent
 implementations must agree before v1.0 is frozen. This is the second one. It was written from
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.3.0/SPEC.md) alone: no Python was read, and every
-place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md).
+place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
+prints a day exactly as the reference implementation (openlogbook, main as of 2026-10-01) does, matched
+against the reference's output on synthetic records, never its source, and checked by a
+cross-implementation test.
 
 Zero runtime dependencies. RFC 8785 canonical JSON, SHA-256 chaining and UUIDv7 are implemented by hand on
 Node's built-ins.
@@ -33,12 +36,17 @@ node dist/bin.js verify /tmp/mine
 #    logbook/2026/03.jsonl line 1: seq 1 — hash 129e6cdc… does not recompute (got cd36ca92…)
 
 # read a day, in the owner's timezone
-node dist/bin.js show tests/fixtures/sample-logbook --day 2026-03-01
-#  08:30        location  sim-phone     tier 1  2 points 08:30–09:40
-#  10:00–11:00  event     sim-calendar  tier 1  Coffee with Ines (ines@example.org)
-#  10:12        photo     sim-camera    tier 1  photo/v1
-#  22:00        note      manual        tier 2  Ines is moving to Tromsø in May. Ask her about the northern lights trip.
-#  23:30–07:45  sleep     sim-watch     tier 3  health-sample/v1
+node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-02
+#  2026-03-02
+#    06:10  flight     flighty        XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot
+#    06:12  flight     manual         superseded by #2
+#    09:04  call       ios-calls      ← Ola Nordmann, 7 min, cellular
+#    09:30  call       ios-calls      → Kari Moe, no answer, facetime-audio
+#    10:00  transcript granola        Catch-up with Ines — Ines Holm, Ola Nordmann
+#    11:15  mail       mail           ✉ Re: Mooring for the weekend — Ola Nordmann → Kari Nordmann (1 attachment)
+#    21:14  voice-memo voice-memos    Idea for the talk (1:42)
+#    22:14  highlight  apple-books    “They sailed west until the coast was a line and then was nothing.” — The Long Ships · the moment the book turns
+#    …
 ```
 
 `pnpm link --global` (or `npm i -g .`) puts the same thing on your path as `logbook-ts`.
@@ -51,7 +59,7 @@ SPEC §6, the conformance rule, and one reader.
 |---|---|
 | `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or the errors on stderr and exits 1. Refuses any `format` other than `logbook/0.2`. |
 | `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify. |
-| `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]` | Prints one local day of the record, sorted by `at`: local time, kind, source, tier and a one-line summary. Only reads. See below. |
+| `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw]` | Prints one local day of the record as the reference does: the day, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 
 The hash is SPEC §3 to the letter:
 
@@ -68,54 +76,78 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 
 `show` prints the lines whose `at` falls on the given calendar day in a timezone: `--tz` if given, else
 the owner's `timezone` from `logbook.json`. The zone comes from Node's built-in ICU (`Intl`), not from a
-dependency. A line with an `end` prints its span (`10:00–11:00`); a span that crosses midnight is still
-listed on the day it starts.
+dependency. The output is, row for row, what `logbook show` of the reference implementation prints
+on the same record: a heading with the day, then `  HH:MM  kind  source  summary` with the kind
+padded to ten columns and the source to fourteen, then, when `notes/<YYYY>/<day>.md` exists,
+`  — note —` and the file two spaces in. A day with no lines prints `<day>: nothing logged`. Rows
+are ordered by the instant `at` denotes, then by `seq` (SPEC §3.2).
 
-The summary depends on the kind:
+The summary depends on the kind; names come from the record's own `resolution/v1` lines (below):
 
 | Kind | Summary |
 |---|---|
-| `location` | `lat,lon`. A run of consecutive points collapses to `n points 08:12–09:40` (first `at` to the last point's `end`, or its `at`) unless `--raw`. |
-| `message` | the chat, the sender in parentheses, then the text: `Sailing club (Ola Nordmann): Regatta moved to Sunday`. The owner's own messages say `(me)`; the sender is dropped when it is the chat's own name. |
-| `event` | the title, then the attendees in parentheses. |
-| `note` | the text. |
-| `resolution` | the ref and what it says: `email ines@example.org → person Ines Holm`, or `handle 2360…@lid → alias of phone +4790000001`. |
-| anything else | `text`, else `title`, else the payload `schema`. |
+| `location` | `n points`, one row per run of consecutive points from one source and of one subject (RFC 0001), its time `08:12–09:40` when the run has more than one point; an asset's run is `solvind: 2 points`. |
+| `message` | `Ola Nordmann: text` in a direct chat, `Ola Nordmann in Sailing club: text` in a group; the owner's own are `me → Kari: text` and `me in Sailing club: text`; a message without text is `[image]`, `[media]`. |
+| `event` | `title · by organizer · with attendees`; several sources carrying one entry (same title, or the same flight in the title, within five minutes) print once, as `ics+ios-calendar`. |
+| `note` | the first non-blank line, then `… (+N lines)`. |
+| `flight` | `XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot`; a line a later flight line supersedes is `superseded by #N`. |
+| `call` | `← Ola Nordmann, 7 min, cellular`, `→ Kari Moe, no answer, facetime-audio`, `→ withheld, 30 s, whatsapp`. |
+| `transcript` | `title — participants; 12 turns, 35 min`. |
+| `mail` | `✉ subject — from → to, cc (n attachments)`; the owner's own mail is from `me`. |
+| `voice-memo` | `title (m:ss)`, then `, not stored` when the record does not hold the audio or `, audio missing` when there is none. |
+| `highlight` | `“quote” — title · note`; a bookmark is `bookmark — title @ location`. |
+| `trip` | `from → to, mode, provider, 58.00 CHF, cancelled, 1 change, ticket`. |
+| `crossing` | `crossed to hermes: 6 lines (tier 1: 2, tier 2: 4)`. |
+| `task`, `browse`, `watch`, `listen`, `commitment` and any other kind | `text`, else `title` (a page's `url`), else every payload field but `schema` as `key=value`, spelled as Python's `str()` spells it, which is what the reference prints for `photo`, `health`, `transaction`, `resolution` and `commitment-close` lines. |
 
-Summaries are cut to their first line and 80 characters. A line hidden by a `retraction/v1` line
-(RFC 0003) stays in its place and prints `[retracted: <reason>]` instead of its summary; the retraction
-itself is not listed on its own day.
+A line hidden by a `retraction/v1` line (RFC 0003) stays in its place as `  22:30  retracted #11: typo`;
+the retraction itself is not listed on its own day.
 
 People are named from the record's own `resolution/v1` lines (RFC 0006), never from a contact list:
 for each ref (`{kind, value}`, such as a phone number or an email address) the last resolution line in
 chain order that stands wins; a line retracted, or named in a later resolution's `supersedes`, does not
 stand; an `alias_of` line is followed to its target ref, at most four hops, stopping on a cycle or at a
 ref nothing resolves. When no resolution names a ref, the name the source itself attached
-(`sender.name`, an attendee's `name`) is used, then, for a direct chat, the chat's name, then the raw
-value. `--raw` prints every ref exactly as the source gave it and ignores those names.
+(`sender.name`, an attendee's `name`, a mail header's display name) is used, then, for a direct chat, the
+chat's name, then the raw value. `--raw` prints every ref exactly as the source gave it, the whole
+text of a note, and a mail's body under its row.
 
-`show` streams: every month file is read once through a fixed buffer for resolution and retraction lines,
-and only the month files around the day are read for its lines. Nothing is loaded whole and nothing is
-written; no index is built. `tests/fixtures/show-sample` is a synthetic record (the same imaginary
-person in Oslo) with a run of points, an alias hop, a retracted resolution, a retracted note and a
-line at 22:30 UTC that is the next day in Oslo; `make.mjs` beside it regenerates it.
+`show` streams: every month file is read once through a fixed buffer for the resolution, retraction
+and flight lines, and only the month files around the day are read for its lines. Nothing is loaded
+whole and nothing is written; no index is built.
+
+Two synthetic records (the same imaginary person in Oslo) are the fixtures: `tests/fixtures/show-sample`
+has a run of points, an alias hop, a retracted resolution, a retracted note and a line at 22:30 UTC that
+is the next day in Oslo; `tests/fixtures/profiles-sample` has one line of every profile the RFCs define
+(flight, call, transcript, mail, voice-memo, highlight, task, browse, watch, listen, trip, transaction,
+health-sample, location with a subject, event, photo, message, note, commitment, crossing, resolution)
+in the RFC examples' shapes. `make.mjs` beside each regenerates it. Beside each, `expected-show/` holds
+what `logbook show` of the reference printed for every day, with and without `--raw`; the unit tests
+check our output against those files, and `tests/cross-impl.test.ts` checks both against the reference
+itself (see Developing). `tests/fixtures/capture-expected-show.mjs` re-captures them from the reference;
+they are never edited by hand.
 
 ```bash
 node dist/bin.js show tests/fixtures/show-sample --day 2026-03-14
-#  08:12        location  sim-phone     tier 1  3 points 08:12–09:40
-#  10:00–11:00  event     sim-calendar  tier 1  Coffee with Ines (Ines Holm-Berg)
-#  10:30        photo     sim-camera    tier 1  photo/v1
-#  12:05        message   whatsapp      tier 2  Sailing club (Ola Nordmann): Regatta moved to Sunday
-#  12:07        message   whatsapp      tier 2  Kari (Kari M): Hei, lunch?
-#  12:09        message   whatsapp      tier 2  Kari (me): On my way
-#  21:30        note      manual        tier 2  Regatta Sunday.
-#  22:00        location  sim-phone     tier 1  59.911,10.75
-#  22:30        note      manual        tier 2  [retracted: typo]
+#  2026-03-14
+#    08:12–09:40  location   sim-phone      3 points
+#    10:00  event      sim-calendar   Coffee with Ines · with Ines Holm-Berg
+#    10:30  photo      sim-camera     file=IMG_0101.jpg
+#    12:05  message    whatsapp       Ola Nordmann in Sailing club: Regatta moved to Sunday
+#    12:07  message    whatsapp       Kari M: Hei, lunch?
+#    12:09  message    whatsapp       me → Kari: On my way
+#    21:30  note       manual         Regatta Sunday. … (+1 line)
+#    22:00  location   sim-phone      1 point
+#    22:30  retracted #11: typo
 ```
 
 The sender of the 12:05 message is a WhatsApp linked-device id; an alias line pairs it with a phone
 number, and a contacts import names that number. The 12:07 sender's resolution was retracted, so the
-name WhatsApp itself showed is printed. `--raw` gives `(236000000000001@lid)` and `(+4790000002)`.
+name WhatsApp itself showed is printed. `--raw` gives `236000000000001@lid` and `+4790000002`.
+
+Where the reference and SPEC §3.2 disagree, this implementation follows the spec and says so in
+SPEC-QUESTIONS.md: a run of points ends at the last point's `end` when it has one, and a day is ordered
+by instant, not by the text of `at`.
 
 ## As a library
 
@@ -141,8 +173,18 @@ pnpm check         # all four
 pre-commit install # lint, format, gitleaks, no commits to main
 ```
 
-CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22, and a separate job clones the spec
-repo at its tag and runs SPEC §6 against the fixture as published there.
+To diff `show` against the reference implementation, clone it and point the test at the clone;
+`uv run` installs the clone's own environment:
+
+```bash
+git clone https://github.com/bighydro/logbook /tmp/logbook-ref
+LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
+```
+
+CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
+tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture
+is still the one on the spec repo's main and that `verify` prints the head published there; and a
+fourth runs the cross-implementation diff against the reference at main.
 
 Rules for anyone (or any agent) changing this repo are in [CLAUDE.md](./CLAUDE.md). Nothing in the
 fixtures is real; the sample person lives in Oslo and does not exist.

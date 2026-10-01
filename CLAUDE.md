@@ -10,7 +10,7 @@ Hard rules — a change that needs to break one is wrong; stop and say so:
 - Never add a runtime dependency. `dependencies` in `package.json` stays empty; JCS, hashing and UUIDs are hand-written on Node built-ins.
 - Never add network calls to a default code path.
 - Never change the envelope or the hash rule (SPEC §2–3) here; that happens in the spec repo with a version bump and a regenerated fixture. This repo follows.
-- Do not read the Python implementation to resolve an ambiguity; write it in `SPEC-QUESTIONS.md` instead.
+- Do not read the Python implementation to resolve an ambiguity; write it in `SPEC-QUESTIONS.md` instead. `show` is matched to the reference by running it (`LOGBOOK_REF=<clone> pnpm vitest run tests/cross-impl.test.ts`) and reading its output, never its source; `tests/fixtures/*/expected-show/` is that output, captured from the reference and never edited by hand.
 - Test first: write the failing test, run it, implement, run it, commit with `-s`. One issue per task, closed by the commit.
 - Never commit to `main`; branch, push, open a PR. Never merge.
 
