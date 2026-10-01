@@ -13,6 +13,7 @@ the versions are this implementation's, and the spec it follows is named in each
 - The conformance sample is part of the cross-implementation diff: `tests/fixtures/sample-logbook/expected-show/` holds the reference's output for the six days it reads as SPEC §3.2 says (SPEC-QUESTIONS 40), checked by the unit tests and by `tests/cross-impl.test.ts`.
 
 ### Changed
+- `show` folds one calendar entry that several sources carry as the reference does since dae84b0 (2026-10-01): on the exact start and end, the title compared with case, accents and whitespace aside or the same flight in the title, two or more sources, printed as `×N sources`; before, within five minutes and printed as `ics+ios-calendar` (SPEC-QUESTIONS 28). `tests/fixtures/profiles-sample` grows a third calendar source (77 lines) so the fold and a near miss are both diffed against the reference.
 - The vendored conformance sample is `conformance/sample-logbook` of bighydro/logbook at v0.5.0: 31 lines (the first sixteen unchanged, then one line of every profile added since v0.2), head `035a74e0…`. The conformance CI job clones the spec at v0.5.0 and expects that head.
 - SPEC-QUESTIONS 38–41: the hero line and keeper row, a flight without a designator, the two days of the sample that cannot be diffed, and the range, profile and JSON flags, which neither the spec nor the reference defines.
 

@@ -42,7 +42,7 @@ export interface ShownRow {
   /** Local `HH:MM` a run of points ends at; absent on every other row. */
   until?: string;
   kind: string;
-  /** The line's source, or every source of a folded entry joined with `+`. */
+  /** The line's source, or `×N sources` for a folded calendar entry. */
   source: string;
   /** The text column: the summary, with refs rendered as names (or raw), or `retracted #seq: reason`. */
   summary: string;
@@ -100,8 +100,6 @@ export interface ShowRange {
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DASH = "–";
 const DAY_MS = 86_400_000;
-/** Two calendar entries from different sources this close, with one title, are one entry. */
-const FOLD_WINDOW_MS = 5 * 60_000;
 /** An airline designator in a calendar title: `LX 561`, `XY561`. */
 const DESIGNATOR = /\b([A-Z]{2})\s?(\d{1,4})\b/;
 
@@ -452,27 +450,33 @@ function subjectOf(entry: Entry): string | undefined {
   return typeof subject === "string" ? subject : undefined;
 }
 
-/** What two calendar titles must share to be one entry: the words, or the flight they name. */
-function eventKeys(entry: Entry): { title: string; flight: string | undefined } {
+/**
+ * What two calendar entries must share to be one: the span, and the title (case, accents and
+ * whitespace aside: `Zürich` is `zurich`, `ø` stays `ø`) or the flight the title names.
+ */
+function eventKeys(entry: Entry): { span: string; title: string; flight: string | undefined } {
   const raw = payloadOf(entry.line).title;
   const title = typeof raw === "string" ? raw : "";
   const m = DESIGNATOR.exec(title);
   return {
-    title: title.trim().toLowerCase().replace(/\s+/g, " "),
+    span: `${entry.ms}|${typeof entry.line.end === "string" ? entry.line.end : ""}`,
+    title: title.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().trim().replace(/\s+/g, " "),
     flight: m ? `${m[1]}${m[2]}` : undefined,
   };
 }
 
-/** A folded entry: the sources joined for the source column, and the lines folded into the first. */
+/** A folded entry: the source column (`×N sources`), and the lines folded into the first. */
 interface Fold {
   sources: string;
   lines: Line[];
 }
 
 /**
- * One calendar entry that several sources carry prints once: `event/v1` lines with one title (case
- * and spacing aside), or naming the same flight, from different sources, starting within five
- * minutes of the first, fold into the first's row with every source in its source column.
+ * One calendar entry that several sources carry prints once, as the reference does: `event/v1`
+ * lines with the same start and end, and one title (case, accents and whitespace aside) or naming
+ * the same flight, from two or more sources, fold into the first's row with `×N sources` — N the
+ * distinct sources — in its source column. One calendar holding an entry twice is still two rows;
+ * a retracted line is neither folded nor counted (SPEC-QUESTIONS 28).
  */
 function foldEvents(
   entries: Entry[],
@@ -487,22 +491,27 @@ function foldEvents(
     const first = events[i] as Entry;
     if (hidden.has(first.line.id)) continue;
     const key = eventKeys(first);
-    const group = [String(first.line.source)];
-    const lines: Line[] = [];
+    const sources = new Set([String(first.line.source)]);
+    const members: Entry[] = [];
     for (let j = i + 1; j < events.length; j++) {
       const other = events[j] as Entry;
-      if (other.ms - first.ms > FOLD_WINDOW_MS) break;
-      if (hidden.has(other.line.id) || group.includes(String(other.line.source))) continue;
+      if (other.ms !== first.ms) break;
+      if (hidden.has(other.line.id)) continue;
       const otherKey = eventKeys(other);
       const same =
-        otherKey.title === key.title ||
-        (key.flight !== undefined && otherKey.flight === key.flight);
+        otherKey.span === key.span &&
+        (otherKey.title === key.title ||
+          (key.flight !== undefined && otherKey.flight === key.flight));
       if (!same) continue;
-      hidden.add(other.line.id);
-      group.push(String(other.line.source));
-      lines.push(other.line);
+      members.push(other);
+      sources.add(String(other.line.source));
     }
-    if (group.length > 1) groups.set(first.line.id, { sources: group.join("+"), lines });
+    if (sources.size < 2) continue;
+    for (const member of members) hidden.add(member.line.id);
+    groups.set(first.line.id, {
+      sources: `×${sources.size} sources`,
+      lines: members.map((m) => m.line),
+    });
   }
   return { hidden, groups };
 }

@@ -6,7 +6,7 @@ The Logbook spec says it should be small enough to implement in an afternoon, an
 implementations must agree before v1.0 is frozen. This is the second one. It was written from
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
-prints a day exactly as the reference implementation (openlogbook, main as of 2026-10-01) does, matched
+prints a day exactly as the reference implementation (openlogbook, main at dae84b0, 2026-10-01) does, matched
 against the reference's output on synthetic records, never its source, and checked by a
 cross-implementation test.
 
@@ -91,7 +91,7 @@ The summary depends on the kind; names come from the record's own `resolution/v1
 |---|---|
 | `location` | `n points`, one row per run of consecutive points from one source and of one subject (RFC 0001), its time `08:12–09:40` when the run has more than one point; an asset's run is `solvind: 2 points`. |
 | `message` | `Ola Nordmann: text` in a direct chat, `Ola Nordmann in Sailing club: text` in a group; the owner's own are `me → Kari: text` and `me in Sailing club: text`; a message without text is `[image]`, `[media]`. |
-| `event` | `title · by organizer · with attendees`; several sources carrying one entry (same title, or the same flight in the title, within five minutes) print once, as `ics+ios-calendar`. |
+| `event` | `title · by organizer · with attendees`; two or more sources carrying one entry (the same start and end, and the same title — case, accents and whitespace aside — or the same flight in the title) print once, as `×2 sources`. |
 | `note` | the first non-blank line, then `… (+N lines)`. |
 | `flight` | `XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot`; a line a later flight line supersedes is `superseded by #N`. |
 | `call` | `← Ola Nordmann, 7 min, cellular`, `→ Kari Moe, no answer, facetime-audio`, `→ withheld, 30 s, whatsapp`. |
@@ -132,7 +132,7 @@ SPEC-QUESTIONS.md (41).
   `line`), `rows` and, when the day has a notes file, `note`. A row is `{time, until?, kind, source,
   summary, retraction?, lines}`: `summary` is the text column exactly (names resolved, or raw with
   `--raw`; `retracted #11: typo` for a hidden line, with the retraction line beside it), `until` the end
-  of a run of points, `source` every source of a folded entry, `lines` the full lines behind the row —
+  of a run of points, `source` the column as printed (`×2 sources` for a folded entry), `lines` the full lines behind the row —
   one, the points of a run, the entries folded. An empty day under `--day` is `{"day": …, "hero": [],
   "rows": []}`; an empty range prints nothing.
 
