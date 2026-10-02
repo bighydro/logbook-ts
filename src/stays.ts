@@ -241,7 +241,7 @@ export function deriveSegments(points: Point[], options: DeriveOptions): Segment
 }
 
 /** The points a segment is judged by: a stay's points inside the radius, a move's interior. */
-function judged(segment: Segment): Point[] {
+export function judged(segment: Segment): Point[] {
   return segment.kind === "move" ? segment.interior : segment.inside;
 }
 

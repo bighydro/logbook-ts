@@ -114,11 +114,66 @@ describe("what the Day reads out of the record", () => {
       "move boat",
       "stay BGO, Bergen",
     ]);
-    expect(wednesday.nights.after).toMatchObject({
+    expect(run?.id).toBe("aboard:solvind:20260408T0715Z");
+    // The container's centre is the inner stay spent longest at: the anchorage, not the berth.
+    expect([run?.lat, run?.lon]).toEqual([60.3, 5.2]);
+    expect(wednesday.nights.after).toEqual({
+      day: "2026-04-08",
       where: "aboard Solvind",
-      aboard: "solvind",
       home: false,
+      aboard: "solvind",
+      in_transit: false,
+      stay: "stay:owner:20260408T0715Z@60.3000,5.2000",
+      position: { lat: 60.3, lon: 5.2 },
+      lines: ["00000000-0000-4000-8000-0000000004912", "00000000-0000-4000-8000-00000000041137"],
     });
+    expect(renderDay(wednesday)).toContain(
+      "  night after   aboard Solvind · 60.3000,5.2000 · away\n",
+    );
+    // The run that began the day before is still one container on the next day, whole: its id,
+    // points, lines and centre are the run's, and only the rows that touch the day are inside it.
+    const thursday = readDay(DAY_SAMPLE, { day: "2026-04-09" });
+    const tail = rows(thursday.timeline).find((t) => t.kind === "aboard");
+    expect(tail).toMatchObject({
+      id: "aboard:solvind:20260408T0715Z",
+      duration_s: 60300,
+      within_day: { duration_s: 7200 },
+      points: 202,
+      distance_m: 0,
+      lines: { first: "00000000-0000-4000-8000-0000000004912" },
+    });
+    expect(tail?.inside?.map((s) => s.id)).toEqual(["stay:owner:20260408T1100Z@60.3000,5.2000"]);
+  });
+
+  it("makes a single stay aboard an asset a container too, and a stay with no run aboard a plain stay", () => {
+    const saturday = readDay(DEMO_SAMPLE, { day: "2026-06-13" });
+    const run = rows(saturday.timeline).find((t) => t.kind === "aboard");
+    expect(run?.asset).toEqual({ id: "nordlys", kind: "yacht", name: "Nordlys" });
+    expect(run?.inside?.map((s) => `${s.kind} ${s.where}`)).toEqual(["stay Marina"]);
+    expect(renderDay(saturday)).toContain(
+      "  09:45–15:05  aboard Nordlys (yacht) · 5 h 20 min · 1 event, 2 messages, 1 photo\n      09:45–15:05  stay   Marina · 5 h 20 min\n",
+    );
+    expect(saturday.nights.after).toMatchObject({
+      where: "Home",
+      home: true,
+      aboard: null,
+      position: { lat: 59.91389, lon: 10.752201 },
+    });
+  });
+
+  it("labels an unnamed stay by the nearest named place within 5 km, and a night by its position", () => {
+    const monday = readDay(DAY_SAMPLE, { day: "2026-04-06" });
+    expect(rows(monday.timeline).map((t) => t.where)).toContain(
+      "59.9120,10.7560 near Home, 0.3 km",
+    );
+    expect(monday.nights.before.position).toEqual({ lat: 59.9139, lon: 10.7522 });
+    const tuesday = readDay(DAY_SAMPLE, { day: "2026-04-07" });
+    expect(tuesday.nights.after).toMatchObject({
+      where: "60.3900,5.3200 near Berth, 0.8 km",
+      position: { lat: 60.39, lon: 5.32 },
+    });
+    const thursday = readDay(DAY_SAMPLE, { day: "2026-04-09" });
+    expect(thursday.nights.after.position).toBeNull();
   });
 
   it("shows the flight line standing, with the declared line its tracked one supersedes left out", () => {

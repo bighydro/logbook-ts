@@ -5,11 +5,15 @@
   "nights": {
     "before": {
       "day": "2026-04-07",
-      "where": "60.3900,5.3200",
+      "where": "60.3900,5.3200 near Berth, 0.8 km",
       "home": false,
       "aboard": null,
       "in_transit": false,
       "stay": "stay:owner:20260407T0850Z@60.3900,5.3200",
+      "position": {
+        "lat": 60.39,
+        "lon": 5.32
+      },
       "lines": [
         "00000000-0000-4000-8000-0000000004472",
         "00000000-0000-4000-8000-0000000004738"
@@ -21,9 +25,13 @@
       "home": false,
       "aboard": "solvind",
       "in_transit": false,
-      "stay": "stay:owner:20260408T1100Z@60.3000,5.2000",
+      "stay": "stay:owner:20260408T0715Z@60.3000,5.2000",
+      "position": {
+        "lat": 60.3,
+        "lon": 5.2
+      },
       "lines": [
-        "00000000-0000-4000-8000-0000000004957",
+        "00000000-0000-4000-8000-0000000004912",
         "00000000-0000-4000-8000-00000000041137"
       ]
     }
@@ -60,7 +68,7 @@
         "duration_s": 32400
       },
       "duration_s": 79800,
-      "where": "60.3900,5.3200",
+      "where": "60.3900,5.3200 near Berth, 0.8 km",
       "place": null,
       "lat": 60.39,
       "lon": 5.32,
@@ -161,8 +169,8 @@
       "duration_s": 60300,
       "where": "aboard Solvind",
       "place": null,
-      "lat": 60.395,
-      "lon": 5.31,
+      "lat": 60.3,
+      "lon": 5.2,
       "aboard": "solvind",
       "asset": {
         "id": "solvind",

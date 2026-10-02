@@ -1,10 +1,10 @@
 2026-04-08  Wednesday
-  night before  60.3900,5.3200 · away
-  night after   aboard Solvind · away
+  night before  60.3900,5.3200 near Berth, 0.8 km · away
+  night after   aboard Solvind · 60.3000,5.2000 · away
   country       NO (nearest airport BGO)
   all day       Boat week
 
-  00:00–09:00  stay   60.3900,5.3200 · 9 h
+  00:00–09:00  stay   60.3900,5.3200 near Berth, 0.8 km · 9 h
   09:00–09:15  move   782 m · 15 min · walk
   09:15–24:00  aboard Solvind (yacht) · 14 h 45 min · 1 note, 1 photo
       09:15–11:00  stay   Berth · 1 h 45 min

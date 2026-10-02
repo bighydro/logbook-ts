@@ -27,6 +27,7 @@ import {
 import { readJudgements } from "./show.js";
 import {
   deriveSegments,
+  judged,
   markAboard,
   type Point,
   type Segment,
@@ -49,6 +50,8 @@ export interface DayNight {
   aboard: string | null;
   in_transit: boolean;
   stay: string | null;
+  /** The night's `lat` and `lon`: the stay's centre, or aboard an asset the anchorage it lay at. */
+  position: { lat: number; lon: number } | null;
   lines: string[];
 }
 
@@ -256,7 +259,7 @@ const NOTE_WIDTH = 72;
 const COUNTRY_AIRPORT_KM = 300;
 /** The city of the nearest large airport within this many km labels an unnamed stay. */
 const CITY_AIRPORT_KM = 30;
-/** An unnamed stay with a named place within this many km is its coordinates alone, no city. */
+/** An unnamed stay is labelled `near` the nearest named place within this many km, else by a city. */
 const NEAR_PLACE_KM = 5;
 /** A night whose stay centre is within this of a home place is at home whatever the radius. */
 const HOME_M = 400;
@@ -363,20 +366,22 @@ export function readDay(root: string, options: DayOptions): Day {
     dayStanding.filter((e) => e.line.kind === "event" && payloadOf(e.line).all_day === true),
   ).map(({ title, line, sources, lines }) => ({ title, line, sources, lines }));
 
-  // The rows: the segments that touch the day, a run of two or more aboard one asset as one row.
-  const dayRows = aboardRuns(segments.filter((s) => s.startMs < dayEndMs && s.endMs > dayStartMs));
+  // The rows: the segments of the window, a run aboard one asset folded into one, those that touch
+  // the day. A run is folded over the whole window, so one that began the day before is still one
+  // container today, whole.
+  const rows = aboardRuns(segments);
+  const dayRows = rows.filter((r) => r.startMs < dayEndMs && r.endMs > dayStartMs);
   const { timeline, unplaced } = buildTimeline(dayRows, flights, dayStanding, ctx);
 
-  const stays = segments.filter((s): s is Stay => s.kind === "stay");
-  const nightBefore = nightOf(before, stays, ctx);
-  const nightAfter = nightOf(day, stays, ctx);
+  const nightBefore = nightOf(before, rows, ctx);
+  const nightAfter = nightOf(day, rows, ctx);
 
   return {
     day,
     weekday: weekdayOf(day),
     tz: timezone,
     nights: { before: nightBefore, after: nightAfter },
-    country: countryOf(nightAfter, stays, ctx),
+    country: countryOf(nightAfter, rows, ctx),
     all_day: allDay,
     timeline,
     flights,
@@ -432,7 +437,11 @@ function promotes(line: Line): boolean {
 // ---------------------------------------------------------------------------------------------
 // Rows: segments, and runs of segments aboard one asset
 
-/** A run of two or more consecutive segments aboard one asset: one row, the segments inside it. */
+/**
+ * A stay aboard an asset is a container: the run of consecutive segments aboard one asset, with
+ * at least one stay in it, is one row from the first's start to the last's end, the run inside it.
+ * A move aboard with no stay either side (a ferry walked on and off) stays a move.
+ */
 interface AboardRun {
   kind: "aboard";
   asset: Asset;
@@ -455,8 +464,8 @@ function aboardRuns(segments: Segment[]): Row[] {
       (segments[j] as Segment).aboard?.id === first.aboard.id
     )
       j += 1;
-    if (first.aboard !== undefined && j - i >= 2) {
-      const run = segments.slice(i, j);
+    const run = segments.slice(i, j);
+    if (first.aboard !== undefined && run.some(isStay)) {
       rows.push({
         kind: "aboard",
         asset: first.aboard,
@@ -464,10 +473,30 @@ function aboardRuns(segments: Segment[]): Row[] {
         startMs: first.startMs,
         endMs: (run[run.length - 1] as Segment).endMs,
       });
-    } else rows.push(first);
+    } else rows.push(...run);
     i = Math.max(j, i + 1);
   }
   return rows;
+}
+
+const isStay = (s: Segment): s is Stay => s.kind !== "move";
+
+/** The inner stay of a run spent longest at: the run's centre, and the coordinate in its id. */
+function centreOf(run: AboardRun): Stay | undefined {
+  let centre: Stay | undefined;
+  for (const s of run.segments) {
+    if (isStay(s) && (centre === undefined || s.endMs - s.startMs > centre.endMs - centre.startMs))
+      centre = s;
+  }
+  return centre;
+}
+
+/** The id a night names a row by: a stay's own, a run's as a stay at its centre. */
+function rowStayId(row: Row): string {
+  if (row.kind !== "aboard") return segmentId(row);
+  const centre = centreOf(row);
+  const at = centre === undefined ? "" : `@${coordinates(centre.lat, centre.lon)}`;
+  return `stay:owner:${stamp(row.startMs)}${at}`;
 }
 
 const stamp = (ms: number): string => {
@@ -481,16 +510,23 @@ function segmentId(segment: Segment): string {
 }
 
 /**
- * The label of a stay: its place; the airport it is at; else its coordinates, with the city of the
- * nearest large airport within 30 km when no named place is within 5 km.
+ * The label of a stay: its place; the airport it is at; else its coordinates, with the nearest
+ * named place within 5 km (`59.9200,10.7400 near Home, 1.0 km`) or, failing one, the city of the
+ * nearest large airport within 30 km.
  */
 function whereOf(stay: Stay, places: Place[]): string {
   if (stay.place !== undefined) return stay.place.name;
   const at = airportAt(stay.lat, stay.lon);
   if (at !== undefined) return `${airportCode(at)}, ${at.city}`;
   const coords = coordinates(stay.lat, stay.lon);
-  if (places.some((p) => distanceM(stay.lat, stay.lon, p.lat, p.lon) <= NEAR_PLACE_KM * 1000))
-    return coords;
+  let nearest: { place: Place; m: number } | undefined;
+  for (const place of places) {
+    const m = distanceM(stay.lat, stay.lon, place.lat, place.lon);
+    if (m <= NEAR_PLACE_KM * 1000 && (nearest === undefined || m < nearest.m))
+      nearest = { place, m };
+  }
+  if (nearest !== undefined)
+    return `${coords} near ${nearest.place.name}, ${(nearest.m / 1000).toFixed(1)} km`;
   const near = nearestAirport(stay.lat, stay.lon, CITY_AIRPORT_KM);
   return near === undefined ? coords : `${coords} (${near.airport.city})`;
 }
@@ -551,8 +587,11 @@ function segmentEntry(segment: Segment, ctx: Context): SegmentEntry {
 }
 
 function runEntry(run: AboardRun, ctx: Context): SegmentEntry {
-  const inside = run.segments.map((s) => segmentEntry(s, ctx));
-  const firstStay = run.segments.find((s): s is Stay => s.kind !== "move");
+  // The container is the whole run: its span, points, lines and centre. Inside it are the rows
+  // that touch the day, and the distance is theirs.
+  const today = run.segments.filter((s) => s.startMs < ctx.dayEndMs && s.endMs > ctx.dayStartMs);
+  const inside = today.map((s) => segmentEntry(s, ctx));
+  const centre = centreOf(run);
   const first = run.segments[0] as Segment;
   const last = run.segments[run.segments.length - 1] as Segment;
   return {
@@ -566,21 +605,18 @@ function runEntry(run: AboardRun, ctx: Context): SegmentEntry {
     duration_s: roundHalfEven((run.endMs - run.startMs) / 1000),
     where: `aboard ${run.asset.name}`,
     place: null,
-    lat: firstStay === undefined ? null : roundTo(firstStay.lat, 6),
-    lon: firstStay === undefined ? null : roundTo(firstStay.lon, 6),
+    lat: centre === undefined ? null : roundTo(centre.lat, 6),
+    lon: centre === undefined ? null : roundTo(centre.lon, 6),
     aboard: run.asset.id,
     asset: { id: run.asset.id, name: run.asset.name, kind: run.asset.kind },
     mode: null,
-    distance_m: run.segments.reduce((sum, s) => sum + (s.kind === "move" ? s.distanceM : 0), 0),
+    distance_m: today.reduce((sum, s) => sum + (s.kind === "move" ? s.distanceM : 0), 0),
     airports: [],
-    points: inside.reduce((sum, s) => sum + s.points, 0),
+    points: run.segments.reduce((sum, s) => sum + judged(s).length, 0),
     promoted: false,
     gap: false,
     inside,
-    lines: {
-      first: (first.kind === "move" ? first.first : first.first).id,
-      last: (last.kind === "move" ? last.last : last.last).id,
-    },
+    lines: { first: first.first.id, last: last.last.id },
   };
 }
 
@@ -1185,21 +1221,41 @@ function keeperPhotoName(p: Payload): string {
 // ---------------------------------------------------------------------------------------------
 // Nights and the country
 
-function isHome(stay: Stay, places: Place[]): boolean {
-  if (stay.place?.kind === "home") return true;
-  return places.some(
+/** The home place a stay's centre is within 400 m of, if any; a stay at that place counts. */
+function homeOf(stay: Stay, places: Place[]): Place | undefined {
+  if (stay.place?.kind === "home") return stay.place;
+  return places.find(
     (p) => p.kind === "home" && distanceM(stay.lat, stay.lon, p.lat, p.lon) <= HOME_M,
   );
 }
 
-/** The night of a day: the stay with the longest part inside the night window; none is in transit. */
-function nightOf(day: string, stays: Stay[], ctx: Context): DayNight {
+const position = (at: { lat: number; lon: number }): { lat: number; lon: number } => ({
+  lat: roundTo(at.lat, 6),
+  lon: roundTo(at.lon, 6),
+});
+
+/** The part of a span inside a window, in ms; nothing when they do not meet. */
+const overlapMs = (
+  startMs: number,
+  endMs: number,
+  windowStart: number,
+  windowEnd: number,
+): number => Math.min(endMs, windowEnd) - Math.max(startMs, windowStart);
+
+/**
+ * The night of a day: the stay with the longest part inside the night window, a stay aboard an
+ * asset counted whole, so a passage through the night is a night aboard; none is in transit. A
+ * night aboard carries the asset's position: the inner stay that held the longest part of the
+ * night window. A night within 400 m of a home place names that place.
+ */
+function nightOf(day: string, rows: Row[], ctx: Context): DayNight {
   const startMs = localToMs(day, ctx.settings.night[0], ctx.timezone);
   const endMs = localToMs(addDays(day, 1), ctx.settings.night[1], ctx.timezone);
-  let best: { stay: Stay; overlap: number } | undefined;
-  for (const stay of stays) {
-    const overlap = Math.min(stay.endMs, endMs) - Math.max(stay.startMs, startMs);
-    if (overlap > 0 && (best === undefined || overlap > best.overlap)) best = { stay, overlap };
+  let best: { row: Stay | AboardRun; overlap: number } | undefined;
+  for (const row of rows) {
+    if (row.kind === "move") continue;
+    const overlap = overlapMs(row.startMs, row.endMs, startMs, endMs);
+    if (overlap > 0 && (best === undefined || overlap > best.overlap)) best = { row, overlap };
   }
   if (best === undefined) {
     return {
@@ -1209,48 +1265,75 @@ function nightOf(day: string, stays: Stay[], ctx: Context): DayNight {
       aboard: null,
       in_transit: true,
       stay: null,
+      position: null,
       lines: [],
     };
   }
-  const { stay } = best;
+  const { row } = best;
+  if (row.kind === "aboard") {
+    let at: { stay: Stay; overlap: number } | undefined;
+    for (const s of row.segments) {
+      if (!isStay(s)) continue;
+      const overlap = overlapMs(s.startMs, s.endMs, startMs, endMs);
+      if (overlap > 0 && (at === undefined || overlap > at.overlap)) at = { stay: s, overlap };
+    }
+    const anchorage = at?.stay ?? centreOf(row);
+    const first = row.segments[0] as Segment;
+    const last = row.segments[row.segments.length - 1] as Segment;
+    return {
+      day,
+      where: `aboard ${row.asset.name}`,
+      home: false,
+      aboard: row.asset.id,
+      in_transit: false,
+      stay: rowStayId(row),
+      position: anchorage === undefined ? null : position(anchorage),
+      lines: [first.first.id, last.last.id],
+    };
+  }
+  const home = homeOf(row, ctx.places);
   return {
     day,
-    where:
-      stay.place !== undefined
-        ? stay.place.name
-        : stay.aboard !== undefined
-          ? `aboard ${stay.aboard.name}`
-          : whereOf(stay, ctx.places),
-    home: isHome(stay, ctx.places),
-    aboard: stay.aboard?.id ?? null,
+    where: row.place?.name ?? home?.name ?? whereOf(row, ctx.places),
+    home: home !== undefined,
+    aboard: row.aboard?.id ?? null,
     in_transit: false,
-    stay: segmentId(stay),
-    lines: [stay.first.id, stay.last.id],
+    stay: segmentId(row),
+    position: position(row),
+    lines: [row.first.id, row.last.id],
   };
 }
 
-function countryOf(night: DayNight, stays: Stay[], ctx: Context): DayCountry {
-  let stay: Stay | undefined;
+/**
+ * The country of the day: the night's place, or the nearest large airport to the night's position;
+ * when the night is in transit, the longest stay of the day decides.
+ */
+function countryOf(night: DayNight, rows: Row[], ctx: Context): DayCountry {
+  let row: Stay | AboardRun | undefined;
   let from: string | null = null;
   if (night.stay !== null) {
-    stay = stays.find((s) => segmentId(s) === night.stay);
+    row = rows.find((r): r is Stay | AboardRun => r.kind !== "move" && rowStayId(r) === night.stay);
     from = "night";
   } else {
     let longest = 0;
-    for (const s of stays) {
-      const part = Math.min(s.endMs, ctx.dayEndMs) - Math.max(s.startMs, ctx.dayStartMs);
+    for (const r of rows) {
+      if (r.kind === "move") continue;
+      const part = overlapMs(r.startMs, r.endMs, ctx.dayStartMs, ctx.dayEndMs);
       if (part > longest) {
         longest = part;
-        stay = s;
+        row = r;
       }
     }
-    if (stay !== undefined) from = "longest stay";
+    if (row !== undefined) from = "longest stay";
   }
-  if (stay === undefined) return { code: null, method: null, by: null, from: null };
-  if (stay.place?.country !== undefined) {
-    return { code: stay.place.country, method: "place", by: stay.place.name, from };
+  if (row === undefined) return { code: null, method: null, by: null, from: null };
+  const place = row.kind === "aboard" ? undefined : row.place;
+  if (place?.country !== undefined) {
+    return { code: place.country, method: "place", by: place.name, from };
   }
-  const near = nearestAirport(stay.lat, stay.lon, COUNTRY_AIRPORT_KM);
+  const at = night.position ?? (row.kind === "aboard" ? centreOf(row) : row);
+  if (at === undefined) return { code: null, method: null, by: null, from };
+  const near = nearestAirport(at.lat, at.lon, COUNTRY_AIRPORT_KM);
   if (near === undefined) return { code: null, method: null, by: null, from };
   return {
     code: countryOfZone(near.airport.tz) ?? null,

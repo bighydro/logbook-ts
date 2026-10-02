@@ -10,6 +10,7 @@
       "aboard": null,
       "in_transit": true,
       "stay": null,
+      "position": null,
       "lines": []
     },
     "after": {
@@ -19,6 +20,10 @@
       "aboard": null,
       "in_transit": false,
       "stay": "stay:owner:20260410T0600Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.9139,
+        "lon": 10.7522
+      },
       "lines": [
         "00000000-0000-4000-8000-00000000041176",
         "00000000-0000-4000-8000-00000000041368"

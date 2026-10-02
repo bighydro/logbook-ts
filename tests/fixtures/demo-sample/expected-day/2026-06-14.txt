@@ -5,7 +5,7 @@
 
   00:00–10:05  stay   Home · 10 h 5 min
   10:05–10:30  move   3.2 km · 25 min · car
-  10:30–11:35  stay   59.9261,10.6999 · 1 h 5 min · 1 event, 1 photo
+  10:30–11:35  stay   59.9261,10.6999 near Marina, 3.1 km · 1 h 5 min · 1 event, 1 photo
       event        Run in the park 10:30–11:30
   11:35–12:00  move   3.2 km · 25 min · car
   12:00–24:00  stay   Home · 12 h · 1 call, 2 messages

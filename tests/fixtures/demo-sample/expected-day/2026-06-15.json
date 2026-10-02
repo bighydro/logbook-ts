@@ -10,6 +10,10 @@
       "aboard": null,
       "in_transit": false,
       "stay": "stay:owner:20260614T1000Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.913893,
+        "lon": 10.752181
+      },
       "lines": [
         "019ec592-e900-7239-8dc5-26214fc4a30a",
         "019ec9f4-6e60-7ea1-bf77-af0ade79d290"
@@ -21,9 +25,13 @@
       "home": false,
       "aboard": "nordlys",
       "in_transit": false,
-      "stay": "stay:owner:20260615T1100Z@59.8500,10.6000",
+      "stay": "stay:owner:20260615T0645Z@59.8500,10.6000",
+      "position": {
+        "lat": 59.849997,
+        "lon": 10.600016
+      },
       "lines": [
-        "019ecaf0-3380-70f5-b702-d38ca1b8d1f1",
+        "019eca06-bde0-7cd7-882a-c86c33e59841",
         "019ecf03-e700-7a2c-b3ce-bf0500c92434"
       ]
     }
@@ -161,8 +169,8 @@
       "duration_s": 83700,
       "where": "aboard Nordlys",
       "place": null,
-      "lat": 59.90501,
-      "lon": 10.735,
+      "lat": 59.849997,
+      "lon": 10.600016,
       "aboard": "nordlys",
       "asset": {
         "id": "nordlys",
