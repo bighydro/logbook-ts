@@ -1,0 +1,9 @@
+2026-04-09  Thursday
+  night before  aboard Solvind · away
+  night after   in transit
+  country       NO (nearest airport BGO) · from the longest stay
+
+  00:00–02:00  stay   BGO, Bergen · 2 h · aboard solvind
+
+  health        no lines
+  sources       sim-phone 25 lines, last 02:00 · ais 24 lines, last 23:00

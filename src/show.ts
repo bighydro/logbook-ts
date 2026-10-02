@@ -1,5 +1,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  checkTimezone,
+  DAY_MS,
+  dayMs,
+  isDay,
+  type Local,
+  type Localize,
+  localizer,
+  monthKey,
+} from "./clock.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import {
   keeperPhoto,
@@ -97,66 +107,11 @@ export interface ShowRange {
   days: Generator<DayShown>;
 }
 
-const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DASH = "–";
-const DAY_MS = 86_400_000;
 /** An airline designator in a calendar title: `LX 561`, `XY561`. */
 const DESIGNATOR = /\b([A-Z]{2})\s?(\d{1,4})\b/;
 
-/** Throws LogbookError unless the zone is one this Node's ICU knows. */
-export function checkTimezone(timezone: string): void {
-  try {
-    new Intl.DateTimeFormat("en-GB", { timeZone: timezone });
-  } catch {
-    throw new LogbookError(`unknown timezone ${timezone}`);
-  }
-}
-
-/** True for `YYYY-MM-DD` naming a real calendar day. */
-export function isDay(day: string): boolean {
-  const m = DAY.exec(day);
-  if (!m) return false;
-  return new Date(dayMs(day)).toISOString().slice(0, 10) === day;
-}
-
-/** Midnight UTC of a `YYYY-MM-DD`, in ms. */
-function dayMs(day: string): number {
-  const m = DAY.exec(day) as RegExpExecArray;
-  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-
-/** `YYYY-MM` of an instant, in UTC: the month file a line written there belongs to. */
-const monthKey = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
-
-interface Local {
-  day: string;
-  clock: string;
-}
-
-/** Local calendar day and HH:MM of an instant in a zone; undefined when `at` is not a date. */
-type Localize = (at: string) => Local | undefined;
-
-function localizer(timezone: string): Localize {
-  const format = new Intl.DateTimeFormat("en-GB", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  return (at) => {
-    const ms = Date.parse(at);
-    if (Number.isNaN(ms)) return undefined;
-    const parts = format.formatToParts(new Date(ms));
-    const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? "";
-    return {
-      day: `${get("year")}-${get("month")}-${get("day")}`,
-      clock: `${get("hour")}:${get("minute")}`,
-    };
-  };
-}
+export { checkTimezone, isDay };
 
 interface Entry {
   line: Line;
@@ -211,7 +166,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
 
   const keep = profileFilter(options.profiles);
   const files = monthFiles(root);
-  const { resolver, supersededFlights, first, last } = judgements(files);
+  const { resolver, supersededFlights, first, last } = readJudgements(files);
   const since = options.since ?? (first === undefined ? undefined : local(first)?.day);
   const until = options.until ?? (last === undefined ? undefined : local(last)?.day);
   const ctx: RenderContext = {
@@ -337,18 +292,26 @@ function heroLine(hero: ShownHero[]): string[] {
   return [`  hero  ${items.join(", ")}`];
 }
 
-/**
- * The judgements the whole record holds — who a ref is, which lines are hidden, which flights
- * replaced — and the first and last instant a listed line has, read in one pass over every file.
- */
-function judgements(files: MonthFile[]): {
+/** The judgements the whole record holds, read in one pass over every file. */
+export interface Judgements {
   resolver: Resolver;
+  /** For a `flight/v1` line another flight line supersedes: that line's seq. */
   supersededFlights: Map<string, number>;
+  /** Every id some line's payload names in `supersedes`, whatever the kind. */
+  superseded: Set<string>;
+  /** The first and last instant a listed line has, as written. */
   first: string | undefined;
   last: string | undefined;
-} {
+}
+
+/**
+ * The judgements the whole record holds — who a ref is, which lines are hidden, which lines
+ * replaced — and the first and last instant a listed line has, read in one pass over every file.
+ */
+export function readJudgements(files: MonthFile[]): Judgements {
   const judged: Line[] = [];
   const supersededFlights = new Map<string, number>();
+  const superseded = new Set<string>();
   let first: { at: string; ms: number } | undefined;
   let last: { at: string; ms: number } | undefined;
   for (const month of files) {
@@ -358,9 +321,10 @@ function judgements(files: MonthFile[]): {
       const { line } = parsed;
       if (line.kind === "resolution" || line.kind === "retraction") judged.push(line);
       if (line.kind === "retraction") continue;
-      if (line.kind === "flight") {
-        const earlier = payloadOf(line).supersedes;
-        if (typeof earlier === "string") supersededFlights.set(earlier, line.seq);
+      const earlier = payloadOf(line).supersedes;
+      if (typeof earlier === "string") {
+        superseded.add(earlier);
+        if (line.kind === "flight") supersededFlights.set(earlier, line.seq);
       }
       if (typeof line.at !== "string") continue;
       const ms = Date.parse(line.at);
@@ -369,7 +333,13 @@ function judgements(files: MonthFile[]): {
       if (last === undefined || ms > last.ms) last = { at: line.at, ms };
     }
   }
-  return { resolver: buildResolver(judged), supersededFlights, first: first?.at, last: last?.at };
+  return {
+    resolver: buildResolver(judged),
+    supersededFlights,
+    superseded,
+    first: first?.at,
+    last: last?.at,
+  };
 }
 
 /** The text of `notes/<YYYY>/<day>.md`, when the day has one. */

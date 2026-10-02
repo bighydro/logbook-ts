@@ -1,5 +1,8 @@
+import { localOf } from "./clock.js";
+import { readDay } from "./day.js";
+import { renderDay } from "./dayText.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
-import { addNote, LogbookError, verifyLogbook } from "./store.js";
+import { addNote, LogbookError, readMeta, verifyLogbook } from "./store.js";
 
 export interface Io {
   stdout: (text: string) => void;
@@ -21,6 +24,13 @@ export const USAGE = `usage:
                                       the same for every day of the range that has a line, oldest
                                       first, streamed, one object per line with --json; a missing
                                       bound is the record's first or last day
+  logbook-ts day <root> [YYYY-MM-DD] [--json]
+                                      the day read back whole, as the reference's \`logbook day\`
+                                      prints it: the nights either side, the country, the timeline
+                                      of stays, stops, moves and flights with what attached to each
+                                      and who was there, what was placed nowhere, the health line,
+                                      the sources; today in the record's zone when no day is given;
+                                      --json prints the Day as one object, every row with its lines
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
@@ -76,6 +86,19 @@ export function main(argv: string[], io: Io): number {
           const span = [shown.since, shown.until].filter((d) => d !== undefined);
           io.stdout(`${span.length ? `${[...new Set(span)].join("–")}: ` : ""}nothing logged\n`);
         }
+        return 0;
+      }
+      case "day": {
+        if (root === undefined) return usage(io);
+        let day: string | undefined;
+        let json = false;
+        for (const arg of rest) {
+          if (arg === "--json" && !json) json = true;
+          else if (day === undefined && isDay(arg)) day = arg;
+          else return usage(io);
+        }
+        const read = readDay(root, { day: day ?? today(root) });
+        io.stdout(json ? `${JSON.stringify(read)}\n` : renderDay(read));
         return 0;
       }
       default:
@@ -158,6 +181,13 @@ function parseShowFlags(args: string[]): ShowFlags | undefined {
   if (until !== undefined) flags.until = until;
   if (timezone !== undefined) flags.timezone = timezone;
   return flags;
+}
+
+/** Today's date on the record's clock. */
+function today(root: string): string {
+  const timezone = readMeta(root).timezone;
+  return localOf(Date.now(), typeof timezone === "string" && timezone !== "" ? timezone : "UTC")
+    .day;
 }
 
 function usage(io: Io): number {

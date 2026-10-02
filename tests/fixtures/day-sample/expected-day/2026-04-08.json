@@ -1,0 +1,368 @@
+{
+  "day": "2026-04-08",
+  "weekday": "Wednesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-07",
+      "where": "60.3900,5.3200",
+      "home": false,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260407T0850Z@60.3900,5.3200",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004472",
+        "00000000-0000-4000-8000-0000000004738"
+      ]
+    },
+    "after": {
+      "day": "2026-04-08",
+      "where": "aboard Solvind",
+      "home": false,
+      "aboard": "solvind",
+      "in_transit": false,
+      "stay": "stay:owner:20260408T1100Z@60.3000,5.2000",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004957",
+        "00000000-0000-4000-8000-00000000041137"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "airport",
+    "by": "BGO",
+    "from": "night"
+  },
+  "all_day": [
+    {
+      "title": "Boat week",
+      "line": "00000000-0000-4000-8000-0000000004746",
+      "sources": [
+        "sim-calendar"
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000004746"
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "stay:owner:20260407T0850Z@60.3900,5.3200",
+      "kind": "stay",
+      "start": "2026-04-07T08:50:00Z",
+      "end": "2026-04-08T07:00:00Z",
+      "start_local": "2026-04-07T10:50:00+02:00",
+      "end_local": "2026-04-08T09:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T22:00:00Z",
+        "end": "2026-04-08T07:00:00Z",
+        "duration_s": 32400
+      },
+      "duration_s": 79800,
+      "where": "60.3900,5.3200",
+      "place": null,
+      "lat": 60.39,
+      "lon": 5.32,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 267,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004472",
+        "last": "00000000-0000-4000-8000-0000000004738"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260408T0700Z",
+      "kind": "move",
+      "start": "2026-04-08T07:00:00Z",
+      "end": "2026-04-08T07:15:00Z",
+      "start_local": "2026-04-08T09:00:00+02:00",
+      "end_local": "2026-04-08T09:15:00+02:00",
+      "within_day": {
+        "start": "2026-04-08T07:00:00Z",
+        "end": "2026-04-08T07:15:00Z",
+        "duration_s": 900
+      },
+      "duration_s": 900,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "walk",
+      "distance_m": 782,
+      "airports": [],
+      "points": 2,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004738",
+        "last": "00000000-0000-4000-8000-0000000004912"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "aboard:solvind:20260408T0715Z",
+      "kind": "aboard",
+      "start": "2026-04-08T07:15:00Z",
+      "end": "2026-04-09T00:00:00Z",
+      "start_local": "2026-04-08T09:15:00+02:00",
+      "end_local": "2026-04-09T02:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-08T07:15:00Z",
+        "end": "2026-04-08T22:00:00Z",
+        "duration_s": 53100
+      },
+      "duration_s": 60300,
+      "where": "aboard Solvind",
+      "place": null,
+      "lat": 60.395,
+      "lon": 5.31,
+      "aboard": "solvind",
+      "asset": {
+        "id": "solvind",
+        "name": "Solvind",
+        "kind": "yacht"
+      },
+      "mode": null,
+      "distance_m": 12174,
+      "airports": [],
+      "points": 202,
+      "promoted": false,
+      "gap": false,
+      "inside": [
+        {
+          "id": "stay:owner:20260408T0715Z@60.3950,5.3100",
+          "kind": "stay",
+          "start": "2026-04-08T07:15:00Z",
+          "end": "2026-04-08T09:00:00Z",
+          "start_local": "2026-04-08T09:15:00+02:00",
+          "end_local": "2026-04-08T11:00:00+02:00",
+          "within_day": {
+            "start": "2026-04-08T07:15:00Z",
+            "end": "2026-04-08T09:00:00Z",
+            "duration_s": 6300
+          },
+          "duration_s": 6300,
+          "where": "Berth",
+          "place": "Berth",
+          "lat": 60.395,
+          "lon": 5.31,
+          "aboard": "solvind",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 22,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "00000000-0000-4000-8000-0000000004912",
+            "last": "00000000-0000-4000-8000-0000000004933"
+          }
+        },
+        {
+          "id": "move:owner:20260408T0900Z",
+          "kind": "move",
+          "start": "2026-04-08T09:00:00Z",
+          "end": "2026-04-08T11:00:00Z",
+          "start_local": "2026-04-08T11:00:00+02:00",
+          "end_local": "2026-04-08T13:00:00+02:00",
+          "within_day": {
+            "start": "2026-04-08T09:00:00Z",
+            "end": "2026-04-08T11:00:00Z",
+            "duration_s": 7200
+          },
+          "duration_s": 7200,
+          "where": null,
+          "place": null,
+          "lat": null,
+          "lon": null,
+          "aboard": "solvind",
+          "mode": "boat",
+          "distance_m": 12174,
+          "airports": [],
+          "points": 23,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "00000000-0000-4000-8000-0000000004933",
+            "last": "00000000-0000-4000-8000-0000000004957"
+          }
+        },
+        {
+          "id": "stay:owner:20260408T1100Z@60.3000,5.2000",
+          "kind": "stay",
+          "start": "2026-04-08T11:00:00Z",
+          "end": "2026-04-09T00:00:00Z",
+          "start_local": "2026-04-08T13:00:00+02:00",
+          "end_local": "2026-04-09T02:00:00+02:00",
+          "within_day": {
+            "start": "2026-04-08T11:00:00Z",
+            "end": "2026-04-08T22:00:00Z",
+            "duration_s": 39600
+          },
+          "duration_s": 46800,
+          "where": "BGO, Bergen",
+          "place": null,
+          "lat": 60.3,
+          "lon": 5.2,
+          "aboard": "solvind",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 157,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "00000000-0000-4000-8000-0000000004957",
+            "last": "00000000-0000-4000-8000-00000000041137"
+          }
+        }
+      ],
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004912",
+        "last": "00000000-0000-4000-8000-00000000041137"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [
+          {
+            "text": "Anchored with Ola Nordmann. Grilled.",
+            "line": "00000000-0000-4000-8000-00000000041174"
+          }
+        ],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 1,
+          "lines": [
+            "00000000-0000-4000-8000-00000000041175"
+          ]
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "019c0000-0000-7000-8000-000000000101",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 1.0,
+            "sources": [
+              "note",
+              "photo"
+            ],
+            "reasons": [
+              "note says with Ola Nordmann",
+              "face in IMG_0408.HEIC"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-00000000041174",
+              "00000000-0000-4000-8000-00000000041175"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": {
+    "sleep_h": 7.0,
+    "steps": null,
+    "resting_hr": null,
+    "hrv": null,
+    "lines": [
+      "00000000-0000-4000-8000-0000000004745"
+    ]
+  },
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 288,
+      "first": "2026-04-07T22:00:00Z",
+      "newest": "2026-04-08T21:55:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 101,
+      "first": "2026-04-07T22:00:00Z",
+      "newest": "2026-04-08T21:00:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 1,
+      "first": "2026-04-07T22:00:00Z",
+      "newest": "2026-04-07T22:00:00Z"
+    },
+    {
+      "source": "immich",
+      "lines": 1,
+      "first": "2026-04-08T13:00:00Z",
+      "newest": "2026-04-08T13:00:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 1,
+      "first": "2026-04-08T12:00:00Z",
+      "newest": "2026-04-08T12:00:00Z"
+    },
+    {
+      "source": "sim-calendar",
+      "lines": 1,
+      "first": "2026-04-07T22:00:00Z",
+      "newest": "2026-04-07T22:00:00Z"
+    }
+  ]
+}

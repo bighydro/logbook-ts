@@ -1,8 +1,18 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
+import { localOf } from "../src/clock.js";
 import { verifyLogbook } from "../src/store.js";
-import { cleanup, copySample, EXPECTED, readLines, SAMPLE, writeLines } from "./helpers.js";
+import {
+  cleanup,
+  copySample,
+  EXPECTED,
+  expectedDays,
+  FIXTURES,
+  readLines,
+  SAMPLE,
+  writeLines,
+} from "./helpers.js";
 
 afterEach(cleanup);
 
@@ -92,6 +102,63 @@ describe("logbook-ts add", () => {
   });
 });
 
+describe("logbook-ts day", () => {
+  const DAY_SAMPLE = join(FIXTURES, "day-sample");
+
+  it("prints the day as the reference does, and the same Day as JSON", () => {
+    for (const expected of expectedDays(DAY_SAMPLE)) {
+      const text = run(["day", DAY_SAMPLE, expected.day]);
+      expect(text.code).toBe(0);
+      expect(text.err).toBe("");
+      expect(text.out).toBe(expected.text);
+      const json = run(["day", DAY_SAMPLE, expected.day, "--json"]);
+      expect(json.code).toBe(0);
+      expect(json.out.endsWith("\n")).toBe(true);
+      expect(JSON.parse(json.out)).toEqual(expected.json);
+    }
+  });
+
+  it("takes the flags in either order", () => {
+    expect(run(["day", DAY_SAMPLE, "--json", "2026-04-09"]).out).toBe(
+      run(["day", DAY_SAMPLE, "2026-04-09", "--json"]).out,
+    );
+  });
+
+  it("reads today, in the record's zone, when no day is given", () => {
+    const { code, out } = run(["day", DAY_SAMPLE]);
+    expect(code).toBe(0);
+    const today = localOf(Date.now(), "Europe/Oslo").day;
+    expect(out.startsWith(`${today}  `)).toBe(true);
+    expect(out).toContain("  timeline      nothing logged\n");
+  });
+
+  it("prints usage and exits 2 on a day that is not one, an unknown flag, or no root", () => {
+    for (const argv of [
+      ["day"],
+      ["day", DAY_SAMPLE, "2026-13-01"],
+      ["day", DAY_SAMPLE, "--raw"],
+      ["day", DAY_SAMPLE, "2026-04-06", "2026-04-07"],
+    ]) {
+      const { code, err } = run(argv);
+      expect(code).toBe(2);
+      expect(err).toMatch(/usage/i);
+    }
+  });
+
+  it("refuses a record it does not carry, and never writes", () => {
+    const root = copySample();
+    const before = readLines(root);
+    const meta = JSON.parse(readLines(root, "logbook.json").join("")) as Record<string, unknown>;
+    writeLines(root, [JSON.stringify({ ...meta, format: "logbook/0.1" })], "logbook.json");
+    const { code, err } = run(["day", root, "2026-03-02"]);
+    expect(code).toBe(1);
+    expect(err).toMatch(/logbook\/0\.1/);
+    writeLines(root, [JSON.stringify(meta)], "logbook.json");
+    expect(run(["day", root, "2026-03-02"]).code).toBe(0);
+    expect(readLines(root)).toEqual(before);
+  });
+});
+
 describe("logbook-ts usage", () => {
   it("prints usage and exits 2 without a command, with an unknown command, or with missing args", () => {
     for (const argv of [[], ["frobnicate"], ["verify"], ["add"], ["add", SAMPLE]]) {
@@ -107,5 +174,6 @@ describe("logbook-ts usage", () => {
     expect(out).toMatch(/usage/i);
     expect(out).toMatch(/verify/);
     expect(out).toMatch(/add/);
+    expect(out).toMatch(/day/);
   });
 });

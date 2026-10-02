@@ -1,0 +1,15 @@
+2026-06-13  Saturday
+  night before  Home · home
+  night after   Home · home
+  country       NO (place Home)
+
+  00:00–09:35  stay   Home · 9 h 35 min
+  09:35–09:45  move   1.4 km · 10 min · car
+  09:45–15:05  stay   Marina · 5 h 20 min · aboard nordlys · 1 event, 2 messages, 1 photo
+      event        Boat prep 10:00–15:00
+      with         Ola Nordmann (calendar, photo), Anders Vik (calendar, photo), Sigrid Moen (calendar)
+  15:05–15:15  move   1.4 km · 10 min · car
+  15:15–24:00  stay   Home · 8 h 45 min · 4 messages
+
+  health        sleep 6.8 h · 8,320 steps · resting 60 bpm
+  sources       dawarich 286 lines, last 23:55 · apple-health 82 lines, last 22:07 · ais 24 lines, last 23:00 · whatsapp 6 lines, last 19:30 · safari 3 lines, last 16:32 · easypark 1 line, last 09:45 · google-takeout 1 line, last 08:30 · immich 1 line, last 13:00 · ios-calendar 1 line, last 10:00 · shazam 1 line, last 10:42

@@ -1,0 +1,18 @@
+2026-06-15  Monday
+  night before  Home · home
+  night after   aboard Nordlys · away
+  country       NO (nearest airport OSL)
+  all day       Nordlys: summer cruise
+
+  00:00–08:35  stay   Home · 8 h 35 min
+  08:35–08:45  move   1.4 km · 10 min · car
+  08:45–24:00  aboard Nordlys (yacht) · 15 h 15 min · 1 note, 1 call
+      08:45–10:05  stay   Marina · 1 h 20 min
+      10:05–13:00  move   9.7 km · 2 h 55 min · boat
+      13:00–24:00  stay   59.8500,10.6000 · 11 h
+      note         Cast off at ten with Ola Nordmann and Anders Vik. Light wind from the s…
+      call         → Ola Nordmann, 15 min
+      with         Ola Nordmann (note), Anders Vik (note)
+
+  health        sleep 6.2 h · 6,671 steps · resting 54 bpm
+  sources       dawarich 286 lines, last 23:55 · ais 161 lines, last 23:50 · apple-health 80 lines, last 22:07 · ios-calendar 1 line, last 00:00 · ios-calls 1 line, last 17:33 · manual 1 line, last 10:05 · safari 1 line, last 10:22 · shazam 1 line, last 17:28 · voice-memos 1 line, last 16:00

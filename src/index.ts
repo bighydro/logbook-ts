@@ -1,13 +1,52 @@
 export { contentHash, contentOf, hashLine, lineHash, sha256Hex, ZERO_HASH } from "./chain.js";
 export { main } from "./cli.js";
+export {
+  addDays,
+  checkTimezone,
+  isDay,
+  localIso,
+  localOf,
+  localToMs,
+  weekdayOf,
+} from "./clock.js";
+export {
+  type AllDayEntry,
+  type Attached,
+  type Company,
+  type Day,
+  type DayCountry,
+  type DayHealth,
+  type DayNight,
+  type DayOptions,
+  type FlightEntry,
+  type Person,
+  readDay,
+  type SegmentEntry,
+  type SourceCount,
+  type TimelineEntry,
+  type UnplacedEntry,
+} from "./day.js";
+export { distanceText, durationText, renderDay } from "./dayText.js";
+export { distanceM, fsum, mean, roundHalfEven, roundTo } from "./geo.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lines.js";
 export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
 export {
-  checkTimezone,
+  type Asset,
+  DEFAULT_STAY_SETTINGS,
+  type OwnerPolicy,
+  type Place,
+  readAssets,
+  readOwnerPolicy,
+  readPlaces,
+  readStaySettings,
+  type StaySettings,
+} from "./settings.js";
+export {
   type DayDetail,
   type DayShown,
-  isDay,
+  type Judgements,
+  readJudgements,
   type ShownHero,
   type ShownRow,
   type ShowOptions,
@@ -18,6 +57,15 @@ export {
   showDays,
   showRange,
 } from "./show.js";
+export {
+  deriveSegments,
+  type Move,
+  markAboard,
+  type Point,
+  placeAt,
+  type Segment,
+  type Stay,
+} from "./stays.js";
 export {
   type AddOptions,
   addNote,

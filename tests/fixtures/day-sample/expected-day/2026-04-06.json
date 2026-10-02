@@ -1,0 +1,776 @@
+{
+  "day": "2026-04-06",
+  "weekday": "Monday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-05",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260405T1600Z@59.9139,10.7522",
+      "lines": [
+        "00000000-0000-4000-8000-000000000407",
+        "00000000-0000-4000-8000-0000000004187"
+      ]
+    },
+    "after": {
+      "day": "2026-04-06",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260406T1650Z@59.9139,10.7522",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004293",
+        "00000000-0000-4000-8000-0000000004439"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "place",
+    "by": "Home",
+    "from": "night"
+  },
+  "all_day": [
+    {
+      "title": "Ines in town",
+      "line": "00000000-0000-4000-8000-0000000004205",
+      "sources": [
+        "sim-calendar"
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000004205"
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "stay:owner:20260405T1600Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-04-05T16:00:00Z",
+      "end": "2026-04-06T07:00:00Z",
+      "start_local": "2026-04-05T18:00:00+02:00",
+      "end_local": "2026-04-06T09:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-05T22:00:00Z",
+        "end": "2026-04-06T07:00:00Z",
+        "duration_s": 32400
+      },
+      "duration_s": 54000,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.9139,
+      "lon": 10.7522,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 181,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-000000000407",
+        "last": "00000000-0000-4000-8000-0000000004187"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260406T0700Z",
+      "kind": "move",
+      "start": "2026-04-06T07:00:00Z",
+      "end": "2026-04-06T07:10:00Z",
+      "start_local": "2026-04-06T09:00:00+02:00",
+      "end_local": "2026-04-06T09:10:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T07:00:00Z",
+        "end": "2026-04-06T07:10:00Z",
+        "duration_s": 600
+      },
+      "duration_s": 600,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "walk",
+      "distance_m": 299,
+      "airports": [],
+      "points": 1,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004187",
+        "last": "00000000-0000-4000-8000-0000000004207"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260406T0710Z@59.9120,10.7560",
+      "kind": "stay",
+      "start": "2026-04-06T07:10:00Z",
+      "end": "2026-04-06T07:15:00Z",
+      "start_local": "2026-04-06T09:10:00+02:00",
+      "end_local": "2026-04-06T09:15:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T07:10:00Z",
+        "end": "2026-04-06T07:15:00Z",
+        "duration_s": 300
+      },
+      "duration_s": 300,
+      "where": "59.9120,10.7560",
+      "place": null,
+      "lat": 59.912,
+      "lon": 10.756,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 2,
+      "promoted": true,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004207",
+        "last": "00000000-0000-4000-8000-0000000004208"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260406T0715Z",
+      "kind": "move",
+      "start": "2026-04-06T07:15:00Z",
+      "end": "2026-04-06T07:20:00Z",
+      "start_local": "2026-04-06T09:15:00+02:00",
+      "end_local": "2026-04-06T09:20:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T07:15:00Z",
+        "end": "2026-04-06T07:20:00Z",
+        "duration_s": 300
+      },
+      "duration_s": 300,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "walk",
+      "distance_m": 315,
+      "airports": [],
+      "points": 0,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004208",
+        "last": "00000000-0000-4000-8000-0000000004209"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260406T0720Z@59.9100,10.7600",
+      "kind": "stay",
+      "start": "2026-04-06T07:20:00Z",
+      "end": "2026-04-06T12:00:00Z",
+      "start_local": "2026-04-06T09:20:00+02:00",
+      "end_local": "2026-04-06T14:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T07:20:00Z",
+        "end": "2026-04-06T12:00:00Z",
+        "duration_s": 16800
+      },
+      "duration_s": 16800,
+      "where": "Office",
+      "place": "Office",
+      "lat": 59.91,
+      "lon": 10.76,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 57,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004209",
+        "last": "00000000-0000-4000-8000-0000000004265"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Weekly planning",
+            "start": "2026-04-06T08:00:00Z",
+            "end": "2026-04-06T08:45:00Z",
+            "line": "00000000-0000-4000-8000-0000000004266",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004266"
+            ]
+          }
+        ],
+        "transcripts": [
+          {
+            "title": "Standup",
+            "line": "00000000-0000-4000-8000-0000000004267"
+          }
+        ],
+        "notes": [
+          {
+            "text": "Lunch with Ola Nordmann and Kari at the office. Ines came by.",
+            "line": "00000000-0000-4000-8000-0000000004276"
+          }
+        ],
+        "mail": [
+          {
+            "subject": "Berth",
+            "thread": "t1",
+            "messages": 2,
+            "lines": [
+              "00000000-0000-4000-8000-0000000004270",
+              "00000000-0000-4000-8000-0000000004271"
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "who": "Ola Nordmann",
+            "direction": "outgoing",
+            "answered": false,
+            "duration_s": 0,
+            "line": "00000000-0000-4000-8000-0000000004272"
+          },
+          {
+            "who": "Ines Holm",
+            "direction": "incoming",
+            "answered": true,
+            "duration_s": 45,
+            "line": "00000000-0000-4000-8000-0000000004273"
+          }
+        ],
+        "messages": {
+          "count": 2,
+          "lines": [
+            "00000000-0000-4000-8000-0000000004268",
+            "00000000-0000-4000-8000-0000000004269"
+          ]
+        },
+        "photos": {
+          "count": 1,
+          "lines": [
+            "00000000-0000-4000-8000-0000000004274"
+          ]
+        },
+        "keepers": [
+          {
+            "name": "IMG_0406.HEIC",
+            "lane": "memory",
+            "line": "00000000-0000-4000-8000-0000000004275"
+          }
+        ]
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "019c0000-0000-7000-8000-000000000101",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 1.0,
+            "sources": [
+              "calendar",
+              "transcript",
+              "note",
+              "photo"
+            ],
+            "reasons": [
+              "attendee of Weekly planning",
+              "spoke in Standup",
+              "note says with Ola Nordmann",
+              "face in IMG_0406.HEIC"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004266",
+              "00000000-0000-4000-8000-0000000004267",
+              "00000000-0000-4000-8000-0000000004276",
+              "00000000-0000-4000-8000-0000000004274"
+            ]
+          },
+          {
+            "person": "019c0000-0000-7000-8000-000000000102",
+            "name": "Ines Holm",
+            "status": "confirmed",
+            "confidence": 0.9,
+            "sources": [
+              "transcript"
+            ],
+            "reasons": [
+              "spoke in Standup"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004267"
+            ]
+          },
+          {
+            "person": null,
+            "name": "Per",
+            "status": "confirmed",
+            "confidence": 0.8,
+            "sources": [
+              "calendar"
+            ],
+            "reasons": [
+              "attendee of Weekly planning"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004266"
+            ]
+          }
+        ],
+        "proposed": [
+          {
+            "person": null,
+            "name": "immich:f_99",
+            "status": "proposed",
+            "confidence": 0.5,
+            "sources": [
+              "photo"
+            ],
+            "reasons": [
+              "face in IMG_0406.HEIC"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004274"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "move:owner:20260406T1200Z",
+      "kind": "move",
+      "start": "2026-04-06T12:00:00Z",
+      "end": "2026-04-06T16:00:00Z",
+      "start_local": "2026-04-06T14:00:00+02:00",
+      "end_local": "2026-04-06T18:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T12:00:00Z",
+        "end": "2026-04-06T16:00:00Z",
+        "duration_s": 14400
+      },
+      "duration_s": 14400,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "walk",
+      "distance_m": 4723,
+      "airports": [],
+      "points": 0,
+      "promoted": false,
+      "gap": true,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004265",
+        "last": "00000000-0000-4000-8000-0000000004283"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260406T1600Z@59.9400,10.7000",
+      "kind": "stay",
+      "start": "2026-04-06T16:00:00Z",
+      "end": "2026-04-06T16:30:00Z",
+      "start_local": "2026-04-06T18:00:00+02:00",
+      "end_local": "2026-04-06T18:30:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T16:00:00Z",
+        "end": "2026-04-06T16:30:00Z",
+        "duration_s": 1800
+      },
+      "duration_s": 1800,
+      "where": "59.9400,10.7000",
+      "place": null,
+      "lat": 59.94,
+      "lon": 10.7,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 7,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004283",
+        "last": "00000000-0000-4000-8000-0000000004289"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260406T1630Z",
+      "kind": "move",
+      "start": "2026-04-06T16:30:00Z",
+      "end": "2026-04-06T16:50:00Z",
+      "start_local": "2026-04-06T18:30:00+02:00",
+      "end_local": "2026-04-06T18:50:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T16:30:00Z",
+        "end": "2026-04-06T16:50:00Z",
+        "duration_s": 1200
+      },
+      "duration_s": 1200,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 4109,
+      "airports": [],
+      "points": 3,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004289",
+        "last": "00000000-0000-4000-8000-0000000004293"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260406T1650Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-04-06T16:50:00Z",
+      "end": "2026-04-07T05:00:00Z",
+      "start_local": "2026-04-06T18:50:00+02:00",
+      "end_local": "2026-04-07T07:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T16:50:00Z",
+        "end": "2026-04-06T22:00:00Z",
+        "duration_s": 18600
+      },
+      "duration_s": 43800,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.9139,
+      "lon": 10.7522,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 147,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004293",
+        "last": "00000000-0000-4000-8000-0000000004439"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [
+          {
+            "text": "Draft of the evening note.",
+            "line": "00000000-0000-4000-8000-0000000004441"
+          },
+          {
+            "text": "Final evening note with Ola Nordmann.",
+            "line": "00000000-0000-4000-8000-0000000004442"
+          }
+        ],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "019c0000-0000-7000-8000-000000000101",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 1.0,
+            "sources": [
+              "note"
+            ],
+            "reasons": [
+              "note says with Ola Nordmann"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004442"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "note",
+      "at": "2026-04-06T13:00:00Z",
+      "end": null,
+      "title": "Walked along the river with Ines Holm.",
+      "line": "00000000-0000-4000-8000-0000000004277"
+    },
+    {
+      "kind": "event",
+      "at": "2026-04-06T13:30:00Z",
+      "end": "2026-04-06T14:30:00Z",
+      "title": "Dentist",
+      "line": "00000000-0000-4000-8000-0000000004278",
+      "sources": [
+        "sim-calendar"
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000004278"
+      ]
+    },
+    {
+      "kind": "call",
+      "at": "2026-04-06T14:00:00Z",
+      "end": "2026-04-06T14:10:00Z",
+      "title": "+4790000002",
+      "line": "00000000-0000-4000-8000-0000000004279"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-04-06T14:30:00Z",
+      "end": null,
+      "title": "Tromsø",
+      "line": "00000000-0000-4000-8000-0000000004280"
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-04-06T15:00:00Z",
+      "end": "2026-04-06T15:20:00Z",
+      "title": "River talk",
+      "line": "00000000-0000-4000-8000-0000000004281"
+    }
+  ],
+  "health": {
+    "sleep_h": 6.4,
+    "steps": 370,
+    "resting_hr": 57,
+    "hrv": 42,
+    "lines": [
+      "00000000-0000-4000-8000-0000000004188",
+      "00000000-0000-4000-8000-0000000004190",
+      "00000000-0000-4000-8000-0000000004191",
+      "00000000-0000-4000-8000-0000000004192",
+      "00000000-0000-4000-8000-0000000004193",
+      "00000000-0000-4000-8000-0000000004199",
+      "00000000-0000-4000-8000-0000000004202",
+      "00000000-0000-4000-8000-0000000004203",
+      "00000000-0000-4000-8000-0000000004196",
+      "00000000-0000-4000-8000-0000000004445",
+      "00000000-0000-4000-8000-0000000004197"
+    ]
+  },
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 241,
+      "first": "2026-04-05T22:00:00Z",
+      "newest": "2026-04-06T21:55:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 17,
+      "first": "2026-04-05T22:00:00Z",
+      "newest": "2026-04-06T20:30:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 4,
+      "first": "2026-04-06T11:45:00Z",
+      "newest": "2026-04-06T18:35:00Z"
+    },
+    {
+      "source": "ios-calls",
+      "lines": 3,
+      "first": "2026-04-06T10:45:00Z",
+      "newest": "2026-04-06T14:00:00Z"
+    },
+    {
+      "source": "mail",
+      "lines": 3,
+      "first": "2026-04-06T10:00:00Z",
+      "newest": "2026-04-06T14:30:00Z"
+    },
+    {
+      "source": "sim-calendar",
+      "lines": 3,
+      "first": "2026-04-05T22:00:00Z",
+      "newest": "2026-04-06T13:30:00Z"
+    },
+    {
+      "source": "granola",
+      "lines": 2,
+      "first": "2026-04-06T09:00:00Z",
+      "newest": "2026-04-06T15:00:00Z"
+    },
+    {
+      "source": "immich",
+      "lines": 2,
+      "first": "2026-04-06T11:30:00Z",
+      "newest": "2026-04-06T15:30:00Z"
+    },
+    {
+      "source": "whatsapp",
+      "lines": 2,
+      "first": "2026-04-06T09:10:00Z",
+      "newest": "2026-04-06T09:12:00Z"
+    },
+    {
+      "source": "keeper-inference",
+      "lines": 1,
+      "first": "2026-04-06T11:30:00Z",
+      "newest": "2026-04-06T11:30:00Z"
+    }
+  ]
+}

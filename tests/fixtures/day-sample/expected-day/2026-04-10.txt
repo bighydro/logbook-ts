@@ -1,0 +1,11 @@
+2026-04-10  Friday
+  night before  in transit
+  night after   Home · home
+  country       NO (place Home)
+
+  00:00–08:00  gap    8 h · no points · 311 km
+  08:00–24:00  stay   Home · 16 h · 1 note
+      note         Coffee with Kari.
+
+  health        no lines
+  sources       sim-phone 192 lines, last 23:55 · ais 2 lines, last 01:00 · manual 1 line, last 12:00

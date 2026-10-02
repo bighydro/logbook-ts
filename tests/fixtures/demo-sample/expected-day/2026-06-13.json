@@ -1,0 +1,507 @@
+{
+  "day": "2026-06-13",
+  "weekday": "Saturday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-06-12",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260612T1625Z@59.9139,10.7522",
+      "lines": [
+        "019ebca6-ab60-7894-b87c-bacfcb191ca4",
+        "019ebfde-a4e0-7717-9b62-3bcd9d34a169"
+      ]
+    },
+    "after": {
+      "day": "2026-06-13",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260613T1315Z@59.9139,10.7522",
+      "lines": [
+        "019ec11f-1420-737d-8e52-e1cf95cfe6fc",
+        "019ec4b7-2f00-7529-a240-c9131872731f"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "place",
+    "by": "Home",
+    "from": "night"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "stay:owner:20260612T1625Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-06-12T16:25:00Z",
+      "end": "2026-06-13T07:35:00Z",
+      "start_local": "2026-06-12T18:25:00+02:00",
+      "end_local": "2026-06-13T09:35:00+02:00",
+      "within_day": {
+        "start": "2026-06-12T22:00:00Z",
+        "end": "2026-06-13T07:35:00Z",
+        "duration_s": 34500
+      },
+      "duration_s": 54600,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.913911,
+      "lon": 10.752187,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 181,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ebca6-ab60-7894-b87c-bacfcb191ca4",
+        "last": "019ebfde-a4e0-7717-9b62-3bcd9d34a169"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260613T0735Z",
+      "kind": "move",
+      "start": "2026-06-13T07:35:00Z",
+      "end": "2026-06-13T07:45:00Z",
+      "start_local": "2026-06-13T09:35:00+02:00",
+      "end_local": "2026-06-13T09:45:00+02:00",
+      "within_day": {
+        "start": "2026-06-13T07:35:00Z",
+        "end": "2026-06-13T07:45:00Z",
+        "duration_s": 600
+      },
+      "duration_s": 600,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 1377,
+      "airports": [],
+      "points": 2,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ebfde-a4e0-7717-9b62-3bcd9d34a169",
+        "last": "019ebff0-f460-7482-bd4f-32ea55a72a09"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260613T0745Z@59.9050,10.7350",
+      "kind": "stay",
+      "start": "2026-06-13T07:45:00Z",
+      "end": "2026-06-13T13:05:00Z",
+      "start_local": "2026-06-13T09:45:00+02:00",
+      "end_local": "2026-06-13T15:05:00+02:00",
+      "within_day": {
+        "start": "2026-06-13T07:45:00Z",
+        "end": "2026-06-13T13:05:00Z",
+        "duration_s": 19200
+      },
+      "duration_s": 19200,
+      "where": "Marina",
+      "place": "Marina",
+      "lat": 59.905007,
+      "lon": 10.735011,
+      "aboard": "nordlys",
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 63,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ebff0-f460-7482-bd4f-32ea55a72a09",
+        "last": "019ec10c-c4a0-7a82-b8fa-925b7278e737"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Boat prep",
+            "start": "2026-06-13T08:00:00Z",
+            "end": "2026-06-13T13:00:00Z",
+            "line": "019ebffe-b000-7ba5-9677-33f1b818a1c0",
+            "sources": [
+              "ios-calendar"
+            ],
+            "lines": [
+              "019ebffe-b000-7ba5-9677-33f1b818a1c0"
+            ]
+          }
+        ],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 2,
+          "lines": [
+            "019ec020-8fe0-7d29-83e3-f7ca0027c6f7",
+            "019ec025-23c0-7607-ad04-67089815bc6b"
+          ]
+        },
+        "photos": {
+          "count": 1,
+          "lines": [
+            "019ec0a3-7b80-7391-872b-6cc15c741f1d"
+          ]
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "4f8c85f9-0e6a-56f0-a9db-0d09bfdd3d56",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 0.8,
+            "sources": [
+              "calendar",
+              "photo"
+            ],
+            "reasons": [
+              "attendee of Boat prep",
+              "face in IMG_06131100.HEIC"
+            ],
+            "lines": [
+              "019ebffe-b000-7ba5-9677-33f1b818a1c0",
+              "019ec0a3-7b80-7391-872b-6cc15c741f1d"
+            ]
+          },
+          {
+            "person": "ca2acbe4-46f5-567d-a961-74420028c869",
+            "name": "Anders Vik",
+            "status": "confirmed",
+            "confidence": 0.8,
+            "sources": [
+              "calendar",
+              "photo"
+            ],
+            "reasons": [
+              "attendee of Boat prep",
+              "face in IMG_06131100.HEIC"
+            ],
+            "lines": [
+              "019ebffe-b000-7ba5-9677-33f1b818a1c0",
+              "019ec0a3-7b80-7391-872b-6cc15c741f1d"
+            ]
+          },
+          {
+            "person": "d3d2086f-ccb7-54ee-a0b4-f10bcf64d1c5",
+            "name": "Sigrid Moen",
+            "status": "confirmed",
+            "confidence": 0.8,
+            "sources": [
+              "calendar"
+            ],
+            "reasons": [
+              "attendee of Boat prep"
+            ],
+            "lines": [
+              "019ebffe-b000-7ba5-9677-33f1b818a1c0"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260613T1305Z",
+      "kind": "move",
+      "start": "2026-06-13T13:05:00Z",
+      "end": "2026-06-13T13:15:00Z",
+      "start_local": "2026-06-13T15:05:00+02:00",
+      "end_local": "2026-06-13T15:15:00+02:00",
+      "within_day": {
+        "start": "2026-06-13T13:05:00Z",
+        "end": "2026-06-13T13:15:00Z",
+        "duration_s": 600
+      },
+      "duration_s": 600,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 1357,
+      "airports": [],
+      "points": 2,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec10c-c4a0-7a82-b8fa-925b7278e737",
+        "last": "019ec11f-1420-737d-8e52-e1cf95cfe6fc"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260613T1315Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-06-13T13:15:00Z",
+      "end": "2026-06-14T06:00:00Z",
+      "start_local": "2026-06-13T15:15:00+02:00",
+      "end_local": "2026-06-14T08:00:00+02:00",
+      "within_day": {
+        "start": "2026-06-13T13:15:00Z",
+        "end": "2026-06-13T22:00:00Z",
+        "duration_s": 31500
+      },
+      "duration_s": 60300,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.91389,
+      "lon": 10.752201,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 202,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec11f-1420-737d-8e52-e1cf95cfe6fc",
+        "last": "019ec4b7-2f00-7529-a240-c9131872731f"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 4,
+          "lines": [
+            "019ec151-6ec0-7c5e-9290-dba5a7f304be",
+            "019ec18e-c5e0-7120-bb12-80c4defe3163",
+            "019ec1cc-1d00-7c22-ab97-8d7e10baf54f",
+            "019ec208-89c0-7d9a-b1f5-7472d08d2298"
+          ]
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": {
+    "sleep_h": 6.8,
+    "steps": 8320,
+    "resting_hr": 60,
+    "hrv": null,
+    "lines": [
+      "019ebdfa-5480-7bb0-a379-4af03aafc962",
+      "019ebe1b-4a00-7b6e-8633-be8a86ac7b91",
+      "019ebe34-ec80-7c67-a8cc-fa1c0226bc8d",
+      "019ebe67-4720-7b23-b581-2cfb8705f358",
+      "019ebe80-e9a0-7086-a595-3ffbb8a5abee",
+      "019ebe99-a1c0-729c-9e01-0de42ddfd62c",
+      "019ebed5-2420-737e-9632-46153b1f1e2e",
+      "019ebeed-dc40-787e-9ba9-da59a7526abe",
+      "019ebf04-bfa0-7ed3-833b-52bec08aa309",
+      "019ebf31-9c00-7fd3-85ba-4852d533ad04",
+      "019ebf43-0120-733d-8b7e-6c157cf725d9",
+      "019ebf53-7be0-77d8-b26d-e72302dcd8dd",
+      "019ebf59-e480-79c1-966b-df3c76bf877a",
+      "019ebf67-a020-7d91-9fd9-bde15bced9bc",
+      "019ebf75-5bc0-768b-9671-49c6a5912a7f",
+      "019ebf83-1760-72e2-8661-99616378fd06",
+      "019ebf90-d300-72ea-b851-893eeaf9029a",
+      "019ebf9e-8ea0-7e3a-b0c5-107c33f63165",
+      "019ebfac-4a40-79b5-bfb2-627d12f48c14",
+      "019ebfba-05e0-7f4c-af46-2e26d8350705",
+      "019ebfc7-c180-7d40-a3d1-063f58c58aa5",
+      "019ebfd5-7d20-70df-98e2-4ce978550b9a",
+      "019ebfe3-38c0-7cf2-887f-0b74fc2f9289",
+      "019ebff0-f460-7495-8437-6d783c9bff6b",
+      "019ebffe-b000-75a3-9acc-0b6cfad6220f",
+      "019ec00c-6ba0-70a8-bcc3-dd33881c69d8",
+      "019ec01a-2740-757a-8dc6-5c327302837a",
+      "019ec027-e2e0-7178-9ce1-d3153b3f8f63",
+      "019ec035-9e80-78b0-af63-8570a5b47355",
+      "019ec043-5a20-78f3-81b8-e78f067694b0",
+      "019ec051-15c0-7f2a-8ded-1ddf17a494a8",
+      "019ec05e-d160-7754-9615-d4d64cab12d9",
+      "019ec06c-8d00-7d73-bf52-bcf5a5dcff2e",
+      "019ec07a-48a0-7169-b459-04aa85ea901b",
+      "019ec088-0440-70e8-8626-4171290b454e",
+      "019ec095-bfe0-73bc-8ab2-476f20aab347",
+      "019ec0a3-7b80-7ad7-83c0-36533ced9713",
+      "019ec0b1-3720-7f91-a568-f7ba9370ade3",
+      "019ec0be-f2c0-792b-a617-d63f22285de1",
+      "019ec0cc-ae60-7768-89e7-8e53e31d7581",
+      "019ec0da-6a00-7e64-b127-7c14fd24eb44",
+      "019ec0e8-25a0-7724-80b1-1e9e0ecc839c",
+      "019ec0f5-e140-7e04-b37a-d1b9690ae4ba",
+      "019ec103-9ce0-768d-97eb-c41da3e802d1",
+      "019ec111-5880-7e15-88ae-63e549818a7b",
+      "019ec11f-1420-7fcd-aba0-fa1909beaae3",
+      "019ec12c-cfc0-70dd-92b9-01b10e57d7a1",
+      "019ec13a-8b60-7048-8e59-935b6720f4be",
+      "019ec148-4700-7c9d-a0b7-861905d8c25b",
+      "019ec156-02a0-7318-8b69-2e5ddc3abef5",
+      "019ec163-be40-704f-b94e-cd07b6fddec1",
+      "019ec171-79e0-7180-8c61-fbdc73f6fb98",
+      "019ec17f-3580-750b-9e12-877499d75d8e",
+      "019ec18c-f120-7ed2-b114-3a549dac98b8",
+      "019ec19a-acc0-7ac4-8079-da521f70a50b",
+      "019ec1a8-6860-7e47-9760-74337b48d669",
+      "019ec1b6-2400-73fe-ab17-388fbf3291fa",
+      "019ec1c3-dfa0-7590-a0d5-f399e7300cce",
+      "019ec1d1-9b40-7282-b056-8c3330aa2390",
+      "019ec1df-56e0-75e0-a467-d33d69a90319",
+      "019ec1ed-1280-79fd-ab42-1540286b349a",
+      "019ec1fa-ce20-7c3d-a90b-f58955bb7b5f",
+      "019ec208-89c0-7454-a154-23ed2de1e1a3",
+      "019ec216-4560-7627-ab82-cdbf49b6ef4a",
+      "019ec224-0100-71ef-b4f7-08faa7a329d4",
+      "019ec231-bca0-7307-b95c-1e72d4d972ef",
+      "019ec23f-7840-7add-8d91-918659d90bf9",
+      "019ec24d-33e0-725c-9366-e0b50b41c738",
+      "019ec25a-ef80-7d49-a6f2-3fcdb4d6ad4e",
+      "019ec268-ab20-73aa-989a-aaf8da1ed593",
+      "019ec276-66c0-79a2-921f-7d42bf843d62",
+      "019ec284-2260-7f64-bc4e-fb9365fbf5c1",
+      "019ebf22-f600-7e05-ab72-5952045bfbab"
+    ]
+  },
+  "sources": [
+    {
+      "source": "dawarich",
+      "lines": 286,
+      "first": "2026-06-12T22:00:00Z",
+      "newest": "2026-06-13T21:55:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 82,
+      "first": "2026-06-12T22:36:00Z",
+      "newest": "2026-06-13T20:07:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 24,
+      "first": "2026-06-12T22:00:00Z",
+      "newest": "2026-06-13T21:00:00Z"
+    },
+    {
+      "source": "whatsapp",
+      "lines": 6,
+      "first": "2026-06-13T08:37:00Z",
+      "newest": "2026-06-13T17:30:00Z"
+    },
+    {
+      "source": "safari",
+      "lines": 3,
+      "first": "2026-06-13T10:03:00Z",
+      "newest": "2026-06-13T14:32:00Z"
+    },
+    {
+      "source": "easypark",
+      "lines": 1,
+      "first": "2026-06-13T07:45:00Z",
+      "newest": "2026-06-13T07:45:00Z"
+    },
+    {
+      "source": "google-takeout",
+      "lines": 1,
+      "first": "2026-06-13T06:30:00Z",
+      "newest": "2026-06-13T06:30:00Z"
+    },
+    {
+      "source": "immich",
+      "lines": 1,
+      "first": "2026-06-13T11:00:00Z",
+      "newest": "2026-06-13T11:00:00Z"
+    },
+    {
+      "source": "ios-calendar",
+      "lines": 1,
+      "first": "2026-06-13T08:00:00Z",
+      "newest": "2026-06-13T08:00:00Z"
+    },
+    {
+      "source": "shazam",
+      "lines": 1,
+      "first": "2026-06-13T08:42:00Z",
+      "newest": "2026-06-13T08:42:00Z"
+    }
+  ]
+}

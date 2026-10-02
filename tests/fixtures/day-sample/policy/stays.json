@@ -1,0 +1,17 @@
+{
+  "stay_min_s": 1200,
+  "stop_min_s": 180,
+  "merge_gap_s": 600,
+  "radius_m": 150,
+  "airport_km": 8,
+  "night": [
+    "22:00",
+    "08:00"
+  ],
+  "modes": {
+    "walk_max_kmh": 7,
+    "car_max_kmh": 130,
+    "flight_min_kmh": 150
+  },
+  "aboard_window_s": 300
+}
