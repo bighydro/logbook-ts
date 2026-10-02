@@ -120,7 +120,7 @@ describe("a day's hero line, as the reference prints it (RFC 0024 rule 4)", () =
 });
 
 describe("logbook-ts show prints a day exactly as the reference implementation does", () => {
-  // The expected files were written by `logbook show` of openlogbook (b60ae11, 2026-10-01) on a
+  // The expected files were written by `logbook show` of openlogbook (b3cd8c5, 2026-10-02) on a
   // copy of each fixture; tests/cross-impl.test.ts re-checks them against the reference itself.
   for (const [name, root] of [
     ["show-sample", SHOW],
@@ -156,14 +156,14 @@ describe("logbook-ts show, beyond the reference", () => {
       [
         "2026-03-01",
         "  hero  IMG_0001.jpg",
-        // SPEC §3.2: the run ends at the last point's `end`; the reference prints 09:05 (SPEC-QUESTIONS 25).
+        // SPEC §3.2: the run ends at the last point's `end`; the reference does the same since b3cd8c5 (SPEC-QUESTIONS 25).
         "  08:30–09:40  location   sim-phone      2 points",
         "  10:00  event      sim-calendar   Coffee with Ines · with ines@example.org",
         "  10:12  photo      sim-camera     camera=SimPhone 3, file=IMG_0001.jpg, lat=59.913, lon=10.742",
         "  10:12  keeper     keeper-inference hero photo (memory): IMG_0001.jpg",
         "  22:00  note       manual         Ines is moving to Tromsø in May. Ask her about the northern lights trip.",
-        // The sample stores `1e+20` and `120.0` as text; Python keeps that spelling, JSON.parse cannot (SPEC-QUESTIONS 24).
-        "  23:30  sleep      sim-watch      calibration={'epsilon': 1e-06, 'gain': 1e+21, 'offset': 100000000000000000000}, hours=8.25, metric=sleep",
+        // The sample stores `1e+20` and `1e-06` as text; both implementations print the value as RFC 8785 spells it (SPEC-QUESTIONS 24).
+        "  23:30  sleep      sim-watch      calibration={'epsilon': 0.000001, 'gain': 1e+21, 'offset': 100000000000000000000}, hours=8.25, metric=sleep",
         "",
       ].join("\n"),
     );

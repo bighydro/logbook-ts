@@ -1,15 +1,21 @@
+import { canonicalize } from "./jcs.js";
 import type { JsonValue } from "./types.js";
 
 /**
- * Python's `str()` of a JSON value: a string as itself, anything else as `repr()`. The reference
- * implementation prints a payload it has no renderer for as `key=str(value)`, so a second
- * implementation that wants to print the same row has to spell values the way Python does.
+ * A JSON value as the reference implementation's generic `key=value` row spells it: a string as
+ * itself, a number as RFC 8785 lays it out, anything else as Python's `repr()`. The reference prints
+ * a payload it has no renderer for this way, so a second implementation that wants to print the same
+ * row has to spell values the same.
  */
 export function pyStr(value: JsonValue | undefined): string {
   return typeof value === "string" ? value : pyRepr(value);
 }
 
-/** Python's `repr()` of a JSON value as `json.loads` would have parsed it from canonical JSON. */
+/**
+ * Python's `repr()` of a JSON value, except that a number, nested or not, is spelled as RFC 8785 does:
+ * the reference prints numbers by value through its chain serialiser (b3cd8c5), never by the text the
+ * writer stored, so `1e-06` in the file prints as `0.000001` and `120.0` as `120` in both implementations.
+ */
 export function pyRepr(value: JsonValue | undefined): string {
   if (value === undefined || value === null) return "None";
   if (value === true) return "True";
@@ -23,17 +29,15 @@ export function pyRepr(value: JsonValue | undefined): string {
 }
 
 /**
- * RFC 8785 writes an integral number below 1e21 without a point or an exponent, which Python
- * parses as an int and prints in full; everything else is a float, whose repr uses the shortest
- * round-trip digits with an exponent (two digits at least, always signed) below 1e-4 and from 1e16.
+ * The RFC 8785 §3.2.2.3 layout, which is ECMAScript's own: shortest round-trip digits, plain form for
+ * 1e-7 < |n| < 1e21, a signed one-digit-or-more exponent outside (`1e-7`, `1e+21`), negative zero as `0`.
+ * Python's `repr` differs below 1e-4 and from 1e16 (`1e-06`, `1e+16`) and on an integral float (`120.0`);
+ * the chain's serialiser is reused so the row and the hash can never disagree on a number's spelling.
+ * A number in a JSON value is finite (JSON has no NaN or Infinity), so `canonicalize` cannot throw here.
+ * One difference remains: an integer from 1e21 is a Python int, printed in full, and a double here.
  */
 function pyNumber(n: number): string {
-  if (Number.isInteger(n) && Math.abs(n) < 1e21) return n === 0 ? "0" : String(n);
-  const [mantissa, e] = n.toExponential().split("e") as [string, string];
-  const exponent = Number(e);
-  if (exponent >= -4 && exponent < 16) return String(n);
-  const abs = Math.abs(exponent);
-  return `${mantissa}e${exponent < 0 ? "-" : "+"}${abs < 10 ? `0${abs}` : abs}`;
+  return canonicalize(n);
 }
 
 /** Characters Python's `str.isprintable` rejects: the C and Z categories, except the space. */

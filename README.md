@@ -156,10 +156,9 @@ health-sample, location with a subject, event, photo, message, note, commitment,
 in the RFC examples' shapes; `tests/fixtures/sample-logbook` is `conformance/sample-logbook` of the spec
 repo at v0.5.0 (31 lines, one of every profile), vendored unchanged. `make.mjs` beside each synthetic
 record regenerates it. Beside each, `expected-show/` holds what `logbook show` of the reference printed
-for every day, with and without `--raw` (for the conformance sample, the six days the reference reads as
-SPEC §3.2 says: not 2026-03-01, where it ends a run at the last point's `at` and prints a stored `1e+20`,
-and not 2026-03-06, where it raises on a string `chat`; SPEC-QUESTIONS 40); the unit tests check our
-output against those files, and `tests/cross-impl.test.ts` checks both against the reference itself (see
+for every day, with and without `--raw` (the conformance sample whole, all eight days, since the
+reference at b3cd8c5 reads each as SPEC §3.2 says; SPEC-QUESTIONS 40); the unit tests check our output
+against those files, and `tests/cross-impl.test.ts` checks both against the reference itself (see
 Developing). `tests/fixtures/capture-expected-show.mjs` re-captures them from the reference; they are
 never edited by hand.
 
