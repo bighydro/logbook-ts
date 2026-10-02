@@ -1,6 +1,6 @@
 2026-06-15  Monday
   night before  Home · home
-  night after   aboard Nordlys · away
+  night after   aboard Nordlys · 59.8500,10.6000 · away
   country       NO (nearest airport OSL)
   all day       Nordlys: summer cruise
 

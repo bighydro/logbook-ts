@@ -9,7 +9,7 @@ import {
   type SegmentEntry,
   type TimelineEntry,
 } from "./day.js";
-import { roundHalfEven } from "./geo.js";
+import { coordinates, roundHalfEven } from "./geo.js";
 
 const DASH = "–";
 const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - [...s].length));
@@ -146,9 +146,14 @@ export function renderDay(day: Day): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** `Home · home`, `aboard Solvind · 60.3000,5.2000 · away`, `in transit`. */
 function nightText(night: DayNight): string {
   if (night.in_transit || night.where === null) return "in transit";
-  return `${night.where} · ${night.home ? "home" : "away"}`;
+  const parts = [night.where];
+  if (night.aboard !== null && night.position !== null)
+    parts.push(coordinates(night.position.lat, night.position.lon));
+  parts.push(night.home ? "home" : "away");
+  return parts.join(" · ");
 }
 
 function countryText(day: Day): string {

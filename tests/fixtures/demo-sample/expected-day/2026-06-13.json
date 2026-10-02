@@ -10,6 +10,10 @@
       "aboard": null,
       "in_transit": false,
       "stay": "stay:owner:20260612T1625Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.913911,
+        "lon": 10.752187
+      },
       "lines": [
         "019ebca6-ab60-7894-b87c-bacfcb191ca4",
         "019ebfde-a4e0-7717-9b62-3bcd9d34a169"
@@ -22,6 +26,10 @@
       "aboard": null,
       "in_transit": false,
       "stay": "stay:owner:20260613T1315Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.91389,
+        "lon": 10.752201
+      },
       "lines": [
         "019ec11f-1420-737d-8e52-e1cf95cfe6fc",
         "019ec4b7-2f00-7529-a240-c9131872731f"
@@ -136,8 +144,8 @@
       "flights": []
     },
     {
-      "id": "stay:owner:20260613T0745Z@59.9050,10.7350",
-      "kind": "stay",
+      "id": "aboard:nordlys:20260613T0745Z",
+      "kind": "aboard",
       "start": "2026-06-13T07:45:00Z",
       "end": "2026-06-13T13:05:00Z",
       "start_local": "2026-06-13T09:45:00+02:00",
@@ -148,17 +156,53 @@
         "duration_s": 19200
       },
       "duration_s": 19200,
-      "where": "Marina",
-      "place": "Marina",
+      "where": "aboard Nordlys",
+      "place": null,
       "lat": 59.905007,
       "lon": 10.735011,
       "aboard": "nordlys",
+      "asset": {
+        "id": "nordlys",
+        "name": "Nordlys",
+        "kind": "yacht"
+      },
       "mode": null,
-      "distance_m": null,
+      "distance_m": 0,
       "airports": [],
       "points": 63,
       "promoted": false,
       "gap": false,
+      "inside": [
+        {
+          "id": "stay:owner:20260613T0745Z@59.9050,10.7350",
+          "kind": "stay",
+          "start": "2026-06-13T07:45:00Z",
+          "end": "2026-06-13T13:05:00Z",
+          "start_local": "2026-06-13T09:45:00+02:00",
+          "end_local": "2026-06-13T15:05:00+02:00",
+          "within_day": {
+            "start": "2026-06-13T07:45:00Z",
+            "end": "2026-06-13T13:05:00Z",
+            "duration_s": 19200
+          },
+          "duration_s": 19200,
+          "where": "Marina",
+          "place": "Marina",
+          "lat": 59.905007,
+          "lon": 10.735011,
+          "aboard": "nordlys",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 63,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "019ebff0-f460-7482-bd4f-32ea55a72a09",
+            "last": "019ec10c-c4a0-7a82-b8fa-925b7278e737"
+          }
+        }
+      ],
       "lines": {
         "first": "019ebff0-f460-7482-bd4f-32ea55a72a09",
         "last": "019ec10c-c4a0-7a82-b8fa-925b7278e737"

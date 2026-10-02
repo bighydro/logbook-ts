@@ -5,7 +5,8 @@
 
   00:00–09:35  stay   Home · 9 h 35 min
   09:35–09:45  move   1.4 km · 10 min · car
-  09:45–15:05  stay   Marina · 5 h 20 min · aboard nordlys · 1 event, 2 messages, 1 photo
+  09:45–15:05  aboard Nordlys (yacht) · 5 h 20 min · 1 event, 2 messages, 1 photo
+      09:45–15:05  stay   Marina · 5 h 20 min
       event        Boat prep 10:00–15:00
       with         Ola Nordmann (calendar, photo), Anders Vik (calendar, photo), Sigrid Moen (calendar)
   15:05–15:15  move   1.4 km · 10 min · car

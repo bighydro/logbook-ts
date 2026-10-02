@@ -9,9 +9,13 @@
       "home": false,
       "aboard": "solvind",
       "in_transit": false,
-      "stay": "stay:owner:20260408T1100Z@60.3000,5.2000",
+      "stay": "stay:owner:20260408T0715Z@60.3000,5.2000",
+      "position": {
+        "lat": 60.3,
+        "lon": 5.2
+      },
       "lines": [
-        "00000000-0000-4000-8000-0000000004957",
+        "00000000-0000-4000-8000-0000000004912",
         "00000000-0000-4000-8000-00000000041137"
       ]
     },
@@ -22,6 +26,7 @@
       "aboard": null,
       "in_transit": true,
       "stay": null,
+      "position": null,
       "lines": []
     }
   },
@@ -34,31 +39,67 @@
   "all_day": [],
   "timeline": [
     {
-      "id": "stay:owner:20260408T1100Z@60.3000,5.2000",
-      "kind": "stay",
-      "start": "2026-04-08T11:00:00Z",
+      "id": "aboard:solvind:20260408T0715Z",
+      "kind": "aboard",
+      "start": "2026-04-08T07:15:00Z",
       "end": "2026-04-09T00:00:00Z",
-      "start_local": "2026-04-08T13:00:00+02:00",
+      "start_local": "2026-04-08T09:15:00+02:00",
       "end_local": "2026-04-09T02:00:00+02:00",
       "within_day": {
         "start": "2026-04-08T22:00:00Z",
         "end": "2026-04-09T00:00:00Z",
         "duration_s": 7200
       },
-      "duration_s": 46800,
-      "where": "BGO, Bergen",
+      "duration_s": 60300,
+      "where": "aboard Solvind",
       "place": null,
       "lat": 60.3,
       "lon": 5.2,
       "aboard": "solvind",
+      "asset": {
+        "id": "solvind",
+        "name": "Solvind",
+        "kind": "yacht"
+      },
       "mode": null,
-      "distance_m": null,
+      "distance_m": 0,
       "airports": [],
-      "points": 157,
+      "points": 202,
       "promoted": false,
       "gap": false,
+      "inside": [
+        {
+          "id": "stay:owner:20260408T1100Z@60.3000,5.2000",
+          "kind": "stay",
+          "start": "2026-04-08T11:00:00Z",
+          "end": "2026-04-09T00:00:00Z",
+          "start_local": "2026-04-08T13:00:00+02:00",
+          "end_local": "2026-04-09T02:00:00+02:00",
+          "within_day": {
+            "start": "2026-04-08T22:00:00Z",
+            "end": "2026-04-09T00:00:00Z",
+            "duration_s": 7200
+          },
+          "duration_s": 46800,
+          "where": "BGO, Bergen",
+          "place": null,
+          "lat": 60.3,
+          "lon": 5.2,
+          "aboard": "solvind",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 157,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "00000000-0000-4000-8000-0000000004957",
+            "last": "00000000-0000-4000-8000-00000000041137"
+          }
+        }
+      ],
       "lines": {
-        "first": "00000000-0000-4000-8000-0000000004957",
+        "first": "00000000-0000-4000-8000-0000000004912",
         "last": "00000000-0000-4000-8000-00000000041137"
       },
       "attached": {

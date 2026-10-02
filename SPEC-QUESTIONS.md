@@ -159,18 +159,30 @@ revealed:
     `aboard_window_s`, more than half lie within `radius_m` of the nearest one in time; a point with no
     asset position near it in time is not judged, so a boat reporting hourly at its berth still has the
     owner aboard, while a passage on which the owner's points fall between the boat's five-minute
-    reports is a `car` move at 9 km/h. A move aboard a yacht is by `boat`. A run of two or more
-    consecutive segments aboard one asset *among the rows of the day* is one `aboard` row with the
-    segments inside; a single one prints flat with ` · aboard <id>`, and a run that reaches into the next
-    day prints flat there when only one of its segments touches it. Whether "more than half" is the
-    reference's rule or "all" is not decidable from the demo (both fit); ADR 0018 could say.
+    reports is a `car` move at 9 km/h. A move aboard a yacht is by `boat`. Since the reference's
+    e5e08a3 (PR #159, 2026-10-02) a stay aboard is a container: the run of consecutive segments
+    aboard one asset, folded over the whole window read, is one `aboard` row from the first's start to
+    the last's end when a stay is among them (a move alone stays a move), whatever day its segments
+    fall on — a run that began the day before is the same row on the next day, with the run's id,
+    span, `points` and `lines`, and only the segments that touch the day inside it (`distance_m` is the
+    inside moves' sum, so it reads `0` on a day the run only lies at anchor). Its `lat`/`lon` is the
+    inner stay spent longest at over the whole run, and that coordinate is in the id the night names it
+    by (`stay:owner:<run start>@<centre>`). docs/day.md also says boarding takes `aboard_min_s`
+    (1200 s) of the asset's fixes within the radius, and that under way the asset's position is read
+    between its two fixes around the owner's instant; no fixture separates that from the
+    "more than half" rule above, which still matches every vendored day. Whether "more than half"
+    is the reference's rule or "all" is not decidable from the demo (both fit); ADR 0018 could say.
 
 45. **Labels.** An unnamed stay is its coordinates to four places; within 3.5 km of an airport of the
     table it is `OSL, Oslo` — the municipality column cut at its first parenthesis or comma
     (`Oslo (Gardermoen)`, `Sandefjord(Torp)`, `Birmingham, West Midlands`); else, when a named place
-    lies within 5 km, the coordinates alone (the README's `near <place>, x km` is `trips`' label, not
-    the Day's); else with the city of the nearest airport within 30 km in parentheses. The night's
-    `where` is the place's name, else `aboard <asset name>` when the stay is aboard, else that label.
+    lies within 5 km, `<coordinates> near <place>, x km` with the nearest such place and the distance
+    to one decimal (since e5e08a3 the Day shares `trips`' label; before, the coordinates alone); else
+    with the city of the nearest airport within 30 km in parentheses. The night's `where` is the
+    place's name, else the home place its centre is within 400 m of, else `aboard <asset name>` when
+    the stay is aboard, else that label; the night's `position` is the stay's `lat` and `lon`, and
+    aboard an asset the inner stay that held the longest part of the night window (the anchorage,
+    printed in the header as `aboard Solvind · 60.3000,5.2000 · away`), `null` in transit.
     The airports and zones tables are the reference's own (RFC 0013 rule 5), vendored into
     `src/tables.ts` by `scripts/make-tables.mjs`, since the nearest airport decides a label and a country.
 

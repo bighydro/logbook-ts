@@ -39,7 +39,7 @@ node dist/bin.js verify /tmp/mine
 node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
 #  2026-06-15  Monday
 #    night before  Home · home
-#    night after   aboard Nordlys · away
+#    night after   aboard Nordlys · 59.8500,10.6000 · away
 #    country       NO (nearest airport OSL)
 #    all day       Nordlys: summer cruise
 #
@@ -218,8 +218,10 @@ within ten minutes; a silence the tracker ends within a short walk of the place 
 spans with nothing attached are **stops**; what lies between is a **move**, with its distance along the
 points, a mode from the speed (walk, car, train, flight, boat aboard a yacht) or `flight` when it runs
 between two airports, or a **gap** when no point fell in it for a silence or more — and marks a stay or
-move **aboard** an asset of `assets.json` when the owner's positions match its track; two or more
-consecutive segments aboard one asset are one row with the berth, the passage and the anchorage inside.
+move **aboard** an asset of `assets.json` when the owner's positions match its track; a stay aboard is a
+container: the run of consecutive segments aboard one asset, with a stay in it, is one row from the first's
+start to the last's end, with the berth, the passage and the anchorage inside, and its centre is the
+inner stay spent longest at (a move aboard with no stay either side stays a move).
 The thresholds are `policy/stays.json`'s, with the reference's defaults when the file is missing.
 
 Then it reads the day: the **night** before and after (the longest stay between 22:00 and 08:00, `home`

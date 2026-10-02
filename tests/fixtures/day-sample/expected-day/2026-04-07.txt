@@ -1,6 +1,6 @@
 2026-04-07  Tuesday
   night before  Home · home
-  night after   60.3900,5.3200 · away
+  night after   60.3900,5.3200 near Berth, 0.8 km · away
   country       NO (nearest airport BGO)
 
   00:00–07:00  stay   Home · 7 h
@@ -12,7 +12,7 @@
       event        Flight to Bergen (XY 123) 08:00–09:05
   10:00–10:20  stay   BGO, Bergen · 20 min
   10:20–10:50  move   12.1 km · 30 min · car
-  10:50–24:00  stay   60.3900,5.3200 · 13 h 10 min · 4 events
+  10:50–24:00  stay   60.3900,5.3200 near Berth, 0.8 km · 13 h 10 min · 4 events
       event        Coffee 11:00–11:30
       event        Site visit 12:00–13:00
       event        Boat talk 14:00–15:00
