@@ -161,20 +161,32 @@ describe("canonicalize - non-JSON input", () => {
  * property list. With an array replacer, JSON.stringify emits keys in the list's order at every
  * level, so a sorted list of every key in the tree yields RFC 8785 key order, and JSON.stringify
  * supplies the ECMAScript number layout on its own.
+ *
+ * JSON.stringify reads each listed key with an ordinary property get, which on a plain object
+ * finds the inherited `__proto__` accessor whenever that name is in the list and emits
+ * `Object.prototype` as a key the object does not own (issue #5). So the tree is first copied into
+ * objects without a prototype, where every property found is an own one; `Object.defineProperty`
+ * keeps an own `__proto__` a data property on the copy as well.
  */
 function reference(value: unknown): string {
   const keys = new Set<string>();
-  const collect = (v: unknown): void => {
-    if (Array.isArray(v)) for (const x of v) collect(x);
-    else if (v !== null && typeof v === "object") {
-      for (const k of Object.keys(v as object)) {
-        keys.add(k);
-        collect((v as Record<string, unknown>)[k]);
-      }
+  const copy = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(copy);
+    if (v === null || typeof v !== "object") return v;
+    const out = Object.create(null) as Record<string, unknown>;
+    for (const k of Object.keys(v)) {
+      keys.add(k);
+      Object.defineProperty(out, k, {
+        value: copy((v as Record<string, unknown>)[k]),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
+    return out;
   };
-  collect(value);
-  return JSON.stringify(value, [...keys].sort());
+  const plain = copy(value);
+  return JSON.stringify(plain, [...keys].sort());
 }
 
 describe("canonicalize - properties", () => {
@@ -198,6 +210,25 @@ describe("canonicalize - properties", () => {
       }),
       { numRuns: 500 },
     );
+  });
+
+  // Issue #5: fast-check once drew a value with an own `__proto__` data property on a nested object,
+  // `{"": {"__proto__": ""}}`, and the reference helper leaked a second top-level `"__proto__"` key.
+  // The counterexample is replayed by its seed and path so that it is run every time, and the same
+  // shape is built with JSON.parse (which creates an own `__proto__` property, as a .jsonl line would).
+  it("agrees with the reference on an own __proto__ property at any depth (issue #5)", () => {
+    fc.assert(
+      fc.property(json, (value) => {
+        expect(canonicalize(value)).toBe(reference(value));
+      }),
+      { seed: -841407877, path: "351:1:0:0:2:87:87", endOnFailure: true },
+    );
+    const nested = JSON.parse('{"":{"__proto__":""}}') as unknown;
+    expect(reference(nested)).toBe('{"":{"__proto__":""}}');
+    expect(canonicalize(nested)).toBe('{"":{"__proto__":""}}');
+    const top = JSON.parse('{"__proto__":{"b":1,"a":[{"__proto__":null}]},"a":2}') as unknown;
+    expect(reference(top)).toBe('{"__proto__":{"a":[{"__proto__":null}],"b":1},"a":2}');
+    expect(canonicalize(top)).toBe(reference(top));
   });
 
   it("contains no leading or trailing whitespace and parses back to an equal value", () => {

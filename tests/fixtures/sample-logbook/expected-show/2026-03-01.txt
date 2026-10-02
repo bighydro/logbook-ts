@@ -1,0 +1,8 @@
+2026-03-01
+  hero  IMG_0001.jpg
+  08:30–09:40  location   sim-phone      2 points
+  10:00  event      sim-calendar   Coffee with Ines · with ines@example.org
+  10:12  photo      sim-camera     camera=SimPhone 3, file=IMG_0001.jpg, lat=59.913, lon=10.742
+  10:12  keeper     keeper-inference hero photo (memory): IMG_0001.jpg
+  22:00  note       manual         Ines is moving to Tromsø in May. Ask her about the northern lights trip.
+  23:30  sleep      sim-watch      calibration={'epsilon': 0.000001, 'gain': 1e+21, 'offset': 100000000000000000000}, hours=8.25, metric=sleep
