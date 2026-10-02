@@ -1,10 +1,14 @@
 import { localOf } from "./clock.js";
+import { renderCountries, rollupCountries } from "./countries.js";
 import { readDay } from "./day.js";
 import { renderDay } from "./dayText.js";
+import type { WindowOptions } from "./reading.js";
+import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
 import { BadRange, gapsText, listSources, sourceGaps, sourcesText } from "./sources.js";
 import { collectStats, statsText } from "./stats.js";
 import { addNote, LogbookError, readMeta, verifyLogbook } from "./store.js";
+import { readTrips, renderTrips } from "./trips.js";
 
 export interface Io {
   stdout: (text: string) => void;
@@ -42,6 +46,16 @@ export const USAGE = `usage:
                                       with no line, from its first line (or --since) to today;
                                       --expect lists only those sources, marks one silent a day or
                                       more, or with no line, with "!" and exits 1
+  logbook-ts trips <root> [--year YYYY | --since YYYY-MM-DD --until YYYY-MM-DD] [--json]
+                                      the trips of the window, as the reference's \`logbook trips\`
+                                      prints them: every run of nights away from home or in transit,
+                                      with its nights (aboard an asset when they were), its route,
+                                      the flights in and out, the named places and who was there;
+                                      the whole record when no window is given, clipped to the days
+                                      the track covers; --json prints the trips as one object
+  logbook-ts rollup countries <root> [--year YYYY | --since YYYY-MM-DD --until YYYY-MM-DD] [--json]
+                                      days per country per year from the overnight stay, in transit
+                                      and unknown apart, with the method; --json as one object
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
@@ -102,6 +116,25 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
           const span = [shown.since, shown.until].filter((d) => d !== undefined);
           io.stdout(`${span.length ? `${[...new Set(span)].join("–")}: ` : ""}nothing logged\n`);
         }
+        return 0;
+      }
+      case "trips": {
+        if (root === undefined) return usage(io);
+        const flags = parseWindowFlags(rest);
+        if (flags === undefined) return usage(io);
+        const { json, ...window } = flags;
+        const trips = readTrips(root, window);
+        io.stdout(json ? `${JSON.stringify(trips)}\n` : renderTrips(trips, readAssets(root)));
+        return 0;
+      }
+      case "rollup": {
+        const [rollupRoot, ...flagsGiven] = rest;
+        if (root !== "countries" || rollupRoot === undefined) return usage(io);
+        const flags = parseWindowFlags(flagsGiven);
+        if (flags === undefined) return usage(io);
+        const { json, ...window } = flags;
+        const countries = rollupCountries(rollupRoot, window);
+        io.stdout(json ? `${JSON.stringify(countries)}\n` : renderCountries(countries));
         return 0;
       }
       case "day": {
@@ -232,6 +265,48 @@ function parseShowFlags(args: string[]): ShowFlags | undefined {
   if (since !== undefined) flags.since = since;
   if (until !== undefined) flags.until = until;
   if (timezone !== undefined) flags.timezone = timezone;
+  return flags;
+}
+
+/**
+ * `--year YYYY`, `--since D`, `--until D` (each also as `--flag=value`) and `--json`; undefined on
+ * anything else, a bad day or year, a range that runs backwards, or `--year` with a bound.
+ */
+function parseWindowFlags(args: string[]): (WindowOptions & { json?: boolean }) | undefined {
+  const flags: WindowOptions & { json?: boolean } = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    const eq = arg.indexOf("=");
+    const name = eq === -1 ? arg : arg.slice(0, eq);
+    const take = (): string | undefined => (eq === -1 ? args[++i] : arg.slice(eq + 1));
+    switch (name) {
+      case "--year": {
+        const value = take();
+        if (value === undefined || !/^\d{4}$/.test(value) || flags.year !== undefined)
+          return undefined;
+        flags.year = value;
+        break;
+      }
+      case "--since":
+      case "--until": {
+        const value = take();
+        if (value === undefined || !isDay(value)) return undefined;
+        if (name === "--since") flags.since = value;
+        else flags.until = value;
+        break;
+      }
+      case "--json":
+        if (eq !== -1) return undefined;
+        flags.json = true;
+        break;
+      default:
+        return undefined;
+    }
+  }
+  if (flags.year !== undefined && (flags.since !== undefined || flags.until !== undefined))
+    return undefined;
+  if (flags.since !== undefined && flags.until !== undefined && flags.since > flags.until)
+    return undefined;
   return flags;
 }
 

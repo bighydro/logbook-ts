@@ -1,0 +1,4 @@
+trips 2026-01-01 – 2026-01-13: 3 trips
+  2026-01-01 – 2026-01-03  3 nights · route CPH, Copenhagen → 55.6850,12.5500 (Copenhagen) · in XY 202 HAM → CPH · out CPH → ENGM · places Office · with Guest 01, Anders Vik, Guest 02, Guest 03, Guest 04, Guest 05, Guest 06, Guest 07, Guest 08, Guest 09, Guest 10, Guest 11
+  2026-01-05 – 2026-01-08  4 nights (2 aboard Solvind, 1 in transit) · route aboard Solvind → 59.9193,10.7522 near Home, 0.6 km · places Marina · with Ola Nordmann
+  2026-01-10 – 2026-01-11  2 nights · route 76.0000,-40.0000

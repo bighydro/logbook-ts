@@ -1,0 +1,36 @@
+{
+  "Home": {
+    "lat": 59.9139,
+    "lon": 10.7522,
+    "radius_m": 120,
+    "kind": "home",
+    "country": "NO"
+  },
+  "Office": {
+    "lat": 59.91,
+    "lon": 10.76,
+    "radius_m": 120,
+    "kind": "other"
+  },
+  "Marina": {
+    "lat": 59.905,
+    "lon": 10.735,
+    "radius_m": 150,
+    "kind": "asset-berth",
+    "tags": [
+      "boat"
+    ]
+  },
+  "Messe": {
+    "lat": 53.54,
+    "lon": 9.92,
+    "radius_m": 200,
+    "kind": "other"
+  },
+  "Kiosk": {
+    "lat": 53.545,
+    "lon": 9.925,
+    "radius_m": 50,
+    "kind": "other"
+  }
+}

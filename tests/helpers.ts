@@ -152,3 +152,43 @@ export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
   writeMeta(root, { ...readMetaFile(root), seq, head: prev });
   return root;
 }
+
+/** A window a trips or countries expectation was captured for: the whole record, one year, or a range. */
+export interface ExpectedWindow {
+  name: string;
+  options: { year?: string; since?: string; until?: string };
+  text: string;
+  json: unknown;
+}
+
+/** `all`, `YYYY` or `YYYY-MM-DD..YYYY-MM-DD` as the options `readTrips` and `rollupCountries` take. */
+export function windowOptions(name: string): ExpectedWindow["options"] {
+  if (name === "all") return {};
+  if (/^\d{4}$/.test(name)) return { year: name };
+  const m = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(name);
+  if (m === null) throw new Error(`not a window: ${name}`);
+  return { since: m[1] as string, until: m[2] as string };
+}
+
+/** The `<window>.txt` and `<window>.json` files of `expected-trips/` or `expected-countries/` beside a fixture. */
+export function expectedWindows(root: string, kind: "trips" | "countries"): ExpectedWindow[] {
+  const dir = join(root, `expected-${kind}`);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => name.endsWith(".txt"))
+    .sort()
+    .map((file) => {
+      const name = file.slice(0, -4);
+      return {
+        name,
+        options: windowOptions(name),
+        text: readFileSync(join(dir, file), "utf-8"),
+        json: JSON.parse(readFileSync(join(dir, `${name}.json`), "utf-8")) as unknown,
+      };
+    });
+}

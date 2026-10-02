@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, and at 996642f (2026-10-02) for `stats` and `sources`.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, and at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -267,3 +267,94 @@ The reference was run, never read: `logbook stats` and `logbook sources --gaps` 
 56. **The `sources --gaps` report is not written down either, and its footer names the index.** Learned by running: a table `  source  lines  last  longest silence  missing days`, each row the source (ten columns at least), the lines, the last line's local `YYYY-MM-DD HH:MM`, the silence as a duration padded to seven (`93d 13h`, `20h 0m`, `5m`: whole units, floored, the largest two) and either `since <local from>` while it runs or `<local from> → <local to>` between two lines, the count of missing days right-aligned to three places (a four-digit count pushes the row), then up to three runs (`2026-06-15`, `2026-07-01..2026-10-02`) and `+N run(s)`; under `--expect` the rows are the sources named, in that order, a flagged one marked `!` in the first column, one with no line as `<name>  0  -  no lines`; a footer of `<n> source(s) with lines` or `<f> of <n> expected source(s) flagged: a, b` or `<n> expected source(s), none flagged`, then `since each source's first line, today <day> (<zone>); counted through the index, every line` (or `since <day>, today …`); `no lines` for an empty record; exit 1 when a source is flagged, 2 on `--since` after today (`sources: --since <day> is after today (<today>)`), a malformed day (`sources: not a date (YYYY-MM-DD): '<text>'`) or `--since`, `--expect` or `--json` without `--gaps` (`sources: --since, --expect and --json go with --gaps`). The rules the runs showed: a line whose local day is after today is outside the range and not counted; today is a missing day only when the last line is 24 hours or more before now; a source is flagged when its longest silence is 86,400 seconds or more, whatever its missing days (a 25-hour silence that skips no local day flags; a 20-hour one does not); under `--since` the range starts at that day's local midnight, lines before it are not counted, and the silence from that midnight to the first line counts. The JSON (`since`, `today`, `timezone`, `expect`, `sources[]` with `lines`, `first`, `last`, `silence {from, to, seconds}`, `missing_days`, `flagged`, and `flagged[]`) is reproduced too. One phrase is not: this implementation has no index and its footer says `counted from the month files`; the cross-implementation test normalises that phrase. A reader that has to be told "the index" is a detail of the reference; suggest the report say `every line` and stop. The silence between two lines is measured on the lines ordered by `at`, which a month file is not (it is in chain order), so this implementation sorts each file's lines per source before measuring; a line placed in the wrong month file (question 2) would measure wrong in both.
 
 57. **`sources` without `--gaps` lists adapters.** The reference prints every adapter its build carries (43 of them), `file`, `live` or `file+live`, and `enabled` or `disabled (<reason>)` from `policy/import.json`, then any disabled name no adapter carries. A second implementation that only reads has no adapters to list. This implementation prints the record's sources instead — one row per source with lines, its lines, its first and last line in the record's zone — and keeps the reference's `--since`, `--expect` and `--json` go with `--gaps` rule. Whether `policy/import.json` (which SPEC §1 does not name) is part of the format, and what a reader without adapters should say to `sources`, is a question for the spec.
+
+## Found while implementing `trips` and `rollup countries` (openlogbook main at 36a7d62, 2026-10-02; README "Trips are derived, never written", ADR 0019, docs/rollups.md)
+
+`trips` and `rollup countries` were written from ADR 0019, the README's paragraphs on trips, homes and
+countries, docs/rollups.md and docs/day.md, and then matched to the reference by running it: on its demo
+record (`logbook demo --days 30 --seed 7`, text and JSON, whole, by year and by range) and on a probe
+record built to have a case of every rule (`tests/fixtures/trips-sample`, seventeen days over the turn of
+2025–26). What the output revealed, none of it written down:
+
+58. **What a trip is, exactly.** "A run of consecutive days whose overnight stay is outside every home
+    region" leaves the nights in transit open. The reference counts a night with no stay in the night
+    window as part of the run on either side of it: a trip may begin on the night the tracker slept
+    through before the first night away, and end on one after the last; a run of such nights alone, with
+    no night at a stay, is no trip. A trip's `until` is the day after its last night whether or not that
+    day is in the window; its `in` flights are the first day's, its `out` flights the day after's, and
+    `flights` are every flight line standing from the first day to the day after — only within the
+    window, so a trip the window cuts has no `in` or no `out`. This implementation does the same.
+
+59. **The nights, by asset.** `asset` is set when every night with a stay was aboard that one asset,
+    the nights in transit not counting against it (`2 nights aboard Nordlys (1 in transit)`, with
+    `asset: "nordlys"`); with a night at a stay ashore it is null and the text counts the nights per
+    asset and in transit in parentheses (`4 nights (2 aboard Solvind, 1 in transit)`). A run of
+    segments aboard one asset is one stay for the night (docs/day.md, *Aboard an asset*), so the
+    `lines` of a trip whose nights are all in one run aboard name that run's first and last point once.
+
+60. **The route.** The night places in order, a night in transit adding nothing; two consecutive
+    nights fold into one element when their labels are equal (every night aboard one asset is `aboard
+    <asset>`, however far the anchorages lie apart) or, for two unnamed stays, when their centres are
+    within 200 m. The label is the named place; else `<code>, <city>` when the stay is within 3.5 km
+    of the reference point of an airport with scheduled traffic (2 km of any other); else the
+    coordinates to four places, with `near <place>, x km` (one decimal) for the nearest named place
+    within 5 km, home places included, else with the city of the nearest large airport within 30 km in
+    parentheses, else alone. docs/day.md says `day` labels an unnamed stay the same way; the `day` here
+    still prints the coordinates alone in the `near` case, as the reference did when its fixtures were
+    captured (question 64).
+
+61. **The places of a trip.** The named places of the stays — not the stops — of every row that touches
+    a day from the trip's first to the day after, places of kind `home` left out, in the order first
+    stayed at. The day after counts: an office visited on the way home from the airport is a place of
+    the trip. A named place inside a run aboard (the marina the run began at) is one.
+
+62. **The people of a trip.** The confirmed company of the same rows, merged by person (the entity id,
+    or the name when the record resolves none: an attendee with a display name and no resolution line
+    is listed, with `id: null`), ordered by how many lines put them there, then by name, and cut at
+    twelve — in the JSON too; the `lines` of a trip carry the listed people's lines only. A person named
+    at a stay at home on the morning of departure, or at the office on the day of return, counts. The
+    `confidence` is the highest of their evidence (`calendar` 0.8, `transcript` 0.9, `note` 1.0).
+
+63. **Whose lines a confirmed person carries.** Unlike the Day, which reads a row's company from the
+    day's own lines, the readers over a window merge a stay's evidence over the stay's whole span: a
+    person confirmed by a note on the first evening and tagged in a photo on the second morning at the
+    same stay carries both lines; a photo's own coordinates do not matter, only that it was taken during
+    the stay. In a run aboard, though, what falls in an inner stay is that stay's and what falls in a
+    passage is the run's, each merged apart: the note written under way on the first day confirms two
+    people with that one line, and the faces tagged at the anchorages on the next two evenings propose
+    them and add nothing. Learned from the demo record and the probe; this implementation does the same.
+    Worth a paragraph in docs/rollups.md, since a third implementation would read the Day's rule and
+    get the lines wrong.
+
+64. **The window.** Clipped to the first and last local day of the owner's own location lines (an
+    asset's do not count), whatever `--since`/`--until` ask beyond them; `--year` with a bound is
+    refused (`give --year, or --since and --until, not both`, exit 2); a window with no days prints
+    `no trips: the record has no days` with `{"window": null, "trips": []}`, and for the rollup
+    `countries` / `nothing in the window` with `{"since": null, "until": null, "days": []}` and no
+    `method`; a window with days and no trips prints `trips <since> – <until>: no trips`; a record
+    without a place of kind `home` prints the warning after the window and carries it under `warning`.
+    `window.days` lists every day of the window, with or without a line. This implementation reads
+    the lines from the window's first midnight to the end of the night after its last day, and takes
+    evidence from the window's days only.
+
+65. **The countries rollup.** Per year of the window, each day counted once for the country of its
+    overnight stay: the stay's place's own `country` when the stay is anchored at a named place that
+    has one (`by.place`), else the zone of the nearest large airport within 300 km (`by.airport`);
+    a night within 400 m of home but outside the home place's radius is a home night for `trips` and
+    still an airport night here, since the stay lies in no place. Countries most days first, then by
+    code; `in transit` always printed (`in transit 0`), `unknown` only when there is one; `1 day`
+    singular. Under `--json` the `lines` of a country repeat a stay's first and last point for every
+    night spent there, `in_transit.lines` is always empty, and `by` names only the methods that
+    counted. A night aboard counts at the position of the inner stay that held the longest part of the
+    night, by its place or its nearest airport.
+
+66. **The thresholds behind the two readers that the prose gives in words.** The night window is
+    `policy/stays.json`'s `night` (22:00–08:00); the night is the stay (a run aboard counted whole) with
+    the longest part in it, the earliest when equal; home is a place of kind `home` holding the stay or
+    within 400 m of its centre; the route folds at 200 m, the near-place label at 5 km, the city label
+    at 30 km, the country airport at 300 km, the people list at twelve. The reference's new
+    `aboard_min_s` (boarding takes twenty minutes) is not implemented here: a segment is aboard when
+    more than half of its points lie within `radius_m` of the asset's position at their instants, read
+    between the two fixes around each when they are at most twice `aboard_window_s` apart, else from
+    the nearest fix within the window. The demo record and both probes agree under either rule.
+

@@ -1,0 +1,11 @@
+{
+  "format": "logbook/0.2",
+  "owner_id": "00000000-0000-4000-8000-000000000005",
+  "created_at": "2025-12-01T07:00:00Z",
+  "timezone": "Europe/Oslo",
+  "owner_emails": [
+    "kari.nordmann@example.org"
+  ],
+  "seq": 4641,
+  "head": "1ab1696f9df5d26707942374838f12beb339f1ea339890edfb5b0865090b0fde"
+}
