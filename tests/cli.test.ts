@@ -8,6 +8,7 @@ import {
   copySample,
   EXPECTED,
   expectedDays,
+  expectedWindows,
   FIXTURES,
   readLines,
   SAMPLE,
@@ -156,6 +157,72 @@ describe("logbook-ts day", () => {
     writeLines(root, [JSON.stringify(meta)], "logbook.json");
     expect(run(["day", root, "2026-03-02"]).code).toBe(0);
     expect(readLines(root)).toEqual(before);
+  });
+});
+
+describe("logbook-ts trips and rollup countries", () => {
+  const root = join(FIXTURES, "trips-sample");
+  const expectedTrips = (name: string) =>
+    expectedWindows(root, "trips").find((w) => w.name === name);
+  const expectedCountries = (name: string) =>
+    expectedWindows(root, "countries").find((w) => w.name === name);
+
+  it("prints the trips as the reference does, and the same trips as JSON", () => {
+    const text = run(["trips", root]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expectedTrips("all")?.text);
+    const json = run(["trips", root, "--year", "2026", "--json"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expectedTrips("2026")?.json);
+  });
+
+  it("prints the countries rollup as the reference does, and the same rollup as JSON", () => {
+    const text = run(["rollup", "countries", root, "--since=2025-12-31", "--until=2026-01-06"]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expectedCountries("2025-12-31..2026-01-06")?.text);
+    const json = run(["rollup", "countries", root, "--json", "--year=2025"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expectedCountries("2025")?.json);
+  });
+
+  it("says so when the window has no days, and exits 0", () => {
+    expect(run(["trips", root, "--year", "2024"]).out).toBe("no trips: the record has no days\n");
+    expect(run(["rollup", "countries", root, "--year", "2024"]).out).toBe(
+      "countries\n  nothing in the window\n",
+    );
+  });
+
+  it("prints usage and exits 2 on a year with a bound, a range that runs backwards, a rollup it does not know, or no root", () => {
+    for (const argv of [
+      ["trips", root, "--year", "2026", "--since", "2026-01-05"],
+      ["trips", root, "--since", "2026-01-05", "--until", "2026-01-04"],
+      ["trips", root, "--year", "26"],
+      ["trips", root, "--raw"],
+      ["trips"],
+      ["rollup", "flights", root],
+      ["rollup", "countries"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toMatch(/^usage:/);
+    }
+  });
+
+  it("refuses a record it does not carry, and never writes", () => {
+    const copy = copySample();
+    const meta = JSON.parse(readLines(copy, "logbook.json").join("")) as Record<string, unknown>;
+    writeLines(copy, [JSON.stringify({ ...meta, format: "logbook/0.1" })], "logbook.json");
+    const before = readLines(copy);
+    for (const argv of [
+      ["trips", copy],
+      ["rollup", "countries", copy],
+    ]) {
+      const { code, err } = run(argv);
+      expect(code).toBe(1);
+      expect(err).toMatch(/logbook\/0\.1/);
+    }
+    expect(readLines(copy)).toEqual(before);
   });
 });
 

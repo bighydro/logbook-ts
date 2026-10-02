@@ -3,18 +3,28 @@ import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
 import { renderDay } from "../src/dayText.js";
+import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
 import { collectStats, statsText } from "../src/stats.js";
-import { cleanup, expectedDays, expectedShows, FIXTURES, tempDir } from "./helpers.js";
+import { readTrips, renderTrips } from "../src/trips.js";
+import {
+  cleanup,
+  expectedDays,
+  expectedShows,
+  expectedWindows,
+  FIXTURES,
+  tempDir,
+  windowOptions,
+} from "./helpers.js";
 
 /**
- * The two implementations must print the same day, and count the same record. This test runs the
- * reference implementation (openlogbook, Python) on a copy of each fixture and diffs its `show`
- * output against ours, and against the expected-show files we vendor; then its `stats` and
- * `sources --gaps` against ours, on the fixtures and on its own demo record. It needs a clone of https://github.com/bighydro/logbook
+ * The two implementations must print the same day. This test runs the reference implementation
+ * (openlogbook, Python) on a copy of each fixture and diffs its `show`, `day`, `stats`, `sources --gaps`,
+ * `trips` and `rollup countries` output against ours, and against the expected files we vendor. It needs a clone of https://github.com/bighydro/logbook
  * named by LOGBOOK_REF, with `uv` on the path (`uv run` installs the clone's own environment);
  * without LOGBOOK_REF it is skipped, so the default `pnpm test` never spawns anything.
  */
@@ -214,3 +224,75 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts count the s
     });
   }
 });
+/** The flags a window name stands for: `all`, `YYYY`, or `since..until`. */
+function windowFlags(name: string): string[] {
+  const options = windowOptions(name);
+  if (options.year !== undefined) return ["--year", options.year];
+  if (options.since !== undefined && options.until !== undefined)
+    return ["--since", options.since, "--until", options.until];
+  return [];
+}
+
+describe.skipIf(!ready)(
+  "the reference implementation and logbook-ts derive the same trips and countries",
+  () => {
+    // trips-sample has a case of every rule; the other two are the day fixtures, read over their days.
+    for (const fixture of ["trips-sample", "day-sample", "demo-sample"]) {
+      it(`agrees on every window of ${fixture}, as text and as JSON, and the vendored files are that output`, () => {
+        const copy = copyOf(fixture);
+        const root = join(FIXTURES, fixture);
+        const assets = readAssets(root);
+        for (const expected of expectedWindows(root, "trips")) {
+          const flags = windowFlags(expected.name);
+          const text = reference(copy, ["trips", ...flags]);
+          const json = JSON.parse(reference(copy, ["trips", ...flags, "--json"])) as unknown;
+          expect(text).toBe(expected.text);
+          expect(json).toEqual(expected.json);
+          const ours = readTrips(root, expected.options);
+          expect(renderTrips(ours, assets)).toBe(text);
+          expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
+        }
+        for (const expected of expectedWindows(root, "countries")) {
+          const flags = windowFlags(expected.name);
+          const text = reference(copy, ["rollup", "countries", ...flags]);
+          const json = JSON.parse(
+            reference(copy, ["rollup", "countries", ...flags, "--json"]),
+          ) as unknown;
+          expect(text).toBe(expected.text);
+          expect(json).toEqual(expected.json);
+          const ours = rollupCountries(root, expected.options);
+          expect(renderCountries(ours)).toBe(text);
+          expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
+        }
+      }, 300_000);
+    }
+
+    it("agrees on the demo record (`logbook demo --days 30 --seed 7`): four trips, three countries, as text and as JSON", () => {
+      const demo = join(tempDir(), "demo");
+      reference(REF as string, ["demo", "--days", "30", "--seed", "7", "--out", demo]);
+      for (const flags of [
+        [],
+        ["--year", "2026"],
+        ["--since", "2026-06-09", "--until", "2026-06-16"],
+      ]) {
+        const options = windowOptions(
+          flags.length === 0
+            ? "all"
+            : flags.length === 2
+              ? (flags[1] as string)
+              : `${flags[1]}..${flags[3]}`,
+        );
+        const trips = readTrips(demo, options);
+        expect(renderTrips(trips, readAssets(demo))).toBe(reference(demo, ["trips", ...flags]));
+        expect(JSON.parse(JSON.stringify(trips))).toEqual(
+          JSON.parse(reference(demo, ["trips", ...flags, "--json"])),
+        );
+        const countries = rollupCountries(demo, options);
+        expect(renderCountries(countries)).toBe(reference(demo, ["rollup", "countries", ...flags]));
+        expect(JSON.parse(JSON.stringify(countries))).toEqual(
+          JSON.parse(reference(demo, ["rollup", "countries", ...flags, "--json"])),
+        );
+      }
+    }, 300_000);
+  },
+);

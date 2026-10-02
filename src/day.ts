@@ -226,7 +226,7 @@ export interface Day {
 }
 
 /** A line read for the day, with its instant and span in ms. */
-interface Entry {
+export interface Entry {
   line: Line;
   ms: number;
   endMs: number;
@@ -234,16 +234,20 @@ interface Entry {
   day: string;
 }
 
-interface Context {
+/** What deciding who was there needs: who a ref is, the named places, and who the owner is. */
+export interface PeopleContext {
+  resolver: Resolver;
+  places: Place[];
+  owner: OwnerIdentity;
+}
+
+interface Context extends PeopleContext {
   timezone: string;
   day: string;
   dayStartMs: number;
   dayEndMs: number;
-  resolver: Resolver;
   supersededFlights: Map<string, number>;
-  places: Place[];
   settings: StaySettings;
-  owner: OwnerIdentity;
 }
 
 const SOURCE_RANK: Record<string, number> = { calendar: 0, transcript: 1, note: 2, photo: 3 };
@@ -420,7 +424,7 @@ function readWindow(files: MonthFile[], startMs: number, endMs: number, timezone
 }
 
 /** Whether a line standing promotes a short cluster to a stay: something happened there. */
-function promotes(line: Line): boolean {
+export function promotes(line: Line): boolean {
   switch (line.kind) {
     case "event":
     case "transcript":
@@ -643,7 +647,7 @@ function eventKey(e: Entry): { span: string; title: string; flight: string | und
   };
 }
 
-interface Folded extends AttachedEvent {
+export interface Folded extends AttachedEvent {
   entries: Entry[];
 }
 
@@ -652,7 +656,7 @@ interface Folded extends AttachedEvent {
  * title (case, accents and whitespace aside) or the same flight in the title, from two or more
  * sources (SPEC-QUESTIONS 28). One calendar holding an entry twice is still two events.
  */
-function foldEvents(events: Entry[]): Folded[] {
+export function foldEvents(events: Entry[]): Folded[] {
   const out: Folded[] = [];
   const taken = new Set<string>();
   for (let i = 0; i < events.length; i++) {
@@ -902,7 +906,16 @@ function buildTimeline(
   for (const p of placed) {
     const entry = p.entry;
     entry.attached = p.attached;
-    entry.with = p.row.kind === "move" ? { confirmed: [], proposed: [] } : company(p, ctx);
+    entry.with =
+      p.row.kind === "move"
+        ? { confirmed: [], proposed: [] }
+        : company(
+            p.row.kind === "aboard"
+              ? p.row.segments.filter((s): s is Stay => s.kind !== "move")
+              : [p.row],
+            p,
+            ctx,
+          );
     if (p.row.kind === "move") {
       const move = p.row;
       entry.flights = flights
@@ -940,13 +953,13 @@ export function callText(call: AttachedCall): string {
 // ---------------------------------------------------------------------------------------------
 // Who was there
 
-interface OwnerIdentity {
+export interface OwnerIdentity {
   ids: Set<string>;
   names: Set<string>;
 }
 
 /** Who the owner is: `owner_id` and `owner_emails` in logbook.json, the resolution lines naming those, `policy/owner.json`. */
-function ownerIdentity(
+export function ownerIdentity(
   resolver: Resolver,
   policy: OwnerPolicy,
   ownerEmails: string[],
@@ -990,7 +1003,7 @@ interface Someone {
 function personOf(
   ref: Ref | undefined,
   fallback: string | undefined,
-  ctx: Context,
+  ctx: PeopleContext,
 ): Someone | undefined {
   const entity = ref === undefined ? undefined : ctx.resolver.entity(ref);
   if (entity !== undefined && entity.type === "person" && entity.label !== undefined) {
@@ -1003,7 +1016,7 @@ function personOf(
 }
 
 /** The attendees of a calendar entry, in its order: the people the record names, else by their display name. */
-function attendees(e: Entry, ctx: Context): Someone[] {
+function attendees(e: Entry, ctx: PeopleContext): Someone[] {
   const list = payloadOf(e.line).attendees;
   if (!Array.isArray(list)) return [];
   const out: Someone[] = [];
@@ -1023,7 +1036,7 @@ const identity = (who: Someone): string => (who.id === null ? `name:${who.name}`
 const NOBODY = /^(speaker\s+\S+|me|unknown)$/i;
 
 /** Whether a timed calendar entry was held at the stay: its location, or a long overlap with no location. */
-function heldAt(event: Entry, stays: Stay[], ctx: Context): boolean {
+function heldAt(event: Entry, stays: Stay[], ctx: PeopleContext): boolean {
   const p = payloadOf(event.line);
   const location = text(p.location);
   if (location !== undefined) {
@@ -1037,7 +1050,7 @@ function heldAt(event: Entry, stays: Stay[], ctx: Context): boolean {
 }
 
 /** A note's `with <name>`: every person the record names who follows a `with` in one sentence. */
-function namedWith(body: string, ctx: Context): Array<Someone & { index: number }> {
+function namedWith(body: string, ctx: PeopleContext): Array<Someone & { index: number }> {
   const out: Array<Someone & { index: number }> = [];
   const people = ctx.resolver.people();
   let offset = 0;
@@ -1056,14 +1069,21 @@ function namedWith(body: string, ctx: Context): Array<Someone & { index: number 
   return out.sort((a, b) => a.index - b.index);
 }
 
-/** The company of a stay or a run aboard, from the evidence attached to it. */
-function company(p: Placed, ctx: Context): Company {
-  const stays =
-    p.row.kind === "aboard"
-      ? p.row.segments.filter((s): s is Stay => s.kind !== "move")
-      : p.row.kind === "move"
-        ? []
-        : [p.row];
+/** The evidence attached to a stay or a run aboard that can say who was there. */
+export interface RowEvidence {
+  events: Folded[];
+  transcripts: Entry[];
+  notes: Entry[];
+  photos: Entry[];
+}
+
+/**
+ * The company of a stay or a run aboard (`stays`: the stay, or the stays inside the run), from the
+ * evidence attached to it: confirmed by an attendee of a timed calendar entry held at the stay, a
+ * participant of a transcript the record resolves, a note that says `with <name>`; proposed by a
+ * face the library tagged. The owner is never their own company.
+ */
+export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Company {
   const found: Found[] = [];
   for (const event of p.events) {
     const first = event.entries[0] as Entry;
@@ -1229,6 +1249,11 @@ function homeOf(stay: Stay, places: Place[]): Place | undefined {
   );
 }
 
+/** Whether a night at this stay is at home: in a place of kind `home`, or within 400 m of one whatever its radius. */
+export function isHome(stay: Stay, places: Place[]): boolean {
+  return homeOf(stay, places) !== undefined;
+}
+
 const position = (at: { lat: number; lon: number }): { lat: number; lon: number } => ({
   lat: roundTo(at.lat, 6),
   lon: roundTo(at.lon, 6),
@@ -1328,18 +1353,30 @@ function countryOf(night: DayNight, rows: Row[], ctx: Context): DayCountry {
   }
   if (row === undefined) return { code: null, method: null, by: null, from: null };
   const place = row.kind === "aboard" ? undefined : row.place;
-  if (place?.country !== undefined) {
-    return { code: place.country, method: "place", by: place.name, from };
-  }
   const at = night.position ?? (row.kind === "aboard" ? centreOf(row) : row);
   if (at === undefined) return { code: null, method: null, by: null, from };
-  const near = nearestAirport(at.lat, at.lon, COUNTRY_AIRPORT_KM);
-  if (near === undefined) return { code: null, method: null, by: null, from };
+  const country = countryAt(place, at.lat, at.lon);
+  if (country === undefined) return { code: null, method: null, by: null, from };
+  return { ...country, from };
+}
+
+/**
+ * The country a position counts for, as `rollup countries` decides it: the place's own `country`
+ * when the stay lies in a named place that has one, else the zone of the nearest large airport
+ * within 300 km; undefined when no airport is that near.
+ */
+export function countryAt(
+  place: Place | undefined,
+  lat: number,
+  lon: number,
+): { code: string | null; method: string; by: string } | undefined {
+  if (place?.country !== undefined) return { code: place.country, method: "place", by: place.name };
+  const near = nearestAirport(lat, lon, COUNTRY_AIRPORT_KM);
+  if (near === undefined) return undefined;
   return {
     code: countryOfZone(near.airport.tz) ?? null,
     method: "airport",
     by: airportCode(near.airport),
-    from,
   };
 }
 

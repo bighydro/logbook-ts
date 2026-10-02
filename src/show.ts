@@ -302,6 +302,9 @@ export interface Judgements {
   /** The first and last instant a listed line has, as written. */
   first: string | undefined;
   last: string | undefined;
+  /** The first and last instant of the owner's own location lines: the days the track covers. */
+  firstLocation: string | undefined;
+  lastLocation: string | undefined;
 }
 
 /**
@@ -314,6 +317,8 @@ export function readJudgements(files: MonthFile[]): Judgements {
   const superseded = new Set<string>();
   let first: { at: string; ms: number } | undefined;
   let last: { at: string; ms: number } | undefined;
+  let firstLocation: { at: string; ms: number } | undefined;
+  let lastLocation: { at: string; ms: number } | undefined;
   for (const month of files) {
     for (const { raw, row } of eachLine(month.file)) {
       const parsed = parseLine(raw, `${month.rel} line ${row}`);
@@ -331,6 +336,11 @@ export function readJudgements(files: MonthFile[]): Judgements {
       if (Number.isNaN(ms)) continue;
       if (first === undefined || ms < first.ms) first = { at: line.at, ms };
       if (last === undefined || ms > last.ms) last = { at: line.at, ms };
+      if (line.kind === "location" && (payloadOf(line).subject ?? null) === null) {
+        if (firstLocation === undefined || ms < firstLocation.ms)
+          firstLocation = { at: line.at, ms };
+        if (lastLocation === undefined || ms > lastLocation.ms) lastLocation = { at: line.at, ms };
+      }
     }
   }
   return {
@@ -339,6 +349,8 @@ export function readJudgements(files: MonthFile[]): Judgements {
     superseded,
     first: first?.at,
     last: last?.at,
+    firstLocation: firstLocation?.at,
+    lastLocation: lastLocation?.at,
   };
 }
 

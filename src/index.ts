@@ -13,15 +13,25 @@ export {
   weekdayOf,
 } from "./clock.js";
 export {
+  COUNTRIES_METHOD,
+  type Countries,
+  type CountryCount,
+  type CountryYear,
+  renderCountries,
+  rollupCountries,
+} from "./countries.js";
+export {
   type AllDayEntry,
   type Attached,
   type Company,
+  countryAt,
   type Day,
   type DayCountry,
   type DayHealth,
   type DayNight,
   type DayOptions,
   type FlightEntry,
+  isHome,
   type Person,
   readDay,
   type SegmentEntry,
@@ -33,6 +43,18 @@ export { distanceText, durationText, renderDay } from "./dayText.js";
 export { distanceM, fsum, mean, roundHalfEven, roundTo } from "./geo.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lines.js";
+export {
+  type DayReading,
+  type FlightLine,
+  type Night,
+  type Opened,
+  openWindow,
+  type ReadingStats,
+  readDays,
+  type Window,
+  type WindowOptions,
+  type WindowRow,
+} from "./reading.js";
 export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
 export {
   type Asset,
@@ -75,12 +97,17 @@ export {
 } from "./sources.js";
 export { collectStats, type KindStats, type Stats, statsText } from "./stats.js";
 export {
+  aboardMatch,
+  type DeriveOptions,
   deriveSegments,
   type Move,
   markAboard,
+  markSegmentAboard,
   type Point,
   placeAt,
   type Segment,
+  SegmentStream,
+  type Span,
   type Stay,
 } from "./stays.js";
 export {
@@ -92,6 +119,16 @@ export {
   rfc3339,
   verifyLogbook,
 } from "./store.js";
+export {
+  labelOf,
+  NO_HOME,
+  readTrips,
+  renderTrips,
+  type Trip,
+  type TripFlight,
+  type TripPerson,
+  type Trips,
+} from "./trips.js";
 export {
   type Content,
   FORMAT,
