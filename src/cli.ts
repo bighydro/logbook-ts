@@ -2,6 +2,8 @@ import { localOf } from "./clock.js";
 import { readDay } from "./day.js";
 import { renderDay } from "./dayText.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
+import { BadRange, gapsText, listSources, sourceGaps, sourcesText } from "./sources.js";
+import { collectStats, statsText } from "./stats.js";
 import { addNote, LogbookError, readMeta, verifyLogbook } from "./store.js";
 
 export interface Io {
@@ -31,12 +33,26 @@ export const USAGE = `usage:
                                       and who was there, what was placed nowhere, the health line,
                                       the sources; today in the record's zone when no day is given;
                                       --json prints the Day as one object, every row with its lines
+  logbook-ts stats <root> [--json]    one screen of what the record holds: lines by kind, source,
+                                      year, tier and month, retractions, resolutions, attachments
+                                      referenced and present; --json gives the same as one object
+  logbook-ts sources <root>           every source with lines: how many, its first and last line
+  logbook-ts sources <root> --gaps [--since YYYY-MM-DD] [--expect <source>...] [--json]
+                                      per source: its last line, the longest silence and the days
+                                      with no line, from its first line (or --since) to today;
+                                      --expect lists only those sources, marks one silent a day or
+                                      more, or with no line, with "!" and exits 1
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
 
+export interface MainOptions {
+  /** The clock `sources --gaps` measures today and the running silence by. Defaults to now. */
+  now?: Date;
+}
+
 /** Run the CLI without touching process globals. Returns the exit code. */
-export function main(argv: string[], io: Io): number {
+export function main(argv: string[], io: Io, options: MainOptions = {}): number {
   const [command, root, ...rest] = argv;
   if (command === "--help" || command === "-h" || command === "help") {
     io.stdout(USAGE);
@@ -100,6 +116,42 @@ export function main(argv: string[], io: Io): number {
         const read = readDay(root, { day: day ?? today(root) });
         io.stdout(json ? `${JSON.stringify(read)}\n` : renderDay(read));
         return 0;
+      }
+      case "stats": {
+        if (root === undefined) return usage(io);
+        if (rest.length > 1 || (rest.length === 1 && rest[0] !== "--json")) return usage(io);
+        const stats = collectStats(root);
+        io.stdout(rest.length === 1 ? `${JSON.stringify(stats, null, 2)}\n` : statsText(stats));
+        return 0;
+      }
+      case "sources": {
+        if (root === undefined) return usage(io);
+        const flags = parseSourcesFlags(rest);
+        if (flags === undefined) return usage(io);
+        if (!flags.gaps) {
+          if (flags.since !== undefined || flags.expect !== undefined || flags.json) {
+            io.stderr("sources: --since, --expect and --json go with --gaps\n");
+            return 2;
+          }
+          io.stdout(sourcesText(listSources(root)));
+          return 0;
+        }
+        const gaps: Parameters<typeof sourceGaps>[1] = {};
+        if (flags.since !== undefined) gaps.since = flags.since;
+        if (flags.expect !== undefined) gaps.expect = flags.expect;
+        if (options.now !== undefined) gaps.now = options.now;
+        let report: ReturnType<typeof sourceGaps>;
+        try {
+          report = sourceGaps(root, gaps);
+        } catch (err) {
+          if (err instanceof BadRange) {
+            io.stderr(`sources: ${err.message}\n`);
+            return 2;
+          }
+          throw err;
+        }
+        io.stdout(flags.json ? `${JSON.stringify(report, null, 2)}\n` : gapsText(report));
+        return report.flagged.length ? 1 : 0;
       }
       default:
         return usage(io);
@@ -188,6 +240,53 @@ function today(root: string): string {
   const timezone = readMeta(root).timezone;
   return localOf(Date.now(), typeof timezone === "string" && timezone !== "" ? timezone : "UTC")
     .day;
+}
+
+interface SourcesFlags {
+  gaps: boolean;
+  since?: string;
+  expect?: string[];
+  json: boolean;
+}
+
+/**
+ * `--gaps`, `--since D` (also `--since=D`; the day is checked later, so the message can name it),
+ * `--expect S [S…]` (the names until the next flag, or comma-separated) and `--json`; undefined on
+ * anything else or on a flag without its value.
+ */
+function parseSourcesFlags(args: string[]): SourcesFlags | undefined {
+  const flags: SourcesFlags = { gaps: false, json: false };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    const eq = arg.indexOf("=");
+    const name = eq === -1 ? arg : arg.slice(0, eq);
+    switch (name) {
+      case "--gaps":
+      case "--json":
+        if (eq !== -1) return undefined;
+        flags[name === "--gaps" ? "gaps" : "json"] = true;
+        break;
+      case "--since": {
+        const value = eq === -1 ? args[++i] : arg.slice(eq + 1);
+        if (value === undefined || value === "" || value.startsWith("--")) return undefined;
+        flags.since = value;
+        break;
+      }
+      case "--expect": {
+        const names = eq === -1 ? [] : [arg.slice(eq + 1)];
+        while (eq === -1 && i + 1 < args.length && !(args[i + 1] as string).startsWith("--")) {
+          names.push(args[++i] as string);
+        }
+        const expect = names.flatMap((n) => n.split(",")).filter((n) => n !== "");
+        if (expect.length === 0) return undefined;
+        flags.expect = [...(flags.expect ?? []), ...expect];
+        break;
+      }
+      default:
+        return undefined;
+    }
+  }
+  return flags;
 }
 
 function usage(io: Io): number {
