@@ -39,7 +39,7 @@ export interface Local {
 }
 
 /** Local calendar day and HH:MM of an instant in a zone; undefined when `at` is not a date. */
-export type Localize = (at: string) => Local | undefined;
+export type Localize = (at: string | number) => Local | undefined;
 
 interface Wall {
   year: number;
@@ -88,7 +88,7 @@ const two = (n: number): string => String(n).padStart(2, "0");
 
 export function localizer(timezone: string): Localize {
   return (at) => {
-    const ms = Date.parse(at);
+    const ms = typeof at === "number" ? at : Date.parse(at);
     if (Number.isNaN(ms)) return undefined;
     return localOf(ms, timezone);
   };
@@ -152,4 +152,33 @@ export function weekdayOf(day: string): string {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(
     new Date(dayMs(day)),
   );
+}
+
+/** The `YYYY-MM-DD` that is `days` calendar days after `day`. */
+export function dayAfter(day: string, days: number): string {
+  return new Date(dayMs(day) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Whole calendar days from `from` to `to` (`to` minus `from`); negative when `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((dayMs(to) - dayMs(from)) / DAY_MS);
+}
+
+/**
+ * The instant, in ms, at which a local day begins in a zone: the first instant whose local clock
+ * reads that day at 00:00 (or, when a zone change skips midnight, the first minute of the day).
+ */
+export function localMidnight(day: string, timezone: string): number {
+  const local = localizer(timezone);
+  // Start from UTC midnight and correct by the zone's offset there; a zone change between the
+  // guess and the answer is caught by a second pass, since offsets move by at most a few hours.
+  let guess = dayMs(day);
+  for (let pass = 0; pass < 3; pass++) {
+    const seen = local(guess) as Local;
+    const [hh, mm] = seen.clock.split(":").map(Number) as [number, number];
+    const drift = (daysBetween(day, seen.day) * 24 + hh) * 3_600_000 + mm * 60_000;
+    if (drift === 0) return guess;
+    guess -= drift;
+  }
+  return guess;
 }

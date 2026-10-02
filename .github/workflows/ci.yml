@@ -34,6 +34,12 @@ jobs:
           node dist/bin.js day tests/fixtures/day-sample 2026-04-06
           node dist/bin.js day tests/fixtures/day-sample 2026-04-08 --json
           node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
+      - name: the built binary counts each fixture and reports where its sources went quiet
+        run: |
+          node dist/bin.js stats tests/fixtures/sample-logbook
+          node dist/bin.js stats tests/fixtures/profiles-sample --json
+          node dist/bin.js sources tests/fixtures/show-sample
+          node dist/bin.js sources tests/fixtures/sample-logbook --gaps --since 2026-03-05
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
@@ -103,11 +109,12 @@ jobs:
           fi
 
   cross-impl:
-    # The reference implementation (Python) and this one must print the same day: tests/cross-impl.test.ts
-    # runs `logbook show` of a clone of bighydro/logbook at main on every expected-show fixture (the
-    # two synthetic records and the conformance sample) and `logbook day` on every expected-day fixture
-    # and on three days of the reference's demo record, and diffs them against ours and against the
-    # vendored expected files.
+    # The reference implementation (Python) and this one must print the same day and count the same
+    # record: tests/cross-impl.test.ts runs `logbook show` of a clone of bighydro/logbook at main on
+    # every expected-show fixture (the two synthetic records and the conformance sample) and `logbook day`
+    # on every expected-day fixture and on three days of the reference's demo record, and diffs them
+    # against ours and against the vendored expected files; then `logbook stats` and
+    # `logbook sources --gaps` on the fixtures and on the reference's own demo record against ours.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -120,5 +127,5 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: install the reference
         run: uv sync --project ref
-      - name: both implementations print the same day
+      - name: both implementations print the same day and count the same record
         run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts

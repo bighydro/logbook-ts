@@ -1,10 +1,13 @@
 export { contentHash, contentOf, hashLine, lineHash, sha256Hex, ZERO_HASH } from "./chain.js";
-export { main } from "./cli.js";
+export { type Io, type MainOptions, main } from "./cli.js";
 export {
   addDays,
   checkTimezone,
+  dayAfter,
+  daysBetween,
   isDay,
   localIso,
+  localMidnight,
   localOf,
   localToMs,
   weekdayOf,
@@ -57,6 +60,20 @@ export {
   showDays,
   showRange,
 } from "./show.js";
+export {
+  BadRange,
+  type GapsOptions,
+  type GapsReport,
+  gapsText,
+  listSources,
+  type Silence,
+  type SourceActivity,
+  type SourcesListed,
+  sourceGaps,
+  sourcesText,
+  spellDuration,
+} from "./sources.js";
+export { collectStats, type KindStats, type Stats, statsText } from "./stats.js";
 export {
   deriveSegments,
   type Move,

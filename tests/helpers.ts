@@ -1,7 +1,18 @@
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hashLine } from "../src/chain.js";
+import { canonicalize } from "../src/jcs.js";
+import type { Line } from "../src/types.js";
 
 export const FIXTURES = fileURLToPath(new URL("./fixtures/", import.meta.url));
 export const SAMPLE = join(FIXTURES, "sample-logbook");
@@ -92,4 +103,52 @@ export function expectedDays(root: string): Array<{ day: string; text: string; j
       text: readFileSync(join(dir, name), "utf-8"),
       json: JSON.parse(readFileSync(join(dir, `${name.slice(0, 10)}.json`), "utf-8")) as unknown,
     }));
+}
+
+/** The content of one line to write with `writeRecord`: the envelope minus what the chain fills in. */
+export interface Draft {
+  at: string;
+  end?: string | null;
+  source: string;
+  kind: string;
+  tier?: 1 | 2 | 3;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * A synthetic record under a fresh temp folder: the drafts chained in order (SPEC §3), each in the
+ * month file of its `at`, and a logbook.json that names the head. Nothing in it is real.
+ */
+export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
+  const root = freshLogbook(timezone);
+  const files = new Map<string, string>();
+  let prev = "0".repeat(64);
+  let seq = 0;
+  for (const draft of drafts) {
+    seq += 1;
+    const line: Line = {
+      id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      seq,
+      at: draft.at,
+      end: draft.end ?? null,
+      tz: timezone,
+      source: draft.source,
+      kind: draft.kind,
+      tier: draft.tier ?? 2,
+      payload: draft.payload as Line["payload"],
+      recorded_at: "2026-10-01T12:00:00Z",
+      prev,
+      hash: "",
+    };
+    line.hash = hashLine(line);
+    prev = line.hash;
+    const rel = join("logbook", draft.at.slice(0, 4), `${draft.at.slice(5, 7)}.jsonl`);
+    files.set(rel, `${files.get(rel) ?? ""}${canonicalize(line)}\n`);
+  }
+  for (const [rel, text] of files) {
+    mkdirSync(join(root, rel, ".."), { recursive: true });
+    writeFileSync(join(root, rel), text, "utf-8");
+  }
+  writeMeta(root, { ...readMetaFile(root), seq, head: prev });
+  return root;
 }

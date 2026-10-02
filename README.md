@@ -74,7 +74,7 @@ node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-02
 
 ## What it does
 
-SPEC §6, the conformance rule, and two readers.
+SPEC §6, the conformance rule, and four readers.
 
 | Command | Does |
 |---|---|
@@ -83,6 +83,9 @@ SPEC §6, the conformance rule, and two readers.
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
 | `logbook-ts day <root> [YYYY-MM-DD] [--json]` | The day read back whole, as the reference's `logbook day` prints it: the nights either side, the country, the timeline of stays, stops, moves, gaps, runs aboard an asset and flights, with what attached to each and who was there, what was placed nowhere, the health line, the sources. Today in the record's zone when no day is given. Only reads. See below. |
+| `logbook-ts stats <root> [--json]` | One screen of what the record holds, as the reference prints it: format and head; lines, first and last `at`; lines per kind with first and last local day and distinct sources; per source; per local year as a bar; then, this implementation's, per tier and per local month; retractions and the lines they hide; resolution lines and the entities they mint; attachments referenced and present. Numbers, kinds, sources and dates, never what a line says. See below. |
+| `logbook-ts sources <root>` | Every source with lines: how many, its first and last line in the record's zone. |
+| `logbook-ts sources <root> --gaps [--since YYYY-MM-DD] [--expect <source>…] [--json]` | Where each source went quiet, as the reference prints it: per source with lines, its last line, the longest silence and the days with no line folded into runs, from its first line (or `--since`) to today. `--expect` lists only those sources, marks one silent a day or more, or with no line, with `!`, and exits 1. See below. |
 
 The hash is SPEC §3 to the letter:
 
@@ -263,6 +266,86 @@ node dist/bin.js day tests/fixtures/day-sample 2026-04-08 --json | jq '.timeline
 
 ```ts
 import { addNote, buildResolver, canonicalize, hashLine, readDay, renderDay, showDay, showDays, verifyLogbook } from "logbook-ts";
+## What the record holds
+
+`stats` and `sources --gaps` are the reference's two counting readers, printed here as it prints them:
+matched by running the reference on the fixtures and on its own demo record (`logbook demo`, a month of
+a person who does not exist, 12,772 lines), never by reading it, and kept matched by
+`tests/cross-impl.test.ts`. Both read every month file once through a fixed buffer; what is held is
+one counter per distinct kind, source, month, entity and digest (`stats`), or one file's timestamps per
+source and the days each source has a line on (`sources`), never the lines, so memory does not grow
+with the record. Nothing is written; no index is built.
+
+```bash
+node dist/bin.js stats tests/fixtures/sample-logbook
+#  logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
+#  31 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:00:00Z
+#
+#    kind         lines   first       last
+#    event            3   2026-03-01  2026-03-07   1 source
+#    location         3   2026-03-01  2026-03-08   2 sources
+#    …
+#    source            lines
+#    manual                4
+#    …
+#    year  lines
+#    2026     31  ████████████████████████████████████████████████████████████████████████████████████████████████████
+#
+#    tier  lines
+#    1        14
+#    2        12
+#    3         5
+#
+#    month    lines
+#    2026-03     31  ████████████████████████████████████████████████████████████████████████████████████████████████████
+#
+#  0 retractions hiding 0 lines
+#  0 resolution lines minting 0 entities
+#  1 attachment referenced by 1 line, 0 present under attachments/
+#
+#  took 0.004s
+```
+
+Kinds and sources are listed by lines, then by name; a kind's `first` and `last` are local days in the
+record's zone, as the years and months are; the bar is one character per percent of the busiest year
+(or month). The tier and month tables are this implementation's (the reference counts kind, source and
+year; SPEC-QUESTIONS 55); everything else, down to the column widths, is the reference's screen. The
+lines a retraction hides are the distinct `supersedes` it names, whether or not such a line exists; the
+entities are the distinct `entity.id` of every resolution line, retracted or not; an attachment is a
+distinct `sha256` under `payload.media`, `payload.extra.media` or `payload.content` (SPEC §1.1; a mail's
+`attachments` list is not one), present when `attachments/<sha256>` is a file. `--json` gives the same
+numbers as one object, with `tiers` and `months` beside the reference's keys.
+
+```bash
+node dist/bin.js sources tests/fixtures/sample-logbook --gaps --since 2026-03-05 --expect manual,sim-phone
+#    source      lines  last              longest silence                  missing days
+#  ! manual          2  2026-03-07 22:30  208d 13h since 2026-03-07 22:30  210  2026-03-06, 2026-03-08..2026-10-02
+#  ! sim-phone       0  -                 no lines
+#
+#  2 of 2 expected sources flagged: manual, sim-phone
+#  since 2026-03-05, today 2026-10-02 (Europe/Oslo); counted from the month files, every line
+```
+
+Per source with lines in the range: the lines, the last line's local time, the longest silence
+(`2d 0h`, `20h 0m`, `5m`: between two lines as `from → to`, from the range's start to the first line
+under `--since`, or `since <last>` and still running) and the local days with no line, counted and
+folded into runs, three at most, then `+N runs`. The range is each source's first line, or `--since`, to
+today in the record's zone; a line dated after today is outside it, and today is a missing day only once
+the source has been silent a full day. A source is flagged when its longest silence is a day or more,
+or it has no line at all; `--expect` lists the sources named, in that order, marks the flagged with `!`
+and exits 1 when any is. Every line counts, retracted or not. `--json` gives the report as data:
+`since`, `today`, `timezone`, `expect`, one object per source (`lines`, `first`, `last`, `silence`
+with `from`, `to` and `seconds`, `missing_days`, `flagged`) and `flagged`. The footer says where the
+lines were counted: the reference's index, the month files here (SPEC-QUESTIONS 56). Without `--gaps`,
+`sources` lists the record's sources with their lines and first and last line; the reference lists its
+adapters there, which this implementation has none of (SPEC-QUESTIONS 57).
+
+## As a library
+
+```ts
+import {
+  addNote, buildResolver, canonicalize, collectStats, gapsText, hashLine, showDay, showDays, sourceGaps, statsText, verifyLogbook,
+} from "logbook-ts";
 
 const result = verifyLogbook("/path/to/root"); // { valid, lines, head, errors }
 const line = addNote("/path/to/root", "a note"); // the Line that was written
@@ -273,6 +356,9 @@ for (const shown of showDays("/path/to/root", { since: "2026-03-01", profiles: [
 const today = readDay("/path/to/root", { day: "2026-06-15" }); // the Day, as `day --json` prints it
 today.nights.after.where; // "aboard Nordlys"
 renderDay(today); // the text `day` prints
+const stats = collectStats("/path/to/root"); // what --json prints: { lines, kinds, sources, years, tiers, months, … }
+const gaps = sourceGaps("/path/to/root", { since: "2026-09-01", expect: ["dawarich"] }); // { today, sources, flagged }
+statsText(stats); gapsText(gaps); // the screens
 buildResolver(lines).name({ kind: "email", value: "ines@example.org" }); // "Ines Holm-Berg" or undefined
 canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
 ```
@@ -289,8 +375,9 @@ pnpm check         # all four
 pre-commit install # lint, format, gitleaks, no commits to main
 ```
 
-To diff `show` and `day` against the reference implementation, clone it and point the test at the clone;
-`uv run` installs the clone's own environment (the `day` diff also builds the reference's demo record):
+To diff `show`, `day`, `stats` and `sources --gaps` against the reference implementation, clone it and
+point the test at the clone; `uv run` installs the clone's own environment, and the test writes the
+reference's demo record into a temp folder to read and count it with both:
 
 ```bash
 git clone https://github.com/bighydro/logbook /tmp/logbook-ref
@@ -305,7 +392,8 @@ All take `LOGBOOK_REF`.
 CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
 tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture
 is still the one on the spec repo's main and that `verify` prints the head published there; and a
-fourth runs the cross-implementation diff against the reference at main.
+fourth runs the cross-implementation diff against the reference at main, on the fixtures and on the
+reference's demo record.
 
 Rules for anyone (or any agent) changing this repo are in [CLAUDE.md](./CLAUDE.md). Nothing in the
 fixtures is real; the sample person lives in Oslo and does not exist.
