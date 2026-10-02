@@ -1,0 +1,35 @@
+2026-04-06  Monday
+  night before  Home · home
+  night after   Home · home
+  country       NO (place Home)
+  all day       Ines in town
+
+  00:00–09:00  stay   Home · 9 h
+  09:00–09:10  move   299 m · 10 min · walk
+  09:10–09:15  stay   59.9120,10.7560 · 5 min
+  09:15–09:20  move   315 m · 5 min · walk
+  09:20–14:00  stay   Office · 4 h 40 min · 1 event, 1 transcript, 1 note, 1 mail thread, 2 calls, 2 messages, 1 photo, 1 keeper
+      event        Weekly planning 10:00–10:45
+      transcript   Standup
+      note         Lunch with Ola Nordmann and Kari at the office. Ines came by.
+      mail         Berth (2 messages)
+      call         → Ola Nordmann, no answer
+      call         ← Ines Holm, 45 s
+      keeper       IMG_0406.HEIC (memory)
+      with         Ola Nordmann (calendar, transcript, note, photo), Ines Holm (transcript), Per (calendar) · proposed immich:f_99 (photo)
+  14:00–18:00  gap    4 h · no points · 4.7 km
+  18:00–18:30  stay   59.9400,10.7000 · 30 min
+  18:30–18:50  move   4.1 km · 20 min · car
+  18:50–24:00  stay   Home · 5 h 10 min · 2 notes
+      note         Draft of the evening note.
+      note         Final evening note with Ola Nordmann.
+      with         Ola Nordmann (note)
+
+  unplaced      15:00  note   Walked along the river with Ines Holm.
+  unplaced      15:30–16:30  event  Dentist
+  unplaced      16:00–16:10  call   +4790000002
+  unplaced      16:30  mail   Tromsø
+  unplaced      17:00–17:20  transcript River talk
+
+  health        sleep 6.4 h · 370 steps · resting 57 bpm
+  sources       sim-phone 241 lines, last 23:55 · apple-health 17 lines, last 22:30 · manual 4 lines, last 20:35 · ios-calls 3 lines, last 16:00 · mail 3 lines, last 16:30 · sim-calendar 3 lines, last 15:30 · granola 2 lines, last 17:00 · immich 2 lines, last 17:30 · whatsapp 2 lines, last 11:12 · keeper-inference 1 line, last 13:30

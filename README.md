@@ -6,9 +6,9 @@ The Logbook spec says it should be small enough to implement in an afternoon, an
 implementations must agree before v1.0 is frozen. This is the second one. It was written from
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
-prints a day exactly as the reference implementation (openlogbook, main at dae84b0, 2026-10-01) does, matched
-against the reference's output on synthetic records, never its source, and checked by a
-cross-implementation test.
+and `day` print a day exactly as the reference implementation (openlogbook, main at 996642f, 2026-10-02)
+does, matched against the reference's output on synthetic records and on its own demo record, never
+its source, and checked by a cross-implementation test.
 
 Zero runtime dependencies. RFC 8785 canonical JSON, SHA-256 chaining and UUIDv7 are implemented by hand on
 Node's built-ins.
@@ -35,7 +35,28 @@ node dist/bin.js verify /tmp/mine
 #  invalid — 1 error
 #    logbook/2026/03.jsonl line 1: seq 1 — hash 129e6cdc… does not recompute (got cd36ca92…)
 
-# read a day, in the owner's timezone
+# the day read back whole: nights, country, stays and moves with what attached to each and who was there
+node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
+#  2026-06-15  Monday
+#    night before  Home · home
+#    night after   aboard Nordlys · away
+#    country       NO (nearest airport OSL)
+#    all day       Nordlys: summer cruise
+#
+#    00:00–08:35  stay   Home · 8 h 35 min
+#    08:35–08:45  move   1.4 km · 10 min · car
+#    08:45–24:00  aboard Nordlys (yacht) · 15 h 15 min · 1 note, 1 call
+#        08:45–10:05  stay   Marina · 1 h 20 min
+#        10:05–13:00  move   9.7 km · 2 h 55 min · boat
+#        13:00–24:00  stay   59.8500,10.6000 · 11 h
+#        note         Cast off at ten with Ola Nordmann and Anders Vik. Light wind from the s…
+#        call         → Ola Nordmann, 15 min
+#        with         Ola Nordmann (note), Anders Vik (note)
+#
+#    health        sleep 6.2 h · 6,671 steps · resting 54 bpm
+#    sources       dawarich 286 lines, last 23:55 · ais 161 lines, last 23:50 · apple-health 80 lines, last 22:07 · …
+
+# every line of a day, as the sources wrote it, in the owner's timezone
 node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-02
 #  2026-03-02
 #    06:10  flight     flighty        XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot
@@ -53,7 +74,7 @@ node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-02
 
 ## What it does
 
-SPEC §6, the conformance rule, and one reader.
+SPEC §6, the conformance rule, and two readers.
 
 | Command | Does |
 |---|---|
@@ -61,6 +82,7 @@ SPEC §6, the conformance rule, and one reader.
 | `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify. |
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
+| `logbook-ts day <root> [YYYY-MM-DD] [--json]` | The day read back whole, as the reference's `logbook day` prints it: the nights either side, the country, the timeline of stays, stops, moves, gaps, runs aboard an asset and flights, with what attached to each and who was there, what was placed nowhere, the health line, the sources. Today in the record's zone when no day is given. Only reads. See below. |
 
 The hash is SPEC §3 to the letter:
 
@@ -184,10 +206,61 @@ Where the reference and SPEC §3.2 disagree, this implementation follows the spe
 SPEC-QUESTIONS.md: a run of points ends at the last point's `end` when it has one, and a day is ordered
 by instant, not by the text of `at`.
 
+## The Day
+
+`day` is the reader [docs/day.md](https://github.com/bighydro/logbook/blob/main/docs/day.md) of the spec repo
+describes, written from that page, SPEC §3.2, the README's prose on `derive stays` and the RFCs, and
+matched to the reference by running it (`tests/cross-impl.test.ts`), never by reading it. It derives the
+owner's **stays** from the `location/v1` points by the documented rules — a span at one place of twenty
+minutes or more, or of any length when something is attached inside it; a point outside the place's
+radius (`places.json`, else 150 m) is an excursion the stay survives when the tracker is back inside
+within ten minutes; a silence the tracker ends within a short walk of the place is time there; shorter
+spans with nothing attached are **stops**; what lies between is a **move**, with its distance along the
+points, a mode from the speed (walk, car, train, flight, boat aboard a yacht) or `flight` when it runs
+between two airports, or a **gap** when no point fell in it for a silence or more — and marks a stay or
+move **aboard** an asset of `assets.json` when the owner's positions match its track; two or more
+consecutive segments aboard one asset are one row with the berth, the passage and the anchorage inside.
+The thresholds are `policy/stays.json`'s, with the reference's defaults when the file is missing.
+
+Then it reads the day: the **night** before and after (the longest stay between 22:00 and 08:00, `home`
+when it lies in a place of kind `home` or within 400 m of one, `in transit` when there is none), the
+**country** (a place's own, else the nearest large airport's zone, from the night or from the day's
+longest stay), the day's all-day entries; the **timeline** of the rows that touch the day, clipped to it,
+each with its **attachments** — events (one entry several calendars carry folded), transcripts, notes,
+mail threads, calls and keepers named, messages and photos counted — and **who was there**: confirmed by a
+timed calendar entry held at the stay, a transcript's participant the record resolves, a note that says
+`with <name>`; proposed by a face the photo library tagged; never the owner (`owner_id` and `owner_emails`
+in `logbook.json`, the resolution lines naming those, `policy/owner.json`). The **flights** are the
+`flight/v1` lines standing. What fell inside no stay or move is **unplaced**. The **health** line is the
+night's sleep (the union of the asleep stages per device, the longest device), the day's steps (the larger
+device per quarter hour) and resting heart rate (the day's mean), corrections honoured. The **sources** are
+every source with a line standing on the day, how many, and its newest. Airports and zones come from the
+reference's own tables (OurAirports and zone.tab, public domain; `src/tables.ts`, generated by
+`scripts/make-tables.mjs`), so both implementations name the same airport, city and country.
+
+`--json` prints the Day as the reference does: one object with `day`, `weekday`, `tz`, `nights`, `country`,
+`all_day`, `timeline` (every row with `within_day`, `attached`, `with` and the ids of its lines), `flights`,
+`unplaced`, `health` and `sources`. The text and the JSON are diffed against the reference on
+`tests/fixtures/day-sample` (six days with a case of every rule) and on three days of the reference's own
+demo record (`logbook demo --days 30 --seed 7`, vendored as `tests/fixtures/demo-sample`, the lines the three
+days read, chained again); `tests/fixtures/*/expected-day/` is the reference's output on each, captured by
+`tests/fixtures/capture-expected-day.mjs` and never edited by hand. Every choice the prose left open,
+and the two places the reference departs from docs/day.md (an all-day entry proposes nobody; a flight
+without a designator prints `None None`), is in SPEC-QUESTIONS.md 42–54.
+
+`day` reads the window the reference reads — the day before, the day, and the night after — in one pass over
+every file for the judgements (as `show` does) and one over the month files the window can touch, keeping
+the window's lines only; the memory is a few days of lines whatever the record's size. Nothing is written.
+
+```bash
+node dist/bin.js day tests/fixtures/day-sample 2026-04-06          # a stop, a gap, unplaced lines, two devices' health
+node dist/bin.js day tests/fixtures/day-sample 2026-04-08 --json | jq '.timeline[] | select(.kind == "aboard") | .inside[].where'
+```
+
 ## As a library
 
 ```ts
-import { addNote, buildResolver, canonicalize, hashLine, showDay, showDays, verifyLogbook } from "logbook-ts";
+import { addNote, buildResolver, canonicalize, hashLine, readDay, renderDay, showDay, showDays, verifyLogbook } from "logbook-ts";
 
 const result = verifyLogbook("/path/to/root"); // { valid, lines, head, errors }
 const line = addNote("/path/to/root", "a note"); // the Line that was written
@@ -195,6 +268,9 @@ const day = showDay("/path/to/root", { day: "2026-03-14", timezone: "Europe/Oslo
 for (const shown of showDays("/path/to/root", { since: "2026-03-01", profiles: ["note"] })) {
   shown.detail.rows; // what --json prints: [{ time, kind, source, summary, lines }, …], a day at a time
 }
+const today = readDay("/path/to/root", { day: "2026-06-15" }); // the Day, as `day --json` prints it
+today.nights.after.where; // "aboard Nordlys"
+renderDay(today); // the text `day` prints
 buildResolver(lines).name({ kind: "email", value: "ines@example.org" }); // "Ines Holm-Berg" or undefined
 canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
 ```
@@ -211,13 +287,18 @@ pnpm check         # all four
 pre-commit install # lint, format, gitleaks, no commits to main
 ```
 
-To diff `show` against the reference implementation, clone it and point the test at the clone;
-`uv run` installs the clone's own environment:
+To diff `show` and `day` against the reference implementation, clone it and point the test at the clone;
+`uv run` installs the clone's own environment (the `day` diff also builds the reference's demo record):
 
 ```bash
 git clone https://github.com/bighydro/logbook /tmp/logbook-ref
 LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
 ```
+
+`tests/fixtures/capture-expected-show.mjs` and `capture-expected-day.mjs` re-capture a fixture's expected
+output from the reference; `tests/fixtures/demo-sample/make.mjs` rebuilds the demo excerpt from the
+reference's `logbook demo`; `scripts/make-tables.mjs` regenerates `src/tables.ts` from its data tables.
+All take `LOGBOOK_REF`.
 
 CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
 tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture

@@ -1,0 +1,474 @@
+{
+  "day": "2026-06-15",
+  "weekday": "Monday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-06-14",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260614T1000Z@59.9139,10.7522",
+      "lines": [
+        "019ec592-e900-7239-8dc5-26214fc4a30a",
+        "019ec9f4-6e60-7ea1-bf77-af0ade79d290"
+      ]
+    },
+    "after": {
+      "day": "2026-06-15",
+      "where": "aboard Nordlys",
+      "home": false,
+      "aboard": "nordlys",
+      "in_transit": false,
+      "stay": "stay:owner:20260615T1100Z@59.8500,10.6000",
+      "lines": [
+        "019ecaf0-3380-70f5-b702-d38ca1b8d1f1",
+        "019ecf03-e700-7a2c-b3ce-bf0500c92434"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "airport",
+    "by": "OSL",
+    "from": "night"
+  },
+  "all_day": [
+    {
+      "title": "Nordlys: summer cruise",
+      "line": "019ec826-1700-796d-95a9-3d8a2314eec5",
+      "sources": [
+        "ios-calendar"
+      ],
+      "lines": [
+        "019ec826-1700-796d-95a9-3d8a2314eec5"
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "stay:owner:20260614T1000Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-06-14T10:00:00Z",
+      "end": "2026-06-15T06:35:00Z",
+      "start_local": "2026-06-14T12:00:00+02:00",
+      "end_local": "2026-06-15T08:35:00+02:00",
+      "within_day": {
+        "start": "2026-06-14T22:00:00Z",
+        "end": "2026-06-15T06:35:00Z",
+        "duration_s": 30900
+      },
+      "duration_s": 74100,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.913893,
+      "lon": 10.752181,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 246,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec592-e900-7239-8dc5-26214fc4a30a",
+        "last": "019ec9f4-6e60-7ea1-bf77-af0ade79d290"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260615T0635Z",
+      "kind": "move",
+      "start": "2026-06-15T06:35:00Z",
+      "end": "2026-06-15T06:45:00Z",
+      "start_local": "2026-06-15T08:35:00+02:00",
+      "end_local": "2026-06-15T08:45:00+02:00",
+      "within_day": {
+        "start": "2026-06-15T06:35:00Z",
+        "end": "2026-06-15T06:45:00Z",
+        "duration_s": 600
+      },
+      "duration_s": 600,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 1401,
+      "airports": [],
+      "points": 2,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec9f4-6e60-7ea1-bf77-af0ade79d290",
+        "last": "019eca06-bde0-7cd7-882a-c86c33e59841"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "aboard:nordlys:20260615T0645Z",
+      "kind": "aboard",
+      "start": "2026-06-15T06:45:00Z",
+      "end": "2026-06-16T06:00:00Z",
+      "start_local": "2026-06-15T08:45:00+02:00",
+      "end_local": "2026-06-16T08:00:00+02:00",
+      "within_day": {
+        "start": "2026-06-15T06:45:00Z",
+        "end": "2026-06-15T22:00:00Z",
+        "duration_s": 54900
+      },
+      "duration_s": 83700,
+      "where": "aboard Nordlys",
+      "place": null,
+      "lat": 59.90501,
+      "lon": 10.735,
+      "aboard": "nordlys",
+      "asset": {
+        "id": "nordlys",
+        "name": "Nordlys",
+        "kind": "yacht"
+      },
+      "mode": null,
+      "distance_m": 9726,
+      "airports": [],
+      "points": 279,
+      "promoted": false,
+      "gap": false,
+      "inside": [
+        {
+          "id": "stay:owner:20260615T0645Z@59.9050,10.7350",
+          "kind": "stay",
+          "start": "2026-06-15T06:45:00Z",
+          "end": "2026-06-15T08:05:00Z",
+          "start_local": "2026-06-15T08:45:00+02:00",
+          "end_local": "2026-06-15T10:05:00+02:00",
+          "within_day": {
+            "start": "2026-06-15T06:45:00Z",
+            "end": "2026-06-15T08:05:00Z",
+            "duration_s": 4800
+          },
+          "duration_s": 4800,
+          "where": "Marina",
+          "place": "Marina",
+          "lat": 59.90501,
+          "lon": 10.735,
+          "aboard": "nordlys",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 15,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "019eca06-bde0-7cd7-882a-c86c33e59841",
+            "last": "019eca46-d420-70f6-8652-d41c58633c56"
+          }
+        },
+        {
+          "id": "move:owner:20260615T0805Z",
+          "kind": "move",
+          "start": "2026-06-15T08:05:00Z",
+          "end": "2026-06-15T11:00:00Z",
+          "start_local": "2026-06-15T10:05:00+02:00",
+          "end_local": "2026-06-15T13:00:00+02:00",
+          "within_day": {
+            "start": "2026-06-15T08:05:00Z",
+            "end": "2026-06-15T11:00:00Z",
+            "duration_s": 10500
+          },
+          "duration_s": 10500,
+          "where": null,
+          "place": null,
+          "lat": null,
+          "lon": null,
+          "aboard": "nordlys",
+          "mode": "boat",
+          "distance_m": 9726,
+          "airports": [],
+          "points": 35,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "019eca46-d420-70f6-8652-d41c58633c56",
+            "last": "019ecaf0-3380-70f5-b702-d38ca1b8d1f1"
+          }
+        },
+        {
+          "id": "stay:owner:20260615T1100Z@59.8500,10.6000",
+          "kind": "stay",
+          "start": "2026-06-15T11:00:00Z",
+          "end": "2026-06-16T06:00:00Z",
+          "start_local": "2026-06-15T13:00:00+02:00",
+          "end_local": "2026-06-16T08:00:00+02:00",
+          "within_day": {
+            "start": "2026-06-15T11:00:00Z",
+            "end": "2026-06-15T22:00:00Z",
+            "duration_s": 39600
+          },
+          "duration_s": 68400,
+          "where": "59.8500,10.6000",
+          "place": null,
+          "lat": 59.849997,
+          "lon": 10.600016,
+          "aboard": "nordlys",
+          "mode": null,
+          "distance_m": null,
+          "airports": [],
+          "points": 229,
+          "promoted": false,
+          "gap": false,
+          "lines": {
+            "first": "019ecaf0-3380-70f5-b702-d38ca1b8d1f1",
+            "last": "019ecf03-e700-7a2c-b3ce-bf0500c92434"
+          }
+        }
+      ],
+      "lines": {
+        "first": "019eca06-bde0-7cd7-882a-c86c33e59841",
+        "last": "019ecf03-e700-7a2c-b3ce-bf0500c92434"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [
+          {
+            "text": "Cast off at ten with Ola Nordmann and Anders Vik. Light wind from the s…",
+            "line": "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+          }
+        ],
+        "mail": [],
+        "calls": [
+          {
+            "who": "Ola Nordmann",
+            "direction": "outgoing",
+            "answered": true,
+            "duration_s": 938,
+            "line": "019ecbea-23e0-73ab-a663-fcf20e3e78ee"
+          }
+        ],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "4f8c85f9-0e6a-56f0-a9db-0d09bfdd3d56",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 1.0,
+            "sources": [
+              "note"
+            ],
+            "reasons": [
+              "note says with Ola Nordmann"
+            ],
+            "lines": [
+              "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+            ]
+          },
+          {
+            "person": "ca2acbe4-46f5-567d-a961-74420028c869",
+            "name": "Anders Vik",
+            "status": "confirmed",
+            "confidence": 1.0,
+            "sources": [
+              "note"
+            ],
+            "reasons": [
+              "note says with Anders Vik"
+            ],
+            "lines": [
+              "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": {
+    "sleep_h": 6.2,
+    "steps": 6671,
+    "resting_hr": 54,
+    "hrv": null,
+    "lines": [
+      "019ec849-cba0-71b5-9dff-85e20554fcd2",
+      "019ec867-17a0-73af-8735-a18908eded4c",
+      "019ec875-bda0-7de0-9c01-a1a54f721354",
+      "019ec8a8-1840-7d83-8f5a-f4a13883645e",
+      "019ec8b7-a8a0-7996-bcf3-a40bdc31adc4",
+      "019ec8ce-8c00-7c1f-b7d1-cb5a374197cd",
+      "019ec90e-a240-72a1-9e4d-7318956af827",
+      "019ec933-4140-7d15-a55a-987c6a049054",
+      "019ec948-4fe0-7d94-b77f-ed8bdd6f87b2",
+      "019ec984-bca0-7e40-95ad-ade589e3f339",
+      "019ec9a6-9c80-7242-a9f8-c958181ce686",
+      "019ec9b4-5820-7c1e-9d1b-0358bf0c1a63",
+      "019ec9c2-13c0-7556-aa1a-af4023fabbd2",
+      "019ec9cf-cf60-78cf-b173-26567ef801a0",
+      "019ec9dd-8b00-7da8-8d7b-bedaf586e42d",
+      "019ec9eb-46a0-7a4e-83a6-9cde856b75c8",
+      "019ec9f9-0240-7235-a499-06e90aa09cec",
+      "019eca06-bde0-76f3-b4ce-65c13b7b469c",
+      "019eca14-7980-7fd6-abb7-87a286090046",
+      "019eca22-3520-79b1-a4c0-d7708cceb5a6",
+      "019eca2f-f0c0-74a1-b200-663727d98afb",
+      "019eca3d-ac60-7260-8e47-0e74da86991e",
+      "019eca4b-6800-7374-af81-1b962eef4018",
+      "019eca59-23a0-740f-b948-2ac263d1a53a",
+      "019eca66-df40-7e87-9ff2-bfc40c42af6f",
+      "019eca74-9ae0-781f-bb69-efa8037b877f",
+      "019eca82-5680-794b-8979-8992d025f06e",
+      "019eca90-1220-7286-be02-244c7be99eab",
+      "019eca9d-cdc0-7661-b838-a5ecc921b969",
+      "019ecaab-8960-7f4c-b7c1-71c97552f1d5",
+      "019ecab9-4500-7963-9b87-d7601c8618b3",
+      "019ecac7-00a0-7fc4-a6b1-413ae965ebbc",
+      "019ecad4-bc40-742f-9a1f-5ff0dbeb804a",
+      "019ecae2-77e0-7fdd-b49f-feacd216ddd7",
+      "019ecaf0-3380-7430-a132-0373342791e9",
+      "019ecafd-ef20-7b26-b9d8-fdc4c2a7f18a",
+      "019ecb0b-aac0-7914-b932-7aa61eb2c0b7",
+      "019ecb19-6660-7769-815b-ae9e14f61dfc",
+      "019ecb27-2200-7b74-9edf-345fdfdc684e",
+      "019ecb34-dda0-7082-9209-d84ef65d1983",
+      "019ecb42-9940-7661-919a-61b9fe95071d",
+      "019ecb50-54e0-777f-8709-5b290983e81e",
+      "019ecb5e-1080-7687-80b1-be407f3bca4b",
+      "019ecb6b-cc20-71ee-b3a0-d2d3bfadd211",
+      "019ecb79-87c0-7b23-98de-a666524d9a7f",
+      "019ecb87-4360-74cb-ae82-77c7ea5b5e60",
+      "019ecb94-ff00-7ab7-912c-af157e1c130d",
+      "019ecba2-baa0-761e-a187-583220be952c",
+      "019ecbb0-7640-71ca-8938-0b9a9b99aa6f",
+      "019ecbbe-31e0-79ac-8744-deb023b4db36",
+      "019ecbcb-ed80-7e95-96f0-1cb569b73afb",
+      "019ecbd9-a920-7e27-8a67-6c6e351f8e14",
+      "019ecbe7-64c0-7103-92bf-86a02474c828",
+      "019ecbf5-2060-7c60-b816-62a1cc29c3f6",
+      "019ecc02-dc00-7c72-8456-1a98b3181d57",
+      "019ecc10-97a0-71fe-80fa-5658d5eb1e30",
+      "019ecc1e-5340-7a85-96ff-4523d50c3d22",
+      "019ecc2c-0ee0-7400-b76c-b9cb7ecf0423",
+      "019ecc39-ca80-71e5-81b3-d068968da35f",
+      "019ecc47-8620-7e20-8ff3-de1d4d344beb",
+      "019ecc55-41c0-7f24-be34-07b7dac078ce",
+      "019ecc62-fd60-7752-aea0-a36051259ede",
+      "019ecc70-b900-7ce6-a75a-f48b44e15373",
+      "019ecc7e-74a0-79b4-ae7f-5caf9a45f131",
+      "019ecc8c-3040-723b-b2fc-2c12f295d8f7",
+      "019ecc99-ebe0-7779-8b98-8b89a80c9ec5",
+      "019ecca7-a780-7181-bb84-0d52a13fcb24",
+      "019eccb5-6320-735c-881d-cd5f6de76c83",
+      "019eccc3-1ec0-7f51-bdee-c709be08fb15",
+      "019eccd0-da60-7a8e-af7b-0e0b9571257f",
+      "019ec96f-ae00-7915-8220-53036e3786df"
+    ]
+  },
+  "sources": [
+    {
+      "source": "dawarich",
+      "lines": 286,
+      "first": "2026-06-14T22:00:00Z",
+      "newest": "2026-06-15T21:55:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 161,
+      "first": "2026-06-14T22:00:00Z",
+      "newest": "2026-06-15T21:50:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 80,
+      "first": "2026-06-14T22:39:00Z",
+      "newest": "2026-06-15T20:07:00Z"
+    },
+    {
+      "source": "ios-calendar",
+      "lines": 1,
+      "first": "2026-06-14T22:00:00Z",
+      "newest": "2026-06-14T22:00:00Z"
+    },
+    {
+      "source": "ios-calls",
+      "lines": 1,
+      "first": "2026-06-15T15:33:00Z",
+      "newest": "2026-06-15T15:33:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 1,
+      "first": "2026-06-15T08:05:00Z",
+      "newest": "2026-06-15T08:05:00Z"
+    },
+    {
+      "source": "safari",
+      "lines": 1,
+      "first": "2026-06-15T08:22:00Z",
+      "newest": "2026-06-15T08:22:00Z"
+    },
+    {
+      "source": "shazam",
+      "lines": 1,
+      "first": "2026-06-15T15:28:00Z",
+      "newest": "2026-06-15T15:28:00Z"
+    },
+    {
+      "source": "voice-memos",
+      "lines": 1,
+      "first": "2026-06-15T14:00:00Z",
+      "newest": "2026-06-15T14:00:00Z"
+    }
+  ]
+}

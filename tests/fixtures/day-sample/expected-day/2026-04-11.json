@@ -1,0 +1,47 @@
+{
+  "day": "2026-04-11",
+  "weekday": "Saturday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-10",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260410T0600Z@59.9139,10.7522",
+      "lines": [
+        "00000000-0000-4000-8000-00000000041176",
+        "00000000-0000-4000-8000-00000000041368"
+      ]
+    },
+    "after": {
+      "day": "2026-04-11",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [],
+  "flights": [],
+  "unplaced": [],
+  "health": null,
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 1,
+      "first": "2026-04-10T22:00:00Z",
+      "newest": "2026-04-10T22:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "format": "logbook/0.2",
+  "owner_id": "a6036501-58e9-5727-af64-64b4a2c319f7",
+  "created_at": "2026-05-31T04:00:00Z",
+  "timezone": "Europe/Oslo",
+  "seq": 1946,
+  "head": "1668bab2f13a16dab3d5bcfadd8b42b527be3e7c29744704958cc7216dd8e0d7",
+  "owner_emails": [
+    "ines.nordmann@example.org"
+  ]
+}

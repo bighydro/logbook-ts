@@ -103,3 +103,146 @@ The reference was run, never read: a synthetic record carrying every profile (`t
     *Answered (b3cd8c5, 2026-10-02).* The reference moved instead of the sample (questions 24, 25 and 27) and pinned 2026-03-01 and 2026-03-06 whole in its own tests; `expected.json` is unchanged. All eight days are now in `tests/fixtures/sample-logbook/expected-show/`, captured from the reference, checked by the unit tests and diffed against the reference by `tests/cross-impl.test.ts`; the sample is the cross-implementation fixture whole.
 
 41. **A range, a profile filter and a JSON form are not specified.** SPEC §3.2 fixes the order of a day and what a reader does with retractions, runs and aliases; it says nothing about listing several days, choosing profiles, or a machine-readable form, and the reference `show` takes one day and `--raw` only (`logbook day --json` is a different reader, of stays and moves). `show` here takes `--since`/`--until` (a range of local days, inclusive; a missing bound is the record's first or last listed day; a day without a line is left out and an empty range says so), `--profile` (lines whose `payload.schema` is one of those given, a name without `/vN` meaning every version, applied before runs are collapsed and entries folded, while resolutions and retractions still come from the whole record), and `--json` (one object per day: `day`, `timezone`, `hero`, `rows`, `note`, each row the text column as `summary` with `time`, `until`, `kind`, `source`, `retraction` and the full `lines` behind it). Two readers that both offer these should agree on at least: whether a filtered day collapses runs across the lines filtered out (here it does, since §3.2 collapses a run "unbroken by any other row" and there is no other row); whether an empty day in a range is listed (here it is not); and what the JSON row carries (here, the lines themselves, so nothing of the record is lost in the reading). Worth a §3.2 sentence each, or a note that they are a reader's own.
+
+## Found while implementing `day` (openlogbook main at 996642f, 2026-10-02; docs/day.md, README "Reading the day back")
+
+`day` was written from SPEC §3.2, docs/day.md, the README's prose on `derive stays`, the with module and the
+labels, and the RFCs, and then matched to the reference by running it: on its own demo record
+(`logbook demo --days 30 --seed 7`, every day of June, text and JSON) and on a probe record built to
+have a case of every rule (`tests/fixtures/day-sample`). Where the prose said one thing and the reference
+did another, this implementation does what the reference does and says so here. What the output
+revealed:
+
+42. **The Day's text and JSON are not written down.** docs/day.md shows two days and names the JSON's
+    keys; the rest is learned by running the reference: the header labels padded to thirteen columns
+    (`night before`, `night after`, `country`, `all day`), a blank line, one row per stay, stop, move,
+    gap, run aboard and flight as `  HH:MM–HH:MM  <kind padded to 6> <text>` (a run's rows four columns
+    further in, without `aboard <id>`), the attachments under a row as `      <label padded to 12> <text>`
+    in the order events, transcripts, notes, mail, calls, keepers, then `with`; `unplaced` one line per
+    line placed nowhere, each with the label; `timeline      nothing logged` for a day with no row; the
+    durations to the minute (`4 h 55 min`, `9 h`, `35 min`), the distances `446 m`, `9.0 km`, `36.7 km`,
+    `1426 km`; a stay as `<where> · <duration>[ · aboard <id>][ · counts]`, a stop as
+    `<where> · <duration> · nothing attached`, a move as `<distance> · <duration> · <mode or mode unknown>[ · OSL → ZRH][ · counts]`,
+    a gap as `<duration> · no points · <distance>`, a run as `<asset name> (<kind>) · <duration>[ · counts]`,
+    a flight as `<carrier> <number>  <from> → <to> · <evidence>`; a night as `<where> · home|away` or
+    `in transit`; the country as `NO (place Home)`, `CH (nearest airport ZRH)`, with ` · from the longest stay`
+    when the night is in transit, or `unknown`; the health line as `sleep 6.6 h · 8,115 steps · resting 53 bpm`
+    or `no lines`; the sources as `<source> N lines, last HH:MM`, most lines first, then by name. A
+    third implementation can only learn this by running the reference; docs/day.md could carry it.
+
+43. **How stays are derived, in the detail the prose leaves out.** README and docs/day.md give the rules
+    in words; the numbers that make two implementations agree are: a cluster is anchored at its first
+    point, or at the centre of the named place whose radius holds that point (the nearest when several
+    do), and takes every later point within the radius; a point outside begins an excursion, and the
+    stay goes on when a point is back inside within `merge_gap_s` *of the last point inside* (not of the
+    first point outside), the excursion's points being neither the stay's nor the move's; the stay ends
+    at its last point inside. A cluster of one point is never a stay or a stop; one of two or more is a
+    stay from `stay_min_s`, a stop from `stop_min_s`, and dissolves into the move below that. *Any*
+    calendar entry inside a cluster promotes it, an all-day one too (a two-point, five-minute cluster on a
+    day with an all-day entry is a stay, `promoted: true`); so do a transcript, a note, a call, a message
+    and a photo. A stay whose next point comes after a silence of `merge_gap_s` and lies within
+    `walk_max_kmh` for `merge_gap_s` of the anchor lasts until that point, which is the first interior
+    point of the move, not the stay's. `points` of a stay counts the points inside; `lat`/`lon` is their
+    mean, exactly summed (Python's `fmean`) and rounded to six places; the stay's id carries the start
+    to the minute and the centroid to four places. A move's distance is the path from the stay's last
+    point through the interior points to the next stay's first; its mode comes from that distance over
+    its duration (`walk` to `walk_max_kmh`, `car` to `car_max_kmh`, `train` below `flight_min_kmh`,
+    else `flight`), computed with no interior point too (a four-hour gap of 4.7 km is a `walk` in the
+    JSON while the text says `gap`), and is `None` (`mode unknown`) below about a kilometre an hour
+    — the demo's five-minute moves of 11 to 51 m have none, a five-minute move of 315 m walks; the
+    threshold itself is a guess at 1 km/h, which the probe cannot pin down. A move whose two ends are
+    within `airport_km` of two different airports is a `flight` with those airports. These are the
+    reference's choices read off its output; `policy/stays.json` could document them.
+
+44. **Aboard.** "When your position matches the asset's own track" is, as far as the output shows: of a
+    segment's points (a stay's inside, a move's interior) that have a position of the asset within
+    `aboard_window_s`, more than half lie within `radius_m` of the nearest one in time; a point with no
+    asset position near it in time is not judged, so a boat reporting hourly at its berth still has the
+    owner aboard, while a passage on which the owner's points fall between the boat's five-minute
+    reports is a `car` move at 9 km/h. A move aboard a yacht is by `boat`. A run of two or more
+    consecutive segments aboard one asset *among the rows of the day* is one `aboard` row with the
+    segments inside; a single one prints flat with ` · aboard <id>`, and a run that reaches into the next
+    day prints flat there when only one of its segments touches it. Whether "more than half" is the
+    reference's rule or "all" is not decidable from the demo (both fit); ADR 0018 could say.
+
+45. **Labels.** An unnamed stay is its coordinates to four places; within 3.5 km of an airport of the
+    table it is `OSL, Oslo` — the municipality column cut at its first parenthesis or comma
+    (`Oslo (Gardermoen)`, `Sandefjord(Torp)`, `Birmingham, West Midlands`); else, when a named place
+    lies within 5 km, the coordinates alone (the README's `near <place>, x km` is `trips`' label, not
+    the Day's); else with the city of the nearest airport within 30 km in parentheses. The night's
+    `where` is the place's name, else `aboard <asset name>` when the stay is aboard, else that label.
+    The airports and zones tables are the reference's own (RFC 0013 rule 5), vendored into
+    `src/tables.ts` by `scripts/make-tables.mjs`, since the nearest airport decides a label and a country.
+
+46. **Country.** The night's stay's place carries a `country`, else the nearest airport within 300 km
+    and the country its zone is filed under in zone.tab; when the night is in transit, the same from
+    the stay with the longest part on the day, `from: "longest stay"`; with no stay at all every field
+    is null and the text says `unknown`.
+
+47. **A flight without a designator prints `None None`.** RFC 0013 lets an `inferred` leg carry no
+    `carrier` and no `number`; the reference's row is `flight None None  BGO → ENGM · inferred`,
+    Python's `None` for each. This implementation prints the same so the diff stays green; a route
+    alone would read better. The JSON has `null`.
+
+48. **Who was there.** An attendee of a timed entry held at the stay is confirmed by `calendar` when the
+    entry's `location` names a place of `places.json` (case aside) within a kilometre of the stay, or
+    when it has no location and overlaps the stay by more than an hour; a location that names no
+    place confirms nobody, whatever the overlap, and coordinates on the entry are not read. An all-day
+    entry proposes nobody — docs/day.md says its attendees are proposed at every stay, and the
+    reference, on a one-day and on a week-long entry, proposes no one; this implementation follows the
+    reference. A `transcript` participant counts by email, else phone, else `provider_id`; `Speaker A`,
+    `me` and `Unknown` are nobody. A `note` confirms every person the record names who follows a `with`
+    in the same sentence (`with Ola Nordmann and Anders Vik`), ordered as the note names them. A
+    `photo`'s `people` are `provider_id` refs `<library>:<id>`, proposed. Someone the record resolves
+    to no person is still listed, by the attendee's display name or the face's `<library>:<id>`, with
+    `person: null`; an attendee with neither name nor resolution is dropped. The owner is never
+    company: by `owner_id`, by every ref that resolves to the same entity as `owner_emails` or the
+    emails and phones of `policy/owner.json`, and by the names there and the owner entity's label (a
+    note's `with Kari` names nobody). Confidence is `calendar` 0.8, `transcript` 0.9, `note` 1.0,
+    `photo` 0.5, the highest of a person's sources; people are listed by confidence, then as the
+    evidence named them; sources, reasons and lines in the order calendar, transcript, note, photo.
+    The text is `Name (calendar, photo), Other (note) · proposed Face (photo)`.
+
+49. **What attaches where.** A line with a span attaches to every row it overlaps for longer than
+    nothing (a lunch from 12:00 to 13:00 is on the stay that ends at 12:55 and on the move that starts
+    then, not on the move that ended at 12:00); an instant attaches to the row that holds it, the ends
+    included (a note written at the minute a stay ends is that stay's). Only the day's lines attach —
+    an entry that runs over several days is on the day of its `at` — and a gap row holds nothing, so a
+    line inside a silence is unplaced. A note another note `supersedes` is still attached beside the
+    newer one; a retracted line is nowhere. An unplaced entry is `{kind, at, end, title, line}` (an
+    event also `sources` and `lines`), its `title` the event's, the transcript's, the note's first line,
+    the mail's subject or the call's counterparty *as written* (`+4790000002`, where the row would
+    print the name). A note's text is its first line cut to 72 characters with an ellipsis. A call is
+    `→ Ola Nordmann, 15 min` with the minutes truncated, `no answer` or `missed` when not answered,
+    `45 s` under a minute. Mail is grouped by `thread`, `1 mail thread` in the counts and
+    `Subject (2 messages)` under the row, the subject the thread's first message's.
+
+50. **Health.** The night's sleep is the asleep stages (`asleep`, `core`, `deep`, `rem`) whose *end*
+    falls on the day, per device the union of their spans (a stage written twice counts once), the
+    longest device; steps are the larger device per quarter hour, summed; the resting rate and the HRV
+    are the day's means, rounded half to even; a line another health line `supersedes` is out; the hours
+    are rounded half to even on an exact tie (6.25 prints `6.2`). The text shows sleep, steps and
+    resting only — `hrv` is in the JSON and not on the line. `health.lines` lists the night's stages,
+    then the winning quarter hours, then the resting readings, then the HRV readings, each by `at`;
+    `health` is `null` when no line contributed. RFC 0014 could say which day a night belongs to.
+
+51. **Sources.** `sources` counts the lines standing on the day: a retracted line is not counted and
+    the retraction line itself is not a source. `first` and `newest` are the lines' `at` as written.
+
+52. **The window a Day reads.** The reference reads the day before and the day, to the end of the
+    night after (`00:00` of the day before to `08:00` of the day after, by `policy/stays.json`'s
+    `night`); a stay in progress at the window's start starts there, and its id carries that start, so
+    the same stay has another id read from another day. This implementation reads the same window —
+    one pass over every file for the resolutions, retractions and `supersedes` (as `show` does), then
+    the month files the window can touch, keeping the lines inside it — so its memory is the window's
+    lines, not the record's, and no index is built or read. SPEC §3.2 could name the window.
+
+53. **Rounding and clocks.** A row's clock is the local time floored to the minute (`08:36` for
+    08:36:40); its duration is the part on the day rounded to the minute; a run of a flight or an entry
+    that ends the next day prints `14:00+1`. The `within_day` of a row that began the evening before
+    starts at local midnight. Two implementations that both print to the minute can still differ at
+    the half minute; the reference's rounding there is not visible in the fixtures (this
+    implementation rounds half to even).
+
+54. **A day of a `logbook/0.1` record.** As with `show` (question 21), `day` refuses it, so every
+    command answers a record it does not carry the same way.

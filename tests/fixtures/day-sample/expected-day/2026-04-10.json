@@ -1,0 +1,164 @@
+{
+  "day": "2026-04-10",
+  "weekday": "Friday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-09",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-04-10",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260410T0600Z@59.9139,10.7522",
+      "lines": [
+        "00000000-0000-4000-8000-00000000041176",
+        "00000000-0000-4000-8000-00000000041368"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "place",
+    "by": "Home",
+    "from": "night"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "move:owner:20260409T0000Z",
+      "kind": "move",
+      "start": "2026-04-09T00:00:00Z",
+      "end": "2026-04-10T06:00:00Z",
+      "start_local": "2026-04-09T02:00:00+02:00",
+      "end_local": "2026-04-10T08:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-09T22:00:00Z",
+        "end": "2026-04-10T06:00:00Z",
+        "duration_s": 28800
+      },
+      "duration_s": 108000,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 310575,
+      "airports": [],
+      "points": 0,
+      "promoted": false,
+      "gap": true,
+      "lines": {
+        "first": "00000000-0000-4000-8000-00000000041137",
+        "last": "00000000-0000-4000-8000-00000000041176"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260410T0600Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-04-10T06:00:00Z",
+      "end": "2026-04-10T22:00:00Z",
+      "start_local": "2026-04-10T08:00:00+02:00",
+      "end_local": "2026-04-11T00:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-10T06:00:00Z",
+        "end": "2026-04-10T22:00:00Z",
+        "duration_s": 57600
+      },
+      "duration_s": 57600,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.9139,
+      "lon": 10.7522,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 193,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-00000000041176",
+        "last": "00000000-0000-4000-8000-00000000041368"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [
+          {
+            "text": "Coffee with Kari.",
+            "line": "00000000-0000-4000-8000-00000000041369"
+          }
+        ],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": null,
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 192,
+      "first": "2026-04-10T06:00:00Z",
+      "newest": "2026-04-10T21:55:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 2,
+      "first": "2026-04-09T22:00:00Z",
+      "newest": "2026-04-09T23:00:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 1,
+      "first": "2026-04-10T10:00:00Z",
+      "newest": "2026-04-10T10:00:00Z"
+    }
+  ]
+}

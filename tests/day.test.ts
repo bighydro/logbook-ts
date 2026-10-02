@@ -1,0 +1,159 @@
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { readDay, type SegmentEntry, type TimelineEntry } from "../src/day.js";
+import { durationText, renderDay } from "../src/dayText.js";
+import { verifyLogbook } from "../src/store.js";
+import { cleanup, copySample, expectedDays, FIXTURES, readLines, writeLines } from "./helpers.js";
+
+afterEach(cleanup);
+
+const DAY_SAMPLE = join(FIXTURES, "day-sample");
+const DEMO_SAMPLE = join(FIXTURES, "demo-sample");
+
+const isRow = (t: TimelineEntry): t is SegmentEntry => t.kind !== "flight";
+const rows = (timeline: TimelineEntry[]): SegmentEntry[] => timeline.filter(isRow);
+
+describe("the day fixtures", () => {
+  it("are valid logbook/0.2 records", () => {
+    expect(verifyLogbook(DAY_SAMPLE).errors).toEqual([]);
+    expect(verifyLogbook(DEMO_SAMPLE).errors).toEqual([]);
+  });
+});
+
+describe("a Day, as the reference's `logbook day` prints it", () => {
+  // tests/fixtures/*/expected-day/ is the reference's own output on each fixture, captured by
+  // tests/fixtures/capture-expected-day.mjs and never edited; tests/cross-impl.test.ts checks it stays so.
+  for (const fixture of [DAY_SAMPLE, DEMO_SAMPLE]) {
+    for (const expected of expectedDays(fixture)) {
+      it(`prints ${expected.day} of ${fixture.split(/[\\/]/).pop()} as the reference does, as text and as JSON`, () => {
+        const day = readDay(fixture, { day: expected.day });
+        expect(renderDay(day)).toBe(expected.text);
+        expect(JSON.parse(JSON.stringify(day))).toEqual(expected.json);
+      });
+    }
+  }
+});
+
+describe("what the Day reads out of the record", () => {
+  const monday = () => readDay(DAY_SAMPLE, { day: "2026-04-06" });
+
+  it("never makes the owner their own company: by owner_emails, by the face the library tagged, by the name in policy/owner.json", () => {
+    const day = monday();
+    const names = JSON.stringify(rows(day.timeline).map((t) => t.with));
+    expect(names).not.toContain("Kari");
+    const office = rows(day.timeline).find((t) => t.kind === "stay" && t.place === "Office");
+    expect(office?.with?.confirmed.map((p) => `${p.name}: ${p.sources.join("+")}`)).toEqual([
+      "Ola Nordmann: calendar+transcript+note+photo",
+      "Ines Holm: transcript",
+      "Per: calendar",
+    ]);
+    expect(office?.with?.proposed.map((p) => [p.person, p.name])).toEqual([[null, "immich:f_99"]]);
+  });
+
+  it("leaves a retracted line out of everything: the rows, the health numbers, the sources", () => {
+    const day = monday();
+    const home = rows(day.timeline)
+      .filter((t) => t.kind === "stay" && t.place === "Home")
+      .at(-1);
+    expect(home?.attached?.notes.map((n) => n.text)).toEqual([
+      "Draft of the evening note.",
+      "Final evening note with Ola Nordmann.",
+    ]);
+    expect(day.health?.steps).toBe(370);
+    expect(day.sources.find((s) => s.source === "apple-health")?.lines).toBe(17);
+    expect(day.sources.find((s) => s.source === "logbook")).toBeUndefined();
+  });
+
+  it("takes the night's sleep from the longest device's union of asleep stages, the steps from the larger device per quarter hour, and the corrected resting rate", () => {
+    const health = monday().health;
+    expect(health).toMatchObject({ sleep_h: 6.4, steps: 370, resting_hr: 57, hrv: 42 });
+    expect(health?.lines).toHaveLength(11);
+  });
+
+  it("places what the tracker saw nothing of nowhere, and says so", () => {
+    const day = monday();
+    const gap = rows(day.timeline).find((t) => t.kind === "move" && t.gap);
+    expect(gap?.attached?.events).toEqual([]);
+    expect(day.unplaced.map((u) => `${u.kind} ${u.title}`)).toEqual([
+      "note Walked along the river with Ines Holm.",
+      "event Dentist",
+      "call +4790000002",
+      "mail Tromsø",
+      "transcript River talk",
+    ]);
+    expect(renderDay(day)).toContain("  14:00–18:00  gap    4 h · no points · 4.7 km\n");
+  });
+
+  it("reads a night with no stay as in transit, the country from the day's longest stay, and a day with nothing as nothing logged", () => {
+    const thursday = readDay(DAY_SAMPLE, { day: "2026-04-09" });
+    expect(thursday.nights.after).toMatchObject({
+      in_transit: true,
+      where: null,
+      stay: null,
+      lines: [],
+    });
+    expect(thursday.country).toEqual({
+      code: "NO",
+      method: "airport",
+      by: "BGO",
+      from: "longest stay",
+    });
+    expect(thursday.health).toBeNull();
+    const saturday = readDay(DAY_SAMPLE, { day: "2026-04-11" });
+    expect(saturday.timeline).toEqual([]);
+    expect(saturday.country).toEqual({ code: null, method: null, by: null, from: null });
+    expect(renderDay(saturday)).toContain("  timeline      nothing logged\n");
+  });
+
+  it("nests a run aboard an asset and names the night aboard it", () => {
+    const wednesday = readDay(DAY_SAMPLE, { day: "2026-04-08" });
+    const run = rows(wednesday.timeline).find((t) => t.kind === "aboard");
+    expect(run?.asset).toEqual({ id: "solvind", kind: "yacht", name: "Solvind" });
+    expect(run?.inside?.map((s) => `${s.kind} ${s.where ?? s.mode}`)).toEqual([
+      "stay Berth",
+      "move boat",
+      "stay BGO, Bergen",
+    ]);
+    expect(wednesday.nights.after).toMatchObject({
+      where: "aboard Solvind",
+      aboard: "solvind",
+      home: false,
+    });
+  });
+
+  it("shows the flight line standing, with the declared line its tracked one supersedes left out", () => {
+    const tuesday = readDay(DAY_SAMPLE, { day: "2026-04-07" });
+    expect(tuesday.flights.map((f) => [f.carrier, f.number, f.from, f.to, f.evidence])).toEqual([
+      ["XY", "123", "OSL", "BGO", "tracked"],
+      [null, null, "BGO", "ENGM", "inferred"],
+    ]);
+    const move = rows(tuesday.timeline).find((t) => t.kind === "move" && t.mode === "flight");
+    expect(move?.flights).toEqual([tuesday.flights[0]?.id]);
+  });
+
+  it("refuses a day that is not one, and a record it does not carry", () => {
+    expect(() => readDay(DAY_SAMPLE, { day: "2026-04-31" })).toThrow(/not a day/);
+    const root = copySample();
+    const meta = JSON.parse(readLines(root, "logbook.json").join("")) as Record<string, unknown>;
+    writeLines(root, [JSON.stringify({ ...meta, format: "logbook/0.1" })], "logbook.json");
+    expect(() => readDay(root, { day: "2026-03-02" })).toThrow(/logbook\/0\.1/);
+  });
+
+  it("reads the conformance sample, which has no places, assets or policy, without a word about them", () => {
+    const day = readDay(copySample(), { day: "2026-03-01" });
+    expect(day.nights.after.home).toBe(false);
+    expect(renderDay(day)).toMatch(/^2026-03-01 {2}Sunday\n/);
+  });
+});
+
+describe("spans and distances in words", () => {
+  it("rounds to the minute and folds hours", () => {
+    expect(durationText(300)).toBe("5 min");
+    expect(durationText(975)).toBe("16 min");
+    expect(durationText(225)).toBe("4 min");
+    expect(durationText(17_700)).toBe("4 h 55 min");
+    expect(durationText(32_400)).toBe("9 h");
+    expect(durationText(31_000)).toBe("8 h 37 min");
+    expect(durationText(86_400)).toBe("24 h");
+  });
+});

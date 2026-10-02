@@ -1,0 +1,608 @@
+{
+  "day": "2026-04-07",
+  "weekday": "Tuesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-06",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260406T1650Z@59.9139,10.7522",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004293",
+        "00000000-0000-4000-8000-0000000004439"
+      ]
+    },
+    "after": {
+      "day": "2026-04-07",
+      "where": "60.3900,5.3200",
+      "home": false,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260407T0850Z@60.3900,5.3200",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004472",
+        "00000000-0000-4000-8000-0000000004726"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "airport",
+    "by": "BGO",
+    "from": "night"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "stay:owner:20260406T1650Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-04-06T16:50:00Z",
+      "end": "2026-04-07T05:00:00Z",
+      "start_local": "2026-04-06T18:50:00+02:00",
+      "end_local": "2026-04-07T07:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-06T22:00:00Z",
+        "end": "2026-04-07T05:00:00Z",
+        "duration_s": 25200
+      },
+      "duration_s": 43800,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.9139,
+      "lon": 10.7522,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 147,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004293",
+        "last": "00000000-0000-4000-8000-0000000004439"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260407T0500Z",
+      "kind": "move",
+      "start": "2026-04-07T05:00:00Z",
+      "end": "2026-04-07T05:40:00Z",
+      "start_local": "2026-04-07T07:00:00+02:00",
+      "end_local": "2026-04-07T07:40:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T05:00:00Z",
+        "end": "2026-04-07T05:40:00Z",
+        "duration_s": 2400
+      },
+      "duration_s": 2400,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 36646,
+      "airports": [],
+      "points": 3,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004439",
+        "last": "00000000-0000-4000-8000-0000000004449"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260407T0540Z@60.1939,11.1004",
+      "kind": "stay",
+      "start": "2026-04-07T05:40:00Z",
+      "end": "2026-04-07T06:40:00Z",
+      "start_local": "2026-04-07T07:40:00+02:00",
+      "end_local": "2026-04-07T08:40:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T05:40:00Z",
+        "end": "2026-04-07T06:40:00Z",
+        "duration_s": 3600
+      },
+      "duration_s": 3600,
+      "where": "OSL, Oslo",
+      "place": null,
+      "lat": 60.1939,
+      "lon": 11.1004,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 13,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004449",
+        "last": "00000000-0000-4000-8000-0000000004461"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Flight to Bergen (XY 123)",
+            "start": "2026-04-07T06:00:00Z",
+            "end": "2026-04-07T07:05:00Z",
+            "line": "00000000-0000-4000-8000-0000000004462",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004462"
+            ]
+          }
+        ],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000004464",
+      "kind": "flight",
+      "start": "2026-04-07T06:12:00Z",
+      "end": "2026-04-07T07:03:00Z",
+      "start_local": "2026-04-07T08:12:00+02:00",
+      "end_local": "2026-04-07T09:03:00+02:00",
+      "carrier": "XY",
+      "number": "123",
+      "from": "OSL",
+      "to": "BGO",
+      "evidence": "tracked",
+      "role": "passenger",
+      "aircraft": {
+        "registration": "ZZ-ABC",
+        "type": "A320"
+      },
+      "line": "00000000-0000-4000-8000-0000000004464"
+    },
+    {
+      "id": "move:owner:20260407T0640Z",
+      "kind": "move",
+      "start": "2026-04-07T06:40:00Z",
+      "end": "2026-04-07T08:00:00Z",
+      "start_local": "2026-04-07T08:40:00+02:00",
+      "end_local": "2026-04-07T10:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T06:40:00Z",
+        "end": "2026-04-07T08:00:00Z",
+        "duration_s": 4800
+      },
+      "duration_s": 4800,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "flight",
+      "distance_m": 324710,
+      "airports": [
+        "OSL",
+        "BGO"
+      ],
+      "points": 0,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004461",
+        "last": "00000000-0000-4000-8000-0000000004465"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Flight to Bergen (XY 123)",
+            "start": "2026-04-07T06:00:00Z",
+            "end": "2026-04-07T07:05:00Z",
+            "line": "00000000-0000-4000-8000-0000000004462",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004462"
+            ]
+          }
+        ],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": [
+        "00000000-0000-4000-8000-0000000004464"
+      ]
+    },
+    {
+      "id": "stay:owner:20260407T0800Z@60.2934,5.2181",
+      "kind": "stay",
+      "start": "2026-04-07T08:00:00Z",
+      "end": "2026-04-07T08:20:00Z",
+      "start_local": "2026-04-07T10:00:00+02:00",
+      "end_local": "2026-04-07T10:20:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T08:00:00Z",
+        "end": "2026-04-07T08:20:00Z",
+        "duration_s": 1200
+      },
+      "duration_s": 1200,
+      "where": "BGO, Bergen",
+      "place": null,
+      "lat": 60.2934,
+      "lon": 5.2181,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 5,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004465",
+        "last": "00000000-0000-4000-8000-0000000004469"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260407T0820Z",
+      "kind": "move",
+      "start": "2026-04-07T08:20:00Z",
+      "end": "2026-04-07T08:50:00Z",
+      "start_local": "2026-04-07T10:20:00+02:00",
+      "end_local": "2026-04-07T10:50:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T08:20:00Z",
+        "end": "2026-04-07T08:50:00Z",
+        "duration_s": 1800
+      },
+      "duration_s": 1800,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 12117,
+      "airports": [],
+      "points": 2,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004469",
+        "last": "00000000-0000-4000-8000-0000000004472"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260407T0850Z@60.3900,5.3200",
+      "kind": "stay",
+      "start": "2026-04-07T08:50:00Z",
+      "end": "2026-04-08T06:00:00Z",
+      "start_local": "2026-04-07T10:50:00+02:00",
+      "end_local": "2026-04-08T08:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-07T08:50:00Z",
+        "end": "2026-04-07T22:00:00Z",
+        "duration_s": 47400
+      },
+      "duration_s": 76200,
+      "where": "60.3900,5.3200",
+      "place": null,
+      "lat": 60.39,
+      "lon": 5.32,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 255,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004472",
+        "last": "00000000-0000-4000-8000-0000000004726"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Coffee",
+            "start": "2026-04-07T09:00:00Z",
+            "end": "2026-04-07T09:30:00Z",
+            "line": "00000000-0000-4000-8000-0000000004739",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004739"
+            ]
+          },
+          {
+            "title": "Site visit",
+            "start": "2026-04-07T10:00:00Z",
+            "end": "2026-04-07T11:00:00Z",
+            "line": "00000000-0000-4000-8000-0000000004740",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004740"
+            ]
+          },
+          {
+            "title": "Boat talk",
+            "start": "2026-04-07T12:00:00Z",
+            "end": "2026-04-07T13:00:00Z",
+            "line": "00000000-0000-4000-8000-0000000004741",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004741"
+            ]
+          },
+          {
+            "title": "Dinner",
+            "start": "2026-04-07T17:00:00Z",
+            "end": "2026-04-07T19:00:00Z",
+            "line": "00000000-0000-4000-8000-0000000004743",
+            "sources": [
+              "sim-calendar"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004743"
+            ]
+          }
+        ],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "019c0000-0000-7000-8000-000000000102",
+            "name": "Ines Holm",
+            "status": "confirmed",
+            "confidence": 0.8,
+            "sources": [
+              "calendar"
+            ],
+            "reasons": [
+              "attendee of Dinner"
+            ],
+            "lines": [
+              "00000000-0000-4000-8000-0000000004743"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000004742",
+      "kind": "flight",
+      "start": "2026-04-07T15:00:00Z",
+      "end": "2026-04-07T17:00:00Z",
+      "start_local": "2026-04-07T17:00:00+02:00",
+      "end_local": "2026-04-07T19:00:00+02:00",
+      "carrier": null,
+      "number": null,
+      "from": "BGO",
+      "to": "ENGM",
+      "evidence": "inferred",
+      "role": "passenger",
+      "aircraft": null,
+      "line": "00000000-0000-4000-8000-0000000004742"
+    }
+  ],
+  "flights": [
+    {
+      "id": "00000000-0000-4000-8000-0000000004464",
+      "kind": "flight",
+      "start": "2026-04-07T06:12:00Z",
+      "end": "2026-04-07T07:03:00Z",
+      "start_local": "2026-04-07T08:12:00+02:00",
+      "end_local": "2026-04-07T09:03:00+02:00",
+      "carrier": "XY",
+      "number": "123",
+      "from": "OSL",
+      "to": "BGO",
+      "evidence": "tracked",
+      "role": "passenger",
+      "aircraft": {
+        "registration": "ZZ-ABC",
+        "type": "A320"
+      },
+      "line": "00000000-0000-4000-8000-0000000004464"
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000004742",
+      "kind": "flight",
+      "start": "2026-04-07T15:00:00Z",
+      "end": "2026-04-07T17:00:00Z",
+      "start_local": "2026-04-07T17:00:00+02:00",
+      "end_local": "2026-04-07T19:00:00+02:00",
+      "carrier": null,
+      "number": null,
+      "from": "BGO",
+      "to": "ENGM",
+      "evidence": "inferred",
+      "role": "passenger",
+      "aircraft": null,
+      "line": "00000000-0000-4000-8000-0000000004742"
+    }
+  ],
+  "unplaced": [],
+  "health": {
+    "sleep_h": null,
+    "steps": 500,
+    "resting_hr": null,
+    "hrv": null,
+    "lines": [
+      "00000000-0000-4000-8000-0000000004744"
+    ]
+  },
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 266,
+      "first": "2026-04-06T22:00:00Z",
+      "newest": "2026-04-07T21:55:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 96,
+      "first": "2026-04-07T06:00:00Z",
+      "newest": "2026-04-07T21:50:00Z"
+    },
+    {
+      "source": "sim-calendar",
+      "lines": 5,
+      "first": "2026-04-07T06:00:00Z",
+      "newest": "2026-04-07T17:00:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 1,
+      "first": "2026-04-07T10:00:00Z",
+      "newest": "2026-04-07T10:00:00Z"
+    },
+    {
+      "source": "flight-inference",
+      "lines": 1,
+      "first": "2026-04-07T15:00:00Z",
+      "newest": "2026-04-07T15:00:00Z"
+    },
+    {
+      "source": "flighty",
+      "lines": 1,
+      "first": "2026-04-07T06:12:00Z",
+      "newest": "2026-04-07T06:12:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 1,
+      "first": "2026-04-07T06:10:00Z",
+      "newest": "2026-04-07T06:10:00Z"
+    }
+  ]
+}

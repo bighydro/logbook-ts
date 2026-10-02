@@ -80,3 +80,16 @@ export function expectedShows(root: string): Array<{ day: string; raw: boolean; 
       text: readFileSync(join(dir, name), "utf-8"),
     }));
 }
+
+/** The `<day>.txt` and `<day>.json` files beside a fixture: `logbook day` of the reference on it. */
+export function expectedDays(root: string): Array<{ day: string; text: string; json: unknown }> {
+  const dir = join(root, "expected-day");
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".txt"))
+    .sort()
+    .map((name) => ({
+      day: name.slice(0, 10),
+      text: readFileSync(join(dir, name), "utf-8"),
+      json: JSON.parse(readFileSync(join(dir, `${name.slice(0, 10)}.json`), "utf-8")) as unknown,
+    }));
+}

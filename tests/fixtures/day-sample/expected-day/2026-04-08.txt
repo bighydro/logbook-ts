@@ -1,0 +1,17 @@
+2026-04-08  Wednesday
+  night before  60.3900,5.3200 · away
+  night after   aboard Solvind · away
+  country       NO (nearest airport BGO)
+  all day       Boat week
+
+  00:00–09:00  stay   60.3900,5.3200 · 9 h
+  09:00–09:15  move   782 m · 15 min · walk
+  09:15–24:00  aboard Solvind (yacht) · 14 h 45 min · 1 note, 1 photo
+      09:15–11:00  stay   Berth · 1 h 45 min
+      11:00–13:00  move   12.2 km · 2 h · boat
+      13:00–24:00  stay   BGO, Bergen · 11 h
+      note         Anchored with Ola Nordmann. Grilled.
+      with         Ola Nordmann (note, photo)
+
+  health        sleep 7.0 h
+  sources       sim-phone 288 lines, last 23:55 · ais 101 lines, last 23:00 · apple-health 1 line, last 00:00 · immich 1 line, last 15:00 · manual 1 line, last 14:00 · sim-calendar 1 line, last 00:00

@@ -1,0 +1,463 @@
+{
+  "day": "2026-06-14",
+  "weekday": "Sunday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-06-13",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260613T1315Z@59.9139,10.7522",
+      "lines": [
+        "019ec11f-1420-737d-8e52-e1cf95cfe6fc",
+        "019ec520-7820-72cb-90d8-5ffd177cb21f"
+      ]
+    },
+    "after": {
+      "day": "2026-06-14",
+      "where": "Home",
+      "home": true,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20260614T1000Z@59.9139,10.7522",
+      "lines": [
+        "019ec592-e900-7239-8dc5-26214fc4a30a",
+        "019ec9dd-8b00-70b9-a393-73823a8dff13"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "place",
+    "by": "Home",
+    "from": "night"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "stay:owner:20260613T1315Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-06-13T13:15:00Z",
+      "end": "2026-06-14T08:05:00Z",
+      "start_local": "2026-06-13T15:15:00+02:00",
+      "end_local": "2026-06-14T10:05:00+02:00",
+      "within_day": {
+        "start": "2026-06-13T22:00:00Z",
+        "end": "2026-06-14T08:05:00Z",
+        "duration_s": 36300
+      },
+      "duration_s": 67800,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.91389,
+      "lon": 10.752199,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 225,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec11f-1420-737d-8e52-e1cf95cfe6fc",
+        "last": "019ec520-7820-72cb-90d8-5ffd177cb21f"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260614T0805Z",
+      "kind": "move",
+      "start": "2026-06-14T08:05:00Z",
+      "end": "2026-06-14T08:30:00Z",
+      "start_local": "2026-06-14T10:05:00+02:00",
+      "end_local": "2026-06-14T10:30:00+02:00",
+      "within_day": {
+        "start": "2026-06-14T08:05:00Z",
+        "end": "2026-06-14T08:30:00Z",
+        "duration_s": 1500
+      },
+      "duration_s": 1500,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 3209,
+      "airports": [],
+      "points": 5,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec520-7820-72cb-90d8-5ffd177cb21f",
+        "last": "019ec540-8340-7f5a-9be8-e46fdf797eb7"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260614T0830Z@59.9261,10.6999",
+      "kind": "stay",
+      "start": "2026-06-14T08:30:00Z",
+      "end": "2026-06-14T09:35:00Z",
+      "start_local": "2026-06-14T10:30:00+02:00",
+      "end_local": "2026-06-14T11:35:00+02:00",
+      "within_day": {
+        "start": "2026-06-14T08:30:00Z",
+        "end": "2026-06-14T09:35:00Z",
+        "duration_s": 3900
+      },
+      "duration_s": 3900,
+      "where": "59.9261,10.6999",
+      "place": null,
+      "lat": 59.926122,
+      "lon": 10.699861,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 12,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec540-8340-7f5a-9be8-e46fdf797eb7",
+        "last": "019ec572-dde0-7629-9f8b-f19781bc0317"
+      },
+      "attached": {
+        "events": [
+          {
+            "title": "Run in the park",
+            "start": "2026-06-14T08:30:00Z",
+            "end": "2026-06-14T09:30:00Z",
+            "line": "019ec540-8340-7ac3-939a-18de9abd2ea3",
+            "sources": [
+              "ios-calendar"
+            ],
+            "lines": [
+              "019ec540-8340-7ac3-939a-18de9abd2ea3"
+            ]
+          }
+        ],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 1,
+          "lines": [
+            "019ec572-dde0-74ad-ad1a-4f363d8aaf75"
+          ]
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    },
+    {
+      "id": "move:owner:20260614T0935Z",
+      "kind": "move",
+      "start": "2026-06-14T09:35:00Z",
+      "end": "2026-06-14T10:00:00Z",
+      "start_local": "2026-06-14T11:35:00+02:00",
+      "end_local": "2026-06-14T12:00:00+02:00",
+      "within_day": {
+        "start": "2026-06-14T09:35:00Z",
+        "end": "2026-06-14T10:00:00Z",
+        "duration_s": 1500
+      },
+      "duration_s": 1500,
+      "where": null,
+      "place": null,
+      "lat": null,
+      "lon": null,
+      "aboard": null,
+      "mode": "car",
+      "distance_m": 3228,
+      "airports": [],
+      "points": 5,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec572-dde0-7629-9f8b-f19781bc0317",
+        "last": "019ec592-e900-7239-8dc5-26214fc4a30a"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      },
+      "flights": []
+    },
+    {
+      "id": "stay:owner:20260614T1000Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-06-14T10:00:00Z",
+      "end": "2026-06-15T06:00:00Z",
+      "start_local": "2026-06-14T12:00:00+02:00",
+      "end_local": "2026-06-15T08:00:00+02:00",
+      "within_day": {
+        "start": "2026-06-14T10:00:00Z",
+        "end": "2026-06-14T22:00:00Z",
+        "duration_s": 43200
+      },
+      "duration_s": 72000,
+      "where": "Home",
+      "place": "Home",
+      "lat": 59.913894,
+      "lon": 10.752177,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 241,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "019ec592-e900-7239-8dc5-26214fc4a30a",
+        "last": "019ec9dd-8b00-70b9-a393-73823a8dff13"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [
+          {
+            "who": "Eva Nordmann",
+            "direction": "incoming",
+            "answered": true,
+            "duration_s": 876,
+            "line": "019ec66e-a300-7e05-ad18-56c73053ae82"
+          }
+        ],
+        "messages": {
+          "count": 2,
+          "lines": [
+            "019ec5d8-7d80-7035-855d-444ec6315be6",
+            "019ec5e5-4ec0-7284-bfb4-0e7af7b225ee"
+          ]
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": {
+    "sleep_h": 6.2,
+    "steps": 10627,
+    "resting_hr": 53,
+    "hrv": null,
+    "lines": [
+      "019ec34c-a280-7cd8-9fee-7bf3efe60954",
+      "019ec36b-c340-792a-ae1d-6fe1f4f33849",
+      "019ec38b-ce60-7748-9dda-17ea280a24db",
+      "019ec3bd-3ea0-7863-8606-08f540ccb701",
+      "019ec3d7-cb80-7a2a-a20a-37caeebf3c4b",
+      "019ec3e2-c800-74ae-af07-6b244240a6de",
+      "019ec420-1f20-76fd-824e-196517ca8f18",
+      "019ec438-d740-7891-aa8b-96144fcd22f5",
+      "019ec453-6420-7186-80d2-57706b053838",
+      "019ec480-4080-7fb5-ba60-9960d3e46ec4",
+      "019ec494-64c0-79a3-bfb7-88a658afb835",
+      "019ec480-4080-79b2-ab3d-a3eda1b8a228",
+      "019ec48d-fc20-74f6-aa96-330076494b53",
+      "019ec49b-b7c0-751f-8df1-83c1e31102a3",
+      "019ec4a9-7360-7374-9f23-e8af6867adcd",
+      "019ec4b7-2f00-732a-aa27-16e23a084061",
+      "019ec4c4-eaa0-7121-ba33-308030977455",
+      "019ec4d2-a640-792d-8312-9a43301c1625",
+      "019ec4e0-61e0-75c6-b33e-c76915ed0a54",
+      "019ec4ee-1d80-7d27-9526-424595eb3ffe",
+      "019ec4fb-d920-7a84-a378-89ca58b67d01",
+      "019ec509-94c0-7f85-a247-d8bbc48a9043",
+      "019ec517-5060-7b13-96b2-3413b0ed1f1c",
+      "019ec525-0c00-7553-9d2a-5181fa05a2d0",
+      "019ec532-c7a0-74a1-b755-775f87313081",
+      "019ec540-8340-70e1-8e33-dd99d14301fb",
+      "019ec54e-3ee0-77a4-a4f1-73dc186aad31",
+      "019ec55b-fa80-7f59-a3f7-4d4d791efb3a",
+      "019ec569-b620-7a22-9176-52a750c2f31d",
+      "019ec577-71c0-760e-86f2-76f72a31f84e",
+      "019ec585-2d60-719b-adb3-533083e6ab37",
+      "019ec592-e900-7ad0-9488-8ac4cb83e72d",
+      "019ec5a0-a4a0-72a0-9574-1d8c76aa4a3a",
+      "019ec5ae-6040-704d-8a8e-f5d7a5415b98",
+      "019ec5bc-1be0-7ac0-ba75-5d6b41faf19d",
+      "019ec5c9-d780-7907-ad14-98c023e8d8d9",
+      "019ec5d7-9320-7059-a61f-1fc78cd2887c",
+      "019ec5e5-4ec0-796a-94f1-1eb13857af25",
+      "019ec5f3-0a60-7205-8c98-d54eec9ea991",
+      "019ec600-c600-780a-a629-203bd345d418",
+      "019ec60e-81a0-71a4-8e0d-1913ffc6db0e",
+      "019ec61c-3d40-7d18-891d-939fd6b0bd82",
+      "019ec629-f8e0-7556-8a0d-c766a1631a4f",
+      "019ec637-b480-7690-b916-d3f9696d7b53",
+      "019ec645-7020-7969-b44c-1feb17168197",
+      "019ec653-2bc0-76e6-9fe4-fc4d825b8cf3",
+      "019ec660-e760-7b53-805f-04a0362d3a0a",
+      "019ec66e-a300-7ced-9d08-e62980de712c",
+      "019ec67c-5ea0-7e05-98d2-396b35577e4d",
+      "019ec68a-1a40-7e91-b56e-8dfffa8a2582",
+      "019ec697-d5e0-7a2f-b4a7-8fbef97a7986",
+      "019ec6a5-9180-76f8-ae4c-47985f3ea149",
+      "019ec6b3-4d20-7b7d-aa9c-0acbf986153e",
+      "019ec6c1-08c0-78ba-9a63-6c43657645c1",
+      "019ec6ce-c460-7a16-bcfc-a303653a9e19",
+      "019ec6dc-8000-7b2f-ac1c-6a6904617af3",
+      "019ec6ea-3ba0-7d56-ac20-18bb823b7a31",
+      "019ec6f7-f740-7aef-8f14-bb2cd4423131",
+      "019ec705-b2e0-7192-9bbb-062057eee486",
+      "019ec713-6e80-7c6d-8a1f-e2dbe63824e1",
+      "019ec721-2a20-7ea8-9574-1b1a066907d1",
+      "019ec72e-e5c0-7b3c-817f-1af4a1dfc044",
+      "019ec73c-a160-72a5-bfc9-9f7e701c36c8",
+      "019ec74a-5d00-7d20-a1ba-12dbfa6c9610",
+      "019ec758-18a0-7c33-ac93-c8e0275374fd",
+      "019ec765-d440-79e5-90c7-8823144b0ec4",
+      "019ec773-8fe0-7c00-96dc-d4a286a16139",
+      "019ec781-4b80-797d-a555-6a5f1342105d",
+      "019ec78f-0720-77e3-9615-de0e5dc3ac51",
+      "019ec79c-c2c0-74e5-9952-f66300c78ec9",
+      "019ec7aa-7e60-7d45-9473-abcecf2e9dc6",
+      "019ec449-5200-7b69-96d4-a181e975464b"
+    ]
+  },
+  "sources": [
+    {
+      "source": "dawarich",
+      "lines": 286,
+      "first": "2026-06-13T22:00:00Z",
+      "newest": "2026-06-14T21:55:00Z"
+    },
+    {
+      "source": "apple-health",
+      "lines": 84,
+      "first": "2026-06-13T22:24:00Z",
+      "newest": "2026-06-14T21:40:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 24,
+      "first": "2026-06-13T22:00:00Z",
+      "newest": "2026-06-14T21:00:00Z"
+    },
+    {
+      "source": "safari",
+      "lines": 2,
+      "first": "2026-06-14T18:57:00Z",
+      "newest": "2026-06-14T19:20:00Z"
+    },
+    {
+      "source": "whatsapp",
+      "lines": 2,
+      "first": "2026-06-14T11:16:00Z",
+      "newest": "2026-06-14T11:30:00Z"
+    },
+    {
+      "source": "apple-books",
+      "lines": 1,
+      "first": "2026-06-14T20:10:00Z",
+      "newest": "2026-06-14T20:10:00Z"
+    },
+    {
+      "source": "apple-podcasts",
+      "lines": 1,
+      "first": "2026-06-14T05:40:00Z",
+      "newest": "2026-06-14T05:40:00Z"
+    },
+    {
+      "source": "google-takeout",
+      "lines": 1,
+      "first": "2026-06-14T20:15:00Z",
+      "newest": "2026-06-14T20:15:00Z"
+    },
+    {
+      "source": "immich",
+      "lines": 1,
+      "first": "2026-06-14T09:25:00Z",
+      "newest": "2026-06-14T09:25:00Z"
+    },
+    {
+      "source": "ios-calendar",
+      "lines": 1,
+      "first": "2026-06-14T08:30:00Z",
+      "newest": "2026-06-14T08:30:00Z"
+    },
+    {
+      "source": "ios-calls",
+      "lines": 1,
+      "first": "2026-06-14T14:00:00Z",
+      "newest": "2026-06-14T14:00:00Z"
+    }
+  ]
+}

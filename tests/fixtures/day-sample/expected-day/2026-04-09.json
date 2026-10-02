@@ -1,0 +1,103 @@
+{
+  "day": "2026-04-09",
+  "weekday": "Thursday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-04-08",
+      "where": "aboard Solvind",
+      "home": false,
+      "aboard": "solvind",
+      "in_transit": false,
+      "stay": "stay:owner:20260408T1100Z@60.3000,5.2000",
+      "lines": [
+        "00000000-0000-4000-8000-0000000004957",
+        "00000000-0000-4000-8000-00000000041137"
+      ]
+    },
+    "after": {
+      "day": "2026-04-09",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "airport",
+    "by": "BGO",
+    "from": "longest stay"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "stay:owner:20260408T1100Z@60.3000,5.2000",
+      "kind": "stay",
+      "start": "2026-04-08T11:00:00Z",
+      "end": "2026-04-09T00:00:00Z",
+      "start_local": "2026-04-08T13:00:00+02:00",
+      "end_local": "2026-04-09T02:00:00+02:00",
+      "within_day": {
+        "start": "2026-04-08T22:00:00Z",
+        "end": "2026-04-09T00:00:00Z",
+        "duration_s": 7200
+      },
+      "duration_s": 46800,
+      "where": "BGO, Bergen",
+      "place": null,
+      "lat": 60.3,
+      "lon": 5.2,
+      "aboard": "solvind",
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 157,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "00000000-0000-4000-8000-0000000004957",
+        "last": "00000000-0000-4000-8000-00000000041137"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [],
+        "notes": [],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [],
+  "health": null,
+  "sources": [
+    {
+      "source": "sim-phone",
+      "lines": 25,
+      "first": "2026-04-08T22:00:00Z",
+      "newest": "2026-04-09T00:00:00Z"
+    },
+    {
+      "source": "ais",
+      "lines": 24,
+      "first": "2026-04-08T22:00:00Z",
+      "newest": "2026-04-09T21:00:00Z"
+    }
+  ]
+}

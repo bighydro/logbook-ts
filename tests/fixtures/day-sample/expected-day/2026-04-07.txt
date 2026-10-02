@@ -1,0 +1,24 @@
+2026-04-07  Tuesday
+  night before  Home · home
+  night after   60.3900,5.3200 · away
+  country       NO (nearest airport BGO)
+
+  00:00–07:00  stay   Home · 7 h
+  07:00–07:40  move   36.6 km · 40 min · car
+  07:40–08:40  stay   OSL, Oslo · 1 h · 1 event
+      event        Flight to Bergen (XY 123) 08:00–09:05
+  08:12–09:03  flight XY 123  OSL → BGO · tracked
+  08:40–10:00  move   325 km · 1 h 20 min · flight · OSL → BGO · 1 event
+      event        Flight to Bergen (XY 123) 08:00–09:05
+  10:00–10:20  stay   BGO, Bergen · 20 min
+  10:20–10:50  move   12.1 km · 30 min · car
+  10:50–24:00  stay   60.3900,5.3200 · 13 h 10 min · 4 events
+      event        Coffee 11:00–11:30
+      event        Site visit 12:00–13:00
+      event        Boat talk 14:00–15:00
+      event        Dinner 19:00–21:00
+      with         Ines Holm (calendar)
+  17:00–19:00  flight None None  BGO → ENGM · inferred
+
+  health        500 steps
+  sources       sim-phone 266 lines, last 23:55 · ais 96 lines, last 23:50 · sim-calendar 5 lines, last 19:00 · apple-health 1 line, last 12:00 · flight-inference 1 line, last 17:00 · flighty 1 line, last 08:12 · manual 1 line, last 08:10

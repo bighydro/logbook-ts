@@ -29,6 +29,11 @@ jobs:
           node dist/bin.js show tests/fixtures/profiles-sample --day 2026-03-04
           node dist/bin.js show tests/fixtures/sample-logbook --since 2026-03-07 --profile note/v1,event/v1
           node dist/bin.js show tests/fixtures/sample-logbook --day 2026-03-08 --json
+      - name: the built binary reads a day of each day fixture, as text and as JSON
+        run: |
+          node dist/bin.js day tests/fixtures/day-sample 2026-04-06
+          node dist/bin.js day tests/fixtures/day-sample 2026-04-08 --json
+          node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
@@ -100,8 +105,9 @@ jobs:
   cross-impl:
     # The reference implementation (Python) and this one must print the same day: tests/cross-impl.test.ts
     # runs `logbook show` of a clone of bighydro/logbook at main on every expected-show fixture (the
-    # two synthetic records and the conformance sample) and diffs it against ours and against the
-    # vendored expected-show files.
+    # two synthetic records and the conformance sample) and `logbook day` on every expected-day fixture
+    # and on three days of the reference's demo record, and diffs them against ours and against the
+    # vendored expected files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

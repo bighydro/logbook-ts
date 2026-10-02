@@ -8,6 +8,14 @@ export interface Ref {
 
 const MAX_HOPS = 4;
 
+/** What a resolution line standing says a ref is (RFC 0006): the entity, and the label it carried. */
+export interface Resolved {
+  type: string;
+  id: string;
+  registry: string;
+  label: string | undefined;
+}
+
 export interface Resolver {
   /**
    * The name a ref resolves to through the record's own resolution lines, or undefined when no
@@ -15,6 +23,10 @@ export interface Resolver {
    * not stand, `alias_of` is followed up to four hops and stops on a cycle (RFC 0006 rule 6).
    */
   name(ref: Ref): string | undefined;
+  /** The entity the same walk reaches, with its label; undefined when it names nothing. */
+  entity(ref: Ref): Resolved | undefined;
+  /** Every person the record's resolution lines standing mint: entity id to the last label given. */
+  people(): Map<string, string>;
   /** The retraction that hides the line with this id, the highest `seq` winning (RFC 0003 rule 4). */
   retractedBy(id: string): Line | undefined;
 }
@@ -61,24 +73,53 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
     standing.set(key(ref), line); // later seq overwrites: the last one wins
   }
 
+  const entityOf = (line: Line): Resolved | undefined => {
+    const entity = line.payload.entity;
+    if (entity === null || typeof entity !== "object" || Array.isArray(entity)) return undefined;
+    const { type, id, registry } = entity;
+    if (typeof type !== "string" || typeof id !== "string") return undefined;
+    const label = line.payload.label;
+    return {
+      type,
+      id,
+      registry: typeof registry === "string" ? registry : "",
+      label: typeof label === "string" ? label : undefined,
+    };
+  };
+
+  const entity = (ref: Ref): Resolved | undefined => {
+    const visited = new Set<string>();
+    let current = ref;
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      const k = key(current);
+      if (visited.has(k)) return undefined; // a cycle
+      visited.add(k);
+      const line = standing.get(k);
+      if (line === undefined) return undefined; // no line standing
+      const alias = asRef(line.payload.alias_of);
+      if (alias === undefined) return entityOf(line);
+      current = alias; // an alias line names nothing itself
+    }
+    return undefined; // more than MAX_HOPS aliases
+  };
+
+  let known: Map<string, string> | undefined;
+
   return {
     name(ref) {
-      const visited = new Set<string>();
-      let current = ref;
-      for (let hop = 0; hop <= MAX_HOPS; hop++) {
-        const k = key(current);
-        if (visited.has(k)) return undefined; // a cycle
-        visited.add(k);
-        const line = standing.get(k);
-        if (line === undefined) return undefined; // no line standing
-        const alias = asRef(line.payload.alias_of);
-        if (alias === undefined) {
-          const label = line.payload.label;
-          return line.payload.entity !== undefined && typeof label === "string" ? label : undefined;
+      return entity(ref)?.label;
+    },
+    entity,
+    people() {
+      if (known === undefined) {
+        known = new Map();
+        for (const line of standing.values()) {
+          const found = entityOf(line);
+          if (found?.type === "person" && found.label !== undefined)
+            known.set(found.id, found.label);
         }
-        current = alias; // an alias line names nothing itself
       }
-      return undefined; // more than MAX_HOPS aliases
+      return known;
     },
     retractedBy(id) {
       return retractions.get(id);

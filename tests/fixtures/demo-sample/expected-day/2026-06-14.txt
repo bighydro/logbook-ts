@@ -1,0 +1,15 @@
+2026-06-14  Sunday
+  night before  Home · home
+  night after   Home · home
+  country       NO (place Home)
+
+  00:00–10:05  stay   Home · 10 h 5 min
+  10:05–10:30  move   3.2 km · 25 min · car
+  10:30–11:35  stay   59.9261,10.6999 · 1 h 5 min · 1 event, 1 photo
+      event        Run in the park 10:30–11:30
+  11:35–12:00  move   3.2 km · 25 min · car
+  12:00–24:00  stay   Home · 12 h · 1 call, 2 messages
+      call         ← Eva Nordmann, 14 min
+
+  health        sleep 6.2 h · 10,627 steps · resting 53 bpm
+  sources       dawarich 286 lines, last 23:55 · apple-health 84 lines, last 23:40 · ais 24 lines, last 23:00 · safari 2 lines, last 21:20 · whatsapp 2 lines, last 13:30 · apple-books 1 line, last 22:10 · apple-podcasts 1 line, last 07:40 · google-takeout 1 line, last 22:15 · immich 1 line, last 11:25 · ios-calendar 1 line, last 10:30 · ios-calls 1 line, last 16:00

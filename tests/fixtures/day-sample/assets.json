@@ -1,0 +1,10 @@
+{
+  "assets": [
+    {
+      "id": "solvind",
+      "kind": "yacht",
+      "name": "Solvind",
+      "mmsi": "999000001"
+    }
+  ]
+}
