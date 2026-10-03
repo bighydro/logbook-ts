@@ -1,0 +1,8 @@
+2026-06-14  Sun  Home                             6.4 km  3 stays (5 attached) · sleep 6.9 h · 10,914 steps · resting 53 bpm · gap manual
+2026-06-15  Mon  aboard Nordlys NO               11.1 km  2 stays (2 attached) · with 2 · sleep 6.6 h · 6,445 steps · resting 53 bpm · gap immich
+2026-06-16  Tue  aboard Nordlys NO               47.2 km  1 stay (4 attached) · sleep 7.3 h · 6,763 steps · resting 52 bpm
+2026-06-17  Wed  aboard Nordlys NO               49.4 km  1 stay (3 attached) · sleep 6.7 h · 6,602 steps · resting 56 bpm
+2026-06-18  Thu  aboard Nordlys NO                2.0 km  3 stays (3 attached) · sleep 7.5 h · 6,019 steps · resting 55 bpm
+2026-06-19  Fri  aboard Nordlys NO               94.6 km  1 stay (5 attached) · sleep 7.0 h · 6,883 steps · resting 53 bpm
+2026-06-20  Sat  aboard Nordlys NO                9.7 km  1 stay (3 attached) · sleep 6.1 h · 6,538 steps · resting 58 bpm
+2026-06-21  Sun  Home                             1.4 km  2 stays (3 attached) · sleep 6.5 h · 6,568 steps · resting 53 bpm

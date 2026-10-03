@@ -1,6 +1,7 @@
 import { localOf } from "./clock.js";
 import { renderCountries, rollupCountries } from "./countries.js";
 import { readDay } from "./day.js";
+import { type DaysOptions, readDayRows, renderDayRow } from "./days.js";
 import { renderDay } from "./dayText.js";
 import { renderNights, rollupNights } from "./nights.js";
 import type { WindowOptions } from "./reading.js";
@@ -38,6 +39,13 @@ export const USAGE = `usage:
                                       and who was there, what was placed nowhere, the health line,
                                       the sources; today in the record's zone when no day is given;
                                       --json prints the Day as one object, every row with its lines
+  logbook-ts days <root> [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]
+                                      a window of days one line each, as the reference's \`logbook
+                                      days\` prints it: the night after and the country, the
+                                      kilometres moved, the flights, the stays and what attached,
+                                      the people confirmed present, the health line, and the usual
+                                      sources silent that day; both bounds default to the days the
+                                      track covers; --json prints one object per day (JSON Lines)
   logbook-ts stats <root> [--json]    one screen of what the record holds: lines by kind, source,
                                       year, tier and month, retractions, resolutions, attachments
                                       referenced and present; --json gives the same as one object
@@ -160,6 +168,21 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         }
         const read = readDay(root, { day: day ?? today(root) });
         io.stdout(json ? `${JSON.stringify(read)}\n` : renderDay(read));
+        return 0;
+      }
+      case "days": {
+        if (root === undefined) return usage(io);
+        const flags = parseDaysFlags(rest);
+        if (flags === undefined) return usage(io);
+        const { json, ...bounds } = flags;
+        if (bounds.from !== undefined && bounds.to !== undefined && bounds.from > bounds.to) {
+          io.stderr(`days: range runs backwards: ${bounds.from} > ${bounds.to}\n`);
+          return 2;
+        }
+        const read = readDayRows(root, bounds);
+        for (const row of read.rows) {
+          io.stdout(json ? `${JSON.stringify(row)}\n` : renderDayRow(row));
+        }
         return 0;
       }
       case "stats": {
@@ -319,6 +342,34 @@ function parseWindowFlags(args: string[]): (WindowOptions & { json?: boolean }) 
     return undefined;
   if (flags.since !== undefined && flags.until !== undefined && flags.since > flags.until)
     return undefined;
+  return flags;
+}
+
+/** `--from D`, `--to D` (each also as `--flag=value`) and `--json`; undefined on anything else or a bad day. */
+function parseDaysFlags(args: string[]): (DaysOptions & { json?: boolean }) | undefined {
+  const flags: DaysOptions & { json?: boolean } = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    const eq = arg.indexOf("=");
+    const name = eq === -1 ? arg : arg.slice(0, eq);
+    const take = (): string | undefined => (eq === -1 ? args[++i] : arg.slice(eq + 1));
+    switch (name) {
+      case "--from":
+      case "--to": {
+        const value = take();
+        if (value === undefined || !isDay(value)) return undefined;
+        if (name === "--from") flags.from = value;
+        else flags.to = value;
+        break;
+      }
+      case "--json":
+        if (eq !== -1) return undefined;
+        flags.json = true;
+        break;
+      default:
+        return undefined;
+    }
+  }
   return flags;
 }
 
