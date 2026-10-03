@@ -431,3 +431,55 @@ question below. None of this is written down:
     implementation follows the reference. §3.2.7 should list the four. The trip id at the end of a
     `trips` row is text, which §3.2 leaves to each reader (the JSON `id` is the contract); it is
     matched here because this repository diffs the text byte for byte.
+
+## Found while implementing `days` (openlogbook main at 176e6a7, 2026-10-04; docs/day.md "A window of days", SPEC §3.2.7)
+
+`days` was written from docs/day.md's fortnight and SPEC §3.2.7 and matched to the reference by running it on
+every fixture and on `logbook demo --seed 1` (`tests/fixtures/demo-seed1`). None of this is written down:
+
+70. **The `days` row is not written down.** docs/day.md shows a fortnight and names the parts; the
+    columns are the output's: the date, two spaces, the weekday's first three letters, two spaces, the
+    night padded to 28 columns, the kilometres right-aligned in 11, two spaces, then the rest joined by
+    ` · `. The night is the Day's `nights.after.where`, with the Day's country code appended when the
+    night is not at home and the code is known (`Cabin NO`, `aboard Nordlys NO`, `47.3769,8.5417
+    (Zurich) CH`; the asset's name, not its id), `in transit` when no stay reaches the night, and `no
+    location` when, besides, the day has no location line standing at all (any subject). The kilometres
+    are `moved_m` as `0.0 km`, `1.1 km` to one decimal under 100 km and `1,471 km` whole above, half to
+    even as Python formats them. The rest: the flights as `XY 561 OSL→ZRH`, joined by `, `, a missing
+    designator left out and a missing airport `?` (`SIM SIM123 ?→?`); `3 stays (4 attached)` with the
+    parenthesis only when something attached, or `nothing logged` in its place on a day with no line
+    standing (a day with lines and no stay reads `0 stays`); `with 2`; the Day's health text; `gap
+    whatsapp` with the usual sources missing sorted by name. Under `--json` the night carries `located`
+    besides the five fields SPEC §3.2.7 names, `country` is the code alone, and `weekday` is the full
+    name. Learned from the reference's output on every fixture and on the seed-1 demo record.
+
+71. **`days` reads a month at a time, and its numbers are not always the single Day's.** docs/day.md
+    says "every number is the Day's" and SPEC §3.2.7 that `days` "reads a range the same way, a chunk
+    at a time"; its *Performance* paragraph says the chunk is a month with the day before it. The stays
+    are derived over that whole reading, so two things differ from `day` run on the same date: a run
+    aboard an asset that spans days keeps its start and its centre on every one of them (the night of
+    2026-06-17 of the seed-1 demo is `stay:owner:20260615T0645Z@59.0500,10.0300` in `days` and
+    `stay:owner:20260615T2200Z@59.0500,10.0300` in `day`, whose window opens the day before), and a
+    move that ends past the day's window — the red-eye of day-sample's 2026-04-09, 311 km over thirty
+    hours — is in the reading and counts for the day it started on, where `day` lists no such row.
+    This implementation reads a calendar month at a time, each with the day before it and the night
+    after its last day, derives the rows once per reading and composes each Day from them; the chunk
+    boundary is the calendar month, which the reference's output does not show either way (every
+    window probed begins on a month's first day or lies inside one).
+
+72. **Which lines make a source usual, and which days count.** "At least four in five of the window's
+    days that have any line (retractions aside)": this implementation counts a day as having lines when
+    the Day's `sources` are not empty and a source's days from the same `sources`, that is lines
+    standing, a retraction line never among them; whether a retracted line keeps its source present
+    on a day is not decided by any fixture, and the reference reads the share from an index
+    aggregate this implementation does not have. The threshold is integer arithmetic (`days × 5 ≥
+    total × 4`), so 28 of 31 days is usual and 3 of 5 is not; a window of one or two days with lines
+    makes every source on them usual. A window given beyond the record (`--from 2026-05-25` on the
+    June demo) prints its empty days with every usual source as a gap, which the reference does too.
+
+73. **The default window of `days` and a bound beyond it.** SPEC §3.2.7: "its range defaults to the
+    days the owner's track covers, else to the days with any line"; the track is bounded by any
+    location line (question 64). Unlike `trips` and `rollup`, a `--from` or `--to` outside the track is
+    not clipped: the reference prints `no location … nothing logged` rows to the bound, and so does
+    this implementation; one bound given leaves the other at the record's. A range that runs
+    backwards is `days: range runs backwards: <from> > <to>`, exit 2, the reference's own message.

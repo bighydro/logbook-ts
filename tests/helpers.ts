@@ -170,11 +170,8 @@ export function windowOptions(name: string): ExpectedWindow["options"] {
   return { since: m[1] as string, until: m[2] as string };
 }
 
-/** The `<window>.txt` and `<window>.json` files of `expected-trips/`, `expected-countries/` or `expected-nights/` beside a fixture. */
-export function expectedWindows(
-  root: string,
-  kind: "trips" | "countries" | "nights",
-): ExpectedWindow[] {
+/** The `<window>.txt` and `<window>.json` files of `expected-<kind>/` beside a fixture: `trips`, `countries`, `nights` or `people`. */
+export function expectedWindows(root: string, kind: string): ExpectedWindow[] {
   const dir = join(root, `expected-${kind}`);
   let names: string[];
   try {
@@ -192,6 +189,49 @@ export function expectedWindows(
         options: windowOptions(name),
         text: readFileSync(join(dir, file), "utf-8"),
         json: JSON.parse(readFileSync(join(dir, `${name}.json`), "utf-8")) as unknown,
+      };
+    });
+}
+
+/** A window `days` output was captured for: the whole record, or `--from`/`--to`. */
+export interface ExpectedDays {
+  name: string;
+  options: { from?: string; to?: string };
+  text: string;
+  /** One object per line of the JSON Lines output. */
+  rows: unknown[];
+}
+
+/** `all` or `YYYY-MM-DD..YYYY-MM-DD` as the options `readDayRows` takes. */
+export function daysOptions(name: string): ExpectedDays["options"] {
+  if (name === "all") return {};
+  const m = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(name);
+  if (m === null) throw new Error(`not a window of days: ${name}`);
+  return { from: m[1] as string, to: m[2] as string };
+}
+
+/** The `<window>.txt` and `<window>.jsonl` files of `expected-days/` beside a fixture. */
+export function expectedDaysWindows(root: string): ExpectedDays[] {
+  const dir = join(root, "expected-days");
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => name.endsWith(".txt"))
+    .sort()
+    .map((file) => {
+      const name = file.slice(0, -4);
+      return {
+        name,
+        options: daysOptions(name),
+        text: readFileSync(join(dir, file), "utf-8"),
+        rows: readFileSync(join(dir, `${name}.jsonl`), "utf-8")
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => JSON.parse(line) as unknown),
       };
     });
 }
