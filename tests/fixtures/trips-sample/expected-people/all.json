@@ -1,0 +1,787 @@
+{
+  "window": {
+    "since": "2025-12-01",
+    "until": "2026-01-13"
+  },
+  "tier": 2,
+  "people": [
+    {
+      "id": "019c0000-0000-7000-8000-000000000202",
+      "name": "Liv Berg",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "liv@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2025-12-29",
+      "last_contact": "2026-01-01",
+      "last_real_contact": {
+        "day": "2026-01-01",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051250"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 3,
+          "first": "2025-12-29",
+          "last": "2026-01-01",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051250"
+        }
+      },
+      "days": 3,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6200,12.6500 (Copenhagen)",
+          "days": 1
+        },
+        {
+          "where": "Messe",
+          "days": 1
+        },
+        {
+          "where": "Office",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000005289",
+        "00000000-0000-4000-8000-0000000005868",
+        "00000000-0000-4000-8000-00000000051250"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000207",
+      "name": "Ola Nordmann",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "ola@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-06",
+      "last_contact": "2026-01-06",
+      "last_real_contact": {
+        "day": "2026-01-06",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000052666"
+      },
+      "channels": {},
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "aboard solvind",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000052666"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000206",
+      "name": "Anders Vik",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "anders@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-04",
+      "last_contact": "2026-01-04",
+      "last_real_contact": {
+        "day": "2026-01-04",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000052045"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-04",
+          "last": "2026-01-04",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000052045"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Office",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000052045"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000210",
+      "name": "Guest 01",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest01@example.org"
+        },
+        {
+          "kind": "provider_id",
+          "value": "immich:f_10"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-03",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        },
+        "faces": {
+          "lines": 1,
+          "first": "2026-01-03",
+          "last": "2026-01-03",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051744"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000211",
+      "name": "Guest 02",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest02@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000212",
+      "name": "Guest 03",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest03@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000213",
+      "name": "Guest 04",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest04@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000214",
+      "name": "Guest 05",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest05@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000215",
+      "name": "Guest 06",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest06@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000216",
+      "name": "Guest 07",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest07@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000217",
+      "name": "Guest 08",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest08@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000218",
+      "name": "Guest 09",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest09@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000219",
+      "name": "Guest 10",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest10@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000220",
+      "name": "Guest 11",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest11@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000221",
+      "name": "Guest 12",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest12@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000222",
+      "name": "Guest 13",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "guest13@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-01-02",
+      "last_contact": "2026-01-02",
+      "last_real_contact": {
+        "day": "2026-01-02",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-00000000051491"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-01-02",
+          "last": "2026-01-02",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-00000000051491"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "55.6850,12.5500 (Copenhagen)",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-00000000051491"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000204",
+      "name": "Freja Lund",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "freja@example.org"
+        },
+        {
+          "kind": "provider_id",
+          "value": "immich:f_04"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2025-12-31",
+      "last_contact": "2025-12-31",
+      "last_real_contact": {
+        "day": "2025-12-31",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-0000000005887"
+      },
+      "channels": {
+        "faces": {
+          "lines": 2,
+          "first": "2025-12-31",
+          "last": "2025-12-31",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-0000000005920"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Messe",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000005887"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000203",
+      "name": "Per Hansen",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "per@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2025-12-31",
+      "last_contact": "2025-12-31",
+      "last_real_contact": {
+        "day": "2025-12-31",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-0000000005868"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2025-12-31",
+          "last": "2025-12-31",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-0000000005868"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Messe",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000005868"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000201",
+      "name": "Ines Holm",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "ines@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2025-12-30",
+      "last_contact": "2025-12-30",
+      "last_real_contact": {
+        "day": "2025-12-30",
+        "via": "meeting",
+        "line": "00000000-0000-4000-8000-0000000005524"
+      },
+      "channels": {},
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Home",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "00000000-0000-4000-8000-0000000005524"
+      ]
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000205",
+      "name": "Jonas Weber",
+      "refs": [
+        {
+          "kind": "provider_id",
+          "value": "immich:f_77"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2025-12-31",
+      "last_contact": "2025-12-31",
+      "last_real_contact": null,
+      "channels": {
+        "faces": {
+          "lines": 1,
+          "first": "2025-12-31",
+          "last": "2025-12-31",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-0000000005894"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    }
+  ]
+}
