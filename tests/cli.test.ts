@@ -186,8 +186,22 @@ describe("logbook-ts trips and rollup countries", () => {
     expect(JSON.parse(json.out)).toEqual(expectedCountries("2025")?.json);
   });
 
+  it("prints the nights rollup as the reference does, and the same rollup as JSON", () => {
+    const expectedNights = (name: string) =>
+      expectedWindows(root, "nights").find((w) => w.name === name);
+    const text = run(["rollup", "nights", root, "--since", "2025-12-31", "--until=2026-01-06"]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expectedNights("2025-12-31..2026-01-06")?.text);
+    const json = run(["rollup", "nights", root, "--year", "2026", "--json"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expectedNights("2026")?.json);
+  });
+
   it("says so when the window has no days, and exits 0", () => {
     expect(run(["trips", root, "--year", "2024"]).out).toBe("no trips: the record has no days\n");
+    expect(run(["rollup", "nights", root, "--year", "2024"]).out).toBe(
+      "nights\n  nothing in the window\n",
+    );
     expect(run(["rollup", "countries", root, "--year", "2024"]).out).toBe(
       "countries\n  nothing in the window\n",
     );
@@ -202,6 +216,8 @@ describe("logbook-ts trips and rollup countries", () => {
       ["trips"],
       ["rollup", "flights", root],
       ["rollup", "countries"],
+      ["rollup", "nights"],
+      ["rollup", "nights", root, "--year", "2026", "--until", "2026-01-05"],
     ]) {
       const { code, out, err } = run(argv);
       expect(code, argv.join(" ")).toBe(2);
@@ -218,6 +234,7 @@ describe("logbook-ts trips and rollup countries", () => {
     for (const argv of [
       ["trips", copy],
       ["rollup", "countries", copy],
+      ["rollup", "nights", copy],
     ]) {
       const { code, err } = run(argv);
       expect(code).toBe(1);

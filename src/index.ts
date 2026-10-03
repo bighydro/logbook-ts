@@ -55,6 +55,14 @@ export { distanceM, fsum, mean, roundHalfEven, roundTo } from "./geo.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lines.js";
 export {
+  type LongestTrip,
+  NIGHTS_NO_HOME,
+  type Nights,
+  type NightsYear,
+  renderNights,
+  rollupNights,
+} from "./nights.js";
+export {
   type DayReading,
   type FlightLine,
   type Night,

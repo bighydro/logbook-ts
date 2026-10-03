@@ -1,0 +1,3 @@
+nights 2026-03-04 – 2026-03-04
+  (no place of kind home in places.json: every night counts as away)
+  2026  0 home · 0 away · 1 in transit · longest trip 2026-03-04 – 2026-03-04 (1 night)

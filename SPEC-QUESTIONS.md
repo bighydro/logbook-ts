@@ -408,3 +408,20 @@ record built to have a case of every rule (`tests/fixtures/trips-sample`, sevent
     not clipped: the reference prints `no location … nothing logged` rows to the bound, and so does
     this implementation; one bound given leaves the other at the record's. A range that runs
     backwards is `days: range runs backwards: <from> > <to>`, exit 2, the reference's own message.
+
+71. **The nights rollup.** SPEC §3.2.8 names the fields; the output shows the rest. The text is
+    `nights <since> – <until>`, then `  (<warning>)` on its own line when the record has no place of
+    kind `home`, then per year `  <year>  <n> home · <n> away · <n> in transit`, ` · <n> night(s)
+    aboard <asset id>` per asset (the id, where `days` and `trips` print the name) and ` · longest trip
+    <start> – <end> (<n> night(s))` when there is one; an empty window is `nights` over `  nothing in
+    the window`, without the warning. The longest trip is a run of consecutive days whose night is
+    away or in transit, counted within the calendar year: trips-sample's five nights over the turn of
+    the year are two in 2025 and three in 2026, and 2026's longest is the yacht's four. Its `end` is
+    the last night's day, not the day after as a trip's `until` is, and a window of in-transit nights
+    alone has one (the conformance sample: eight nights, no lines). `lines` of a year are the first
+    and last location line of every night's stay in night order, a run aboard contributing the same
+    two ids on each of its nights, a night in transit none; the longest trip's are those of its own
+    nights. Chosen here, where no fixture decides: of equal runs the first is kept; the assets are
+    listed in the order they first appear; a night aboard an asset is never home, as the Day's night
+    says (`trips` here reads a night aboard within 400 m of home as home, which no record exercised);
+    a night aboard counts under `aboard` whether or not the stay is at a named place.
