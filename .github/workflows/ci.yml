@@ -46,6 +46,18 @@ jobs:
           node dist/bin.js trips tests/fixtures/trips-sample --year 2026 --json
           node dist/bin.js rollup countries tests/fixtures/trips-sample --since 2025-12-31 --until 2026-01-06
           node dist/bin.js rollup countries tests/fixtures/trips-sample --json
+          node dist/bin.js rollup countries tests/fixtures/sample-logbook
+          node dist/bin.js rollup countries tests/fixtures/demo-seed-1 --year 2026 --json
+          node dist/bin.js rollup nights tests/fixtures/trips-sample
+          node dist/bin.js rollup nights tests/fixtures/demo-seed-1 --year 2026 --json
+      - name: the built binary reads the days of the demo record, whole and a range, as text and as JSON Lines
+        run: |
+          node dist/bin.js days tests/fixtures/demo-seed-1
+          node dist/bin.js days tests/fixtures/demo-seed-1 --from 2026-06-14 --to 2026-06-21 --json
+      - name: the built binary lists the people of the demo record, whole and one year, as text and as JSON
+        run: |
+          node dist/bin.js people tests/fixtures/demo-seed-1
+          node dist/bin.js people tests/fixtures/demo-seed-1 --year 2026 --json
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
@@ -109,7 +121,7 @@ jobs:
       - name: the vendored fixture is the one on main
         run: |
           set -euo pipefail
-          if ! diff -r --exclude=expected-show spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
+          if ! diff -r --exclude='expected-*' spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
             echo "::error::conformance/ moved on bighydro/logbook main; copy sample-logbook and expected.json into tests/fixtures and update the conformance job's SPEC_TAG, EXPECTED_HEAD and EXPECTED_LINES"
             exit 1
           fi
@@ -120,8 +132,11 @@ jobs:
     # bighydro/logbook at main on every expected-show fixture (the two synthetic records and the
     # conformance sample), `logbook day` on every expected-day fixture and on three days of the
     # reference's demo record, `logbook stats` and `logbook sources --gaps` on the fixtures and on the
-    # demo record, and `logbook trips` and `logbook rollup countries` on every expected-trips fixture
-    # and on the whole demo record, and diffs them against ours and against the vendored expected files.
+    # demo record, `logbook trips` and `logbook rollup countries` on every expected-trips fixture
+    # and on the whole demo record, and `logbook days`, `logbook rollup nights`, `logbook rollup
+    # countries` and `logbook people` on every expected-days, expected-nights, expected-countries and
+    # expected-people fixture — the conformance sample and the vendored `logbook demo --seed 1` record
+    # among them — and diffs them against ours and against the vendored expected files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

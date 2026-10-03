@@ -1,0 +1,34 @@
+{
+  "kind": "nights",
+  "window": {
+    "since": "2026-03-01",
+    "until": "2026-03-08",
+    "days": [
+      "2026-03-01",
+      "2026-03-02",
+      "2026-03-03",
+      "2026-03-04",
+      "2026-03-05",
+      "2026-03-06",
+      "2026-03-07",
+      "2026-03-08"
+    ]
+  },
+  "warning": "no place of kind home in places.json: every night counts as away",
+  "years": [
+    {
+      "year": "2026",
+      "home": 0,
+      "away": 0,
+      "in_transit": 8,
+      "aboard": {},
+      "lines": [],
+      "longest_trip": {
+        "start": "2026-03-01",
+        "end": "2026-03-08",
+        "nights": 8,
+        "lines": []
+      }
+    }
+  ]
+}

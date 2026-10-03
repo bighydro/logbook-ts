@@ -8,6 +8,7 @@ import {
   copySample,
   EXPECTED,
   expectedDays,
+  expectedDaysWindows,
   expectedWindows,
   FIXTURES,
   readLines,
@@ -185,8 +186,22 @@ describe("logbook-ts trips and rollup countries", () => {
     expect(JSON.parse(json.out)).toEqual(expectedCountries("2025")?.json);
   });
 
+  it("prints the nights rollup as the reference does, and the same rollup as JSON", () => {
+    const expectedNights = (name: string) =>
+      expectedWindows(root, "nights").find((w) => w.name === name);
+    const text = run(["rollup", "nights", root, "--since", "2025-12-31", "--until=2026-01-06"]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expectedNights("2025-12-31..2026-01-06")?.text);
+    const json = run(["rollup", "nights", root, "--year", "2026", "--json"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expectedNights("2026")?.json);
+  });
+
   it("says so when the window has no days, and exits 0", () => {
     expect(run(["trips", root, "--year", "2024"]).out).toBe("no trips: the record has no days\n");
+    expect(run(["rollup", "nights", root, "--year", "2024"]).out).toBe(
+      "nights\n  nothing in the window\n",
+    );
     expect(run(["rollup", "countries", root, "--year", "2024"]).out).toBe(
       "countries\n  nothing in the window\n",
     );
@@ -201,6 +216,8 @@ describe("logbook-ts trips and rollup countries", () => {
       ["trips"],
       ["rollup", "flights", root],
       ["rollup", "countries"],
+      ["rollup", "nights"],
+      ["rollup", "nights", root, "--year", "2026", "--until", "2026-01-05"],
     ]) {
       const { code, out, err } = run(argv);
       expect(code, argv.join(" ")).toBe(2);
@@ -217,12 +234,87 @@ describe("logbook-ts trips and rollup countries", () => {
     for (const argv of [
       ["trips", copy],
       ["rollup", "countries", copy],
+      ["rollup", "nights", copy],
     ]) {
       const { code, err } = run(argv);
       expect(code).toBe(1);
       expect(err).toMatch(/logbook\/0\.1/);
     }
     expect(readLines(copy)).toEqual(before);
+  });
+});
+
+describe("logbook-ts days", () => {
+  const root = join(FIXTURES, "demo-seed-1");
+  const expected = (name: string) => expectedDaysWindows(root).find((w) => w.name === name);
+
+  it("prints the days as the reference does, and the same days as JSON Lines", () => {
+    const text = run(["days", root]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expected("all")?.text);
+    const json = run(["days", root, "--from=2026-06-14", "--to", "2026-06-21", "--json"]);
+    expect(json.code).toBe(0);
+    expect(
+      json.out
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    ).toEqual(expected("2026-06-14..2026-06-21")?.rows);
+  });
+
+  it("says so and exits 2 on a range that runs backwards, as the reference does", () => {
+    const { code, out, err } = run(["days", root, "--from", "2026-06-12", "--to", "2026-06-10"]);
+    expect(code).toBe(2);
+    expect(out).toBe("");
+    expect(err).toBe("days: range runs backwards: 2026-06-12 > 2026-06-10\n");
+  });
+
+  it("prints usage and exits 2 on a bound that is not a day, a flag it does not know, or no root", () => {
+    for (const argv of [
+      ["days", root, "--from", "2026-6-1"],
+      ["days", root, "--to"],
+      ["days", root, "--year", "2026"],
+      ["days"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toMatch(/^usage:/);
+    }
+  });
+});
+
+describe("logbook-ts people", () => {
+  const root = join(FIXTURES, "demo-seed-1");
+  const expected = (name: string) => expectedWindows(root, "people").find((w) => w.name === name);
+
+  it("prints the people as the reference does, and the same report as JSON", () => {
+    const text = run(["people", root]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expected("all")?.text);
+    const json = run(["people", root, "--year=2026", "--json"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expected("2026")?.json);
+  });
+
+  it("says so when the year has no days, and exits 0", () => {
+    const { code, out } = run(["people", root, "--year", "2025"]);
+    expect(code).toBe(0);
+    expect(out).toBe("no people: the record has no days in 2025\n");
+  });
+
+  it("prints usage and exits 2 on a range, a bad year, a flag it does not know, or no root", () => {
+    for (const argv of [
+      ["people", root, "--since", "2026-06-01", "--until", "2026-06-30"],
+      ["people", root, "--year", "26"],
+      ["people", root, "--merge"],
+      ["people"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toMatch(/^usage:/);
+    }
   });
 });
 

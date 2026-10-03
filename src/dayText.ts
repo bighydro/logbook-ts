@@ -4,6 +4,7 @@ import {
   type Company,
   callText,
   type Day,
+  type DayHealth,
   type DayNight,
   type FlightEntry,
   type SegmentEntry,
@@ -129,7 +130,7 @@ export function renderDay(day: Day): string {
   }
 
   lines.push("");
-  lines.push(header("health", healthText(day)));
+  lines.push(header("health", healthText(day.health) ?? "no lines"));
   lines.push(
     header(
       "sources",
@@ -199,12 +200,11 @@ function flightText(f: FlightEntry): string {
 }
 
 /** `sleep 6.6 h · 8,115 steps · resting 53 bpm`; the heart-rate variability is in the JSON only. */
-function healthText(day: Day): string {
-  const h = day.health;
-  if (h === null) return "no lines";
+export function healthText(health: DayHealth | null): string | undefined {
+  if (health === null) return undefined;
   const parts: string[] = [];
-  if (h.sleep_h !== null) parts.push(`sleep ${h.sleep_h.toFixed(1)} h`);
-  if (h.steps !== null) parts.push(`${h.steps.toLocaleString("en-US")} steps`);
-  if (h.resting_hr !== null) parts.push(`resting ${h.resting_hr} bpm`);
-  return parts.length ? parts.join(" · ") : "no lines";
+  if (health.sleep_h !== null) parts.push(`sleep ${health.sleep_h.toFixed(1)} h`);
+  if (health.steps !== null) parts.push(`${health.steps.toLocaleString("en-US")} steps`);
+  if (health.resting_hr !== null) parts.push(`resting ${health.resting_hr} bpm`);
+  return parts.length ? parts.join(" · ") : undefined;
 }

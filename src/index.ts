@@ -39,10 +39,40 @@ export {
   type TimelineEntry,
   type UnplacedEntry,
 } from "./day.js";
-export { distanceText, durationText, renderDay } from "./dayText.js";
+export {
+  type DayRow,
+  type DayRowFlight,
+  type DayRowNight,
+  type DayRows,
+  type DaysOptions,
+  kilometresText,
+  readDayRows,
+  renderDayRow,
+  renderDayRows,
+} from "./days.js";
+export { distanceText, durationText, healthText, renderDay } from "./dayText.js";
 export { distanceM, fsum, mean, roundHalfEven, roundTo } from "./geo.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { eachLine, type MonthFile, monthFiles, parseLine, type Row } from "./lines.js";
+export {
+  type LongestTrip,
+  NIGHTS_NO_HOME,
+  type Nights,
+  type NightsYear,
+  renderNights,
+  rollupNights,
+} from "./nights.js";
+export {
+  CHANNELS,
+  type Channel,
+  type ChannelName,
+  type People,
+  type PeopleOptions,
+  type PersonReport,
+  type RealContact,
+  readPeople,
+  renderPeople,
+} from "./people.js";
 export {
   type DayReading,
   type FlightLine,

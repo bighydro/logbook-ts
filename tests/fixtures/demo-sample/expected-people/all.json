@@ -1,0 +1,351 @@
+{
+  "window": {
+    "since": "2026-05-31",
+    "until": "2026-06-16"
+  },
+  "tier": 2,
+  "people": [
+    {
+      "id": "ca2acbe4-46f5-567d-a961-74420028c869",
+      "name": "Anders Vik",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "anders.vik@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900005"
+        },
+        {
+          "kind": "provider_id",
+          "value": "immich:f_05"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-12",
+      "last_contact": "2026-06-15",
+      "last_real_contact": {
+        "day": "2026-06-15",
+        "via": "meeting",
+        "line": "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+      },
+      "channels": {
+        "messages": {
+          "lines": 1,
+          "first": "2026-06-13",
+          "last": "2026-06-13",
+          "tier": 2,
+          "last_line": "019ec151-6ec0-7c5e-9290-dba5a7f304be"
+        },
+        "mail": {
+          "lines": 1,
+          "first": "2026-06-12",
+          "last": "2026-06-12",
+          "tier": 2,
+          "last_line": "019ebb6f-63e0-738e-9284-4269af05825a"
+        },
+        "calendar": {
+          "lines": 2,
+          "first": "2026-06-13",
+          "last": "2026-06-15",
+          "tier": 1,
+          "last_line": "019ec826-1700-796d-95a9-3d8a2314eec5"
+        },
+        "faces": {
+          "lines": 1,
+          "first": "2026-06-13",
+          "last": "2026-06-13",
+          "tier": 1,
+          "last_line": "019ec0a3-7b80-7391-872b-6cc15c741f1d"
+        }
+      },
+      "days": 2,
+      "nights": 1,
+      "places": [
+        {
+          "where": "Marina",
+          "days": 2
+        }
+      ],
+      "lines": [
+        "019ebffe-b000-7ba5-9677-33f1b818a1c0",
+        "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+      ]
+    },
+    {
+      "id": "4f8c85f9-0e6a-56f0-a9db-0d09bfdd3d56",
+      "name": "Ola Nordmann",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "ola.nordmann@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900001"
+        },
+        {
+          "kind": "provider_id",
+          "value": "immich:f_01"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-12",
+      "last_contact": "2026-06-15",
+      "last_real_contact": {
+        "day": "2026-06-15",
+        "via": "meeting",
+        "line": "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+      },
+      "channels": {
+        "messages": {
+          "lines": 7,
+          "first": "2026-06-12",
+          "last": "2026-06-14",
+          "tier": 2,
+          "last_line": "019ec5e5-4ec0-7284-bfb4-0e7af7b225ee"
+        },
+        "calls": {
+          "lines": 1,
+          "first": "2026-06-15",
+          "last": "2026-06-15",
+          "tier": 1,
+          "last_line": "019ecbea-23e0-73ab-a663-fcf20e3e78ee"
+        },
+        "calendar": {
+          "lines": 2,
+          "first": "2026-06-13",
+          "last": "2026-06-15",
+          "tier": 1,
+          "last_line": "019ec826-1700-796d-95a9-3d8a2314eec5"
+        },
+        "faces": {
+          "lines": 1,
+          "first": "2026-06-13",
+          "last": "2026-06-13",
+          "tier": 1,
+          "last_line": "019ec0a3-7b80-7391-872b-6cc15c741f1d"
+        }
+      },
+      "days": 2,
+      "nights": 1,
+      "places": [
+        {
+          "where": "Marina",
+          "days": 2
+        }
+      ],
+      "lines": [
+        "019ebffe-b000-7ba5-9677-33f1b818a1c0",
+        "019eca4f-fbe0-7911-bd60-e5e15b7a5323"
+      ]
+    },
+    {
+      "id": "d3d2086f-ccb7-54ee-a0b4-f10bcf64d1c5",
+      "name": "Sigrid Moen",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "sigrid.moen@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900006"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-13",
+      "last_contact": "2026-06-15",
+      "last_real_contact": {
+        "day": "2026-06-13",
+        "via": "meeting",
+        "line": "019ebffe-b000-7ba5-9677-33f1b818a1c0"
+      },
+      "channels": {
+        "messages": {
+          "lines": 1,
+          "first": "2026-06-13",
+          "last": "2026-06-13",
+          "tier": 2,
+          "last_line": "019ec18e-c5e0-7120-bb12-80c4defe3163"
+        },
+        "calendar": {
+          "lines": 2,
+          "first": "2026-06-13",
+          "last": "2026-06-15",
+          "tier": 1,
+          "last_line": "019ec826-1700-796d-95a9-3d8a2314eec5"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Marina",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "019ebffe-b000-7ba5-9677-33f1b818a1c0"
+      ]
+    },
+    {
+      "id": "2e18aa2a-d3b0-553e-ba40-ed41bccccf6d",
+      "name": "Liv Berg",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "liv.berg@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900004"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-12",
+      "last_contact": "2026-06-12",
+      "last_real_contact": {
+        "day": "2026-06-12",
+        "via": "meeting",
+        "line": "019ebaa1-6580-7b57-be6b-bbc492789c81"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-06-12",
+          "last": "2026-06-12",
+          "tier": 1,
+          "last_line": "019ebaa1-6580-7b57-be6b-bbc492789c81"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Office",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "019ebaa1-6580-7b57-be6b-bbc492789c81"
+      ]
+    },
+    {
+      "id": "33072822-5482-58ba-bc63-8f198e35d71e",
+      "name": "Per Hansen",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "per.hansen@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900003"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-12",
+      "last_contact": "2026-06-12",
+      "last_real_contact": {
+        "day": "2026-06-12",
+        "via": "meeting",
+        "line": "019ebaa1-6580-7b57-be6b-bbc492789c81"
+      },
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-06-12",
+          "last": "2026-06-12",
+          "tier": 1,
+          "last_line": "019ebaa1-6580-7b57-be6b-bbc492789c81"
+        }
+      },
+      "days": 1,
+      "nights": 0,
+      "places": [
+        {
+          "where": "Office",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "019ebaa1-6580-7b57-be6b-bbc492789c81"
+      ]
+    },
+    {
+      "id": "15d9fd59-d867-5dbc-9b64-aecee8442320",
+      "name": "Eva Nordmann",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "eva.nordmann@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900011"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-14",
+      "last_contact": "2026-06-14",
+      "last_real_contact": {
+        "day": "2026-06-14",
+        "via": "call",
+        "line": "019ec66e-a300-7e05-ad18-56c73053ae82"
+      },
+      "channels": {
+        "calls": {
+          "lines": 1,
+          "first": "2026-06-14",
+          "last": "2026-06-14",
+          "tier": 1,
+          "last_line": "019ec66e-a300-7e05-ad18-56c73053ae82"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    },
+    {
+      "id": "e5a51b20-fe2f-5b5a-9bc2-c030547795de",
+      "name": "Tore Dahl",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "tore.dahl@example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900012"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-06-14",
+      "last_contact": "2026-06-14",
+      "last_real_contact": null,
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-06-14",
+          "last": "2026-06-14",
+          "tier": 1,
+          "last_line": "019ec540-8340-7ac3-939a-18de9abd2ea3"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    }
+  ]
+}
