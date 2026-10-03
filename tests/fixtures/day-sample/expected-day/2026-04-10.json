@@ -146,6 +146,7 @@
   "flights": [],
   "unplaced": [],
   "health": null,
+  "spend": null,
   "sources": [
     {
       "source": "sim-phone",
