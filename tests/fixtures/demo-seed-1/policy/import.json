@@ -1,0 +1,12 @@
+{
+  "disabled": [
+    {
+      "source": "google-takeout-access-log",
+      "reason": "every sign-in to every Google service; opt in"
+    },
+    {
+      "source": "google-takeout-activity",
+      "reason": "every search and app opened; opt in"
+    }
+  ]
+}

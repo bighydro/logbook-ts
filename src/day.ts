@@ -24,7 +24,7 @@ import {
   readStaySettings,
   type StaySettings,
 } from "./settings.js";
-import { readJudgements } from "./show.js";
+import { type Judgements, readJudgements } from "./show.js";
 import {
   deriveSegments,
   judged,
@@ -281,6 +281,25 @@ const HELD_OVERLAP_S = 3600;
 export function readDay(root: string, options: DayOptions): Day {
   const { day } = options;
   if (!isDay(day)) throw new LogbookError(`not a day: ${day}`);
+  const reader = openDayReader(root);
+  const { startMs, endMs } = dayWindow(reader, day);
+  return dayOf(reader, day, readEntries(reader.files, startMs, endMs, reader.timezone));
+}
+
+/** A record opened for the Day: its settings, its files and its judgements, read once for as many days as are asked. */
+export interface DayReader {
+  root: string;
+  timezone: string;
+  settings: StaySettings;
+  places: Place[];
+  assets: Asset[];
+  files: MonthFile[];
+  judgements: Judgements;
+  owner: OwnerIdentity;
+}
+
+/** Opens a record for the Day: the settings and one pass over every file for the judgements. */
+export function openDayReader(root: string): DayReader {
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
@@ -289,40 +308,44 @@ export function readDay(root: string, options: DayOptions): Day {
     throw new LogbookError("logbook.json: timezone is missing");
   }
   checkTimezone(timezone);
-
-  const settings = readStaySettings(root);
-  const places = readPlaces(root);
-  const assets = readAssets(root);
-  const policy = readOwnerPolicy(root);
   const files = monthFiles(root);
-  const { resolver, supersededFlights } = readJudgements(files);
-
-  // The window: the day before (its night is the night before) to the end of the night after.
-  const before = addDays(day, -1);
-  const after = addDays(day, 1);
-  const windowStartMs = localToMs(before, "00:00", timezone);
-  const windowEndMs = localToMs(after, settings.night[1], timezone);
-  const dayStartMs = localToMs(day, "00:00", timezone);
-  const dayEndMs = localToMs(after, "00:00", timezone);
-  const entries = readWindow(files, windowStartMs, windowEndMs, timezone);
-  const standing = (e: Entry): boolean => resolver.retractedBy(e.line.id) === undefined;
-
+  const judgements = readJudgements(files);
   const ownerEmails = Array.isArray(meta.owner_emails)
     ? meta.owner_emails.filter((v): v is string => typeof v === "string")
     : [];
-  const owner = ownerIdentity(resolver, policy, ownerEmails, meta.owner_id);
-  const ctx: Context = {
+  return {
+    root,
     timezone,
-    day,
-    dayStartMs,
-    dayEndMs,
-    resolver,
-    supersededFlights,
-    places,
-    settings,
-    owner,
+    settings: readStaySettings(root),
+    places: readPlaces(root),
+    assets: readAssets(root),
+    files,
+    judgements,
+    owner: ownerIdentity(judgements.resolver, readOwnerPolicy(root), ownerEmails, meta.owner_id),
   };
+}
 
+/** The span of lines a Day reads: the day before's local midnight to the end of the night after. */
+export function dayWindow(reader: DayReader, day: string): { startMs: number; endMs: number } {
+  return {
+    startMs: localToMs(addDays(day, -1), "00:00", reader.timezone),
+    endMs: localToMs(addDays(day, 1), reader.settings.night[1], reader.timezone),
+  };
+}
+
+/** A row of the owner's track as the Day reads it: a stay, stop or move, or a run aboard an asset. */
+export type DerivedRow = Row;
+
+/**
+ * The rows of a span of lines: the owner's stays, stops and moves derived from its location lines,
+ * each marked aboard an asset whose track matches, a run aboard one asset folded into one row.
+ * `readDay` derives them from the day's own window; `days` from a month at a time, so a run aboard
+ * that spans days is one row on each of them.
+ */
+export function deriveRows(reader: DayReader, entries: Entry[]): DerivedRow[] {
+  const { settings, places, assets } = reader;
+  const resolver = reader.judgements.resolver;
+  const standing = (e: Entry): boolean => resolver.retractedBy(e.line.id) === undefined;
   // The tracks: the owner's points, and each registered asset's.
   const ownerPoints: Point[] = [];
   const tracks = assets.map((asset) => ({ asset, points: [] as Point[] }));
@@ -352,6 +375,33 @@ export function readDay(root: string, options: DayOptions): Day {
     },
   });
   markAboard(segments, tracks, settings);
+  return aboardRuns(segments);
+}
+
+/**
+ * The Day composed from the lines of its window (`dayWindow`), in time order: what `readDay` does
+ * once it has read them, so a reader over many days reads each month's lines once.
+ */
+export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: DerivedRow[]): Day {
+  const { timezone, settings, places, owner } = reader;
+  const { resolver, supersededFlights } = reader.judgements;
+  const before = addDays(day, -1);
+  const after = addDays(day, 1);
+  const dayStartMs = localToMs(day, "00:00", timezone);
+  const dayEndMs = localToMs(after, "00:00", timezone);
+  const standing = (e: Entry): boolean => resolver.retractedBy(e.line.id) === undefined;
+
+  const ctx: Context = {
+    timezone,
+    day,
+    dayStartMs,
+    dayEndMs,
+    resolver,
+    supersededFlights,
+    places,
+    settings,
+    owner,
+  };
 
   // The day's own lines: everything whose `at` is on the day, retractions aside.
   const dayLines = entries.filter((e) => e.day === day && e.line.kind !== "retraction");
@@ -373,7 +423,7 @@ export function readDay(root: string, options: DayOptions): Day {
   // The rows: the segments of the window, a run aboard one asset folded into one, those that touch
   // the day. A run is folded over the whole window, so one that began the day before is still one
   // container today, whole.
-  const rows = aboardRuns(segments);
+  const rows = given ?? deriveRows(reader, entries);
   const dayRows = rows.filter((r) => r.startMs < dayEndMs && r.endMs > dayStartMs);
   const { timeline, unplaced } = buildTimeline(dayRows, flights, dayStanding, ctx);
 
@@ -395,8 +445,13 @@ export function readDay(root: string, options: DayOptions): Day {
   };
 }
 
-/** Every line of the month files the window can touch whose `at` falls inside it, in file order. */
-function readWindow(files: MonthFile[], startMs: number, endMs: number, timezone: string): Entry[] {
+/** Every line of the month files a span can touch whose `at` falls inside it, in time order. */
+export function readEntries(
+  files: MonthFile[],
+  startMs: number,
+  endMs: number,
+  timezone: string,
+): Entry[] {
   const firstMonth = monthKey(startMs);
   const lastMonth = monthKey(endMs);
   const entries: Entry[] = [];

@@ -1,0 +1,17 @@
+2025-12-28  Sun  Home                             0.0 km  1 stay
+2025-12-29  Mon  Home                             1.2 km  3 stays (1 attached) · with 1
+2025-12-30  Tue  53.5700,10.0130 (Hamburg) DE     777 km  XY 101 OSL→HAM · 4 stays (1 attached) · with 1
+2025-12-31  Wed  53.5700,10.0130 (Hamburg) DE    14.1 km  3 stays (5 attached) · with 4
+2026-01-01  Thu  CPH, Copenhagen DK               287 km  XY 202 HAM→CPH · 4 stays (1 attached) · with 1
+2026-01-02  Fri  55.6850,12.5500 (Copenhagen) DK     9.6 km  2 stays (1 attached) · with 13
+2026-01-03  Sat  55.6850,12.5500 (Copenhagen) DK     0.0 km  1 stay (1 attached)
+2026-01-04  Sun  Home                             564 km  CPH→ENGM · 5 stays (1 attached) · with 1
+2026-01-05  Mon  in transit                       1.4 km  1 stay
+2026-01-06  Tue  aboard Solvind NO               13.9 km  1 stay (1 attached) · with 1
+2026-01-07  Wed  aboard Solvind NO                6.2 km  1 stay
+2026-01-08  Thu  59.9193,10.7522 near Home, 0.6 km NO    22.0 km  2 stays
+2026-01-09  Fri  Home                             0.9 km  3 stays
+2026-01-10  Sat  76.0000,-40.0000               2,626 km  3 stays
+2026-01-11  Sun  76.0000,-40.0000                 0.0 km  1 stay
+2026-01-12  Mon  Home                           2,625 km  2 stays
+2026-01-13  Tue  in transit                       0.0 km  1 stay

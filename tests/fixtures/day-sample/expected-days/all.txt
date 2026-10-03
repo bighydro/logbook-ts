@@ -1,0 +1,7 @@
+2026-04-05  Sun  Home                             0.0 km  1 stay
+2026-04-06  Mon  Home                             9.4 km  5 stays (12 attached) · with 3 · sleep 6.4 h · 370 steps · resting 57 bpm
+2026-04-07  Tue  60.3900,5.3200 near Berth, 0.8 km NO     373 km  XY 123 OSL→BGO, BGO→ENGM · 4 stays (6 attached) · with 1 · 500 steps
+2026-04-08  Wed  aboard Solvind NO               13.0 km  2 stays (2 attached) · with 1 · sleep 7.0 h
+2026-04-09  Thu  in transit                       311 km  1 stay
+2026-04-10  Fri  Home                             0.0 km  1 stay (1 attached)
+2026-04-11  Sat  in transit                       0.0 km  0 stays
