@@ -361,7 +361,7 @@ record built to have a case of every rule (`tests/fixtures/trips-sample`, sevent
     the nearest fix within the window. The demo record and both probes agree under either rule.
 
 
-## Found while implementing `rollup nights` (openlogbook main at 77b994c, 2026-10-03; docs/rollups.md "Countries, flights, nights", docs/day.md's home-region rule, ADR 0019)
+## Found while implementing `rollup nights` (openlogbook main at bf9ed76, 2026-10-03; docs/rollups.md "Countries, flights, nights", docs/day.md's home-region rule, ADR 0019)
 
 `rollup nights` was written from the one sentence docs/rollups.md gives it and matched to the reference by
 running it: on `tests/fixtures/nights-sample`, on the other fixtures, on the conformance sample, on
@@ -410,4 +410,10 @@ question below. None of this is written down:
     swipe at 00:30 counts for the day it was made on, not the day the bank files it under; and that the
     lines, and so the merchants, come in file order (`seq`), not clock order. What `spend` is on a day
     whose only transaction lines are superseded by a correction dated another day is not known; this
-    implementation prints `null`.
+    implementation prints `null`. (d) Since a4a9b0c (`sync weather`, RFC 0026, merged while this was
+    being written) the Day carries `weather` and every trip carries `weather`: `null` without a
+    `weather/v1` line, else the day's weather row or the trip's span summary (docs/day.md item 5,
+    the changelog). No fixture here has a weather line — the demo record has none, since `sync
+    weather` asks a third party — so only `null` is read and matched; a record with weather lines
+    would print a `weather` row in the reference and none here, and that reader is left for its own
+    task.

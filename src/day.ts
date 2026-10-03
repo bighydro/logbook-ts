@@ -237,6 +237,12 @@ export interface Day {
   health: DayHealth | null;
   /** null when no transaction line is on the day. */
   spend: DaySpend | null;
+  /**
+   * The day's weather row, from its `weather/v1` lines (RFC 0026), as the reference's Day has it
+   * since a4a9b0c; null when the day has none. Only null is read here: a record with weather lines
+   * is not matched yet (SPEC-QUESTIONS 69).
+   */
+  weather: null;
   sources: SourceCount[];
 }
 
@@ -407,6 +413,7 @@ export function readDay(root: string, options: DayOptions): Day {
     unplaced,
     health: health(entries.filter(standing), ctx),
     spend: spend(dayStanding),
+    weather: null,
     sources: sources(dayStanding),
   };
 }

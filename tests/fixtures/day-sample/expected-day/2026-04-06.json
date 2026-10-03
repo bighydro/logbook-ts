@@ -720,6 +720,7 @@
     ]
   },
   "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "sim-phone",

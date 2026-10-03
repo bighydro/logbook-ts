@@ -60,6 +60,12 @@ export interface Trip {
   flights_out: TripFlight[];
   flights: TripFlight[];
   lines: string[];
+  /**
+   * The weather of the trip's days, first to return day, as the reference summarises its `weather/v1`
+   * lines (RFC 0026) since a4a9b0c; null when the record has none. Only null is read here: a record
+   * with weather lines is not matched yet (SPEC-QUESTIONS 69).
+   */
+  weather: null;
 }
 
 /** What `trips --json` prints. */
@@ -196,6 +202,7 @@ function tripOf(run: DayReading[], after: DayReading | undefined, places: Place[
     flights_out: flightsOut,
     flights,
     lines,
+    weather: null,
   };
 }
 

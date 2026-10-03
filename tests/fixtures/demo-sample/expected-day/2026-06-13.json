@@ -487,6 +487,7 @@
     ]
   },
   "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "dawarich",
