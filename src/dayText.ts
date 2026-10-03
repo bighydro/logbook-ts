@@ -5,6 +5,7 @@ import {
   callText,
   type Day,
   type DayNight,
+  type DaySpend,
   type FlightEntry,
   type SegmentEntry,
   type TimelineEntry,
@@ -130,6 +131,7 @@ export function renderDay(day: Day): string {
 
   lines.push("");
   lines.push(header("health", healthText(day)));
+  if (day.spend !== null) lines.push(header("spend", spendText(day.spend)));
   lines.push(
     header(
       "sources",
@@ -196,6 +198,27 @@ function rowText(entry: SegmentEntry, inside: boolean): string {
 function flightText(f: FlightEntry): string {
   const head = `${f.carrier ?? "None"} ${f.number ?? "None"}  ${f.from ?? "None"} → ${f.to ?? "None"}`;
   return `${head} · ${f.evidence ?? "None"}`;
+}
+
+/** The spend line names this many merchants, then `+N` for the rest. */
+const MERCHANTS_SHOWN = 4;
+
+/** `CHF -94.50 · NOK 44,727.00 · 6 transactions · 1 deleted · Kafé Måken, Gasthaus zur Brücke +1`. */
+function spendText(spend: DaySpend): string {
+  const money = (n: number): string =>
+    n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const parts = Object.keys(spend.totals)
+    .sort()
+    .map((c) => `${c} ${money((spend.totals[c] as { net: number }).net)}`);
+  parts.push(plural(spend.count, "transaction"));
+  if (spend.deleted) parts.push(`${spend.deleted} deleted`);
+  if (spend.merchants.length) {
+    const rest = spend.merchants.length - MERCHANTS_SHOWN;
+    parts.push(
+      `${spend.merchants.slice(0, MERCHANTS_SHOWN).join(", ")}${rest > 0 ? ` +${rest}` : ""}`,
+    );
+  }
+  return parts.join(" · ");
 }
 
 /** `sleep 6.6 h · 8,115 steps · resting 53 bpm`; the heart-rate variability is in the JSON only. */
