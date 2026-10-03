@@ -8,6 +8,7 @@ import { readDay } from "../src/day.js";
 import { readDayRows, renderDayRows } from "../src/days.js";
 import { renderDay } from "../src/dayText.js";
 import { renderNights, rollupNights } from "../src/nights.js";
+import { readPeople, renderPeople } from "../src/people.js";
 import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
@@ -27,8 +28,8 @@ import {
 /**
  * The two implementations must print the same day. This test runs the reference implementation
  * (openlogbook, Python) on a copy of each fixture and diffs its `show`, `day`, `stats`, `sources --gaps`,
- * `trips`, `rollup countries`, `rollup nights` and `days` output against ours, and against the expected
- * files we vendor. It needs a clone of https://github.com/bighydro/logbook
+ * `trips`, `rollup countries`, `rollup nights`, `days` and `people` output against ours, and against the
+ * expected files we vendor. It needs a clone of https://github.com/bighydro/logbook
  * named by LOGBOOK_REF, with `uv` on the path (`uv run` installs the clone's own environment);
  * without LOGBOOK_REF it is skipped, so the default `pnpm test` never spawns anything.
  */
@@ -382,6 +383,25 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts read the sa
         const ours = readDayRows(root, expected.options);
         expect(renderDayRows(ours)).toBe(text);
         expect(ours.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(rows);
+      }
+    }, 300_000);
+  }
+});
+
+describe.skipIf(!ready)("the reference implementation and logbook-ts know the same people", () => {
+  for (const fixture of READER_FIXTURES) {
+    it(`agrees on every window of ${fixture}, as text and as JSON, and the vendored files are that output`, () => {
+      const copy = copyOf(fixture);
+      const root = join(FIXTURES, fixture);
+      for (const expected of expectedWindows(root, "people")) {
+        const flags = windowFlags(expected.name);
+        const text = reference(copy, ["people", ...flags]);
+        const json = JSON.parse(reference(copy, ["people", ...flags, "--json"])) as unknown;
+        expect(text).toBe(expected.text);
+        expect(json).toEqual(expected.json);
+        const ours = readPeople(root, expected.options);
+        expect(renderPeople(ours, expected.options)).toBe(text);
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
       }
     }, 300_000);
   }

@@ -483,3 +483,58 @@ every fixture and on `logbook demo --seed 1` (`tests/fixtures/demo-seed1`). None
     not clipped: the reference prints `no location … nothing logged` rows to the bound, and so does
     this implementation; one bound given leaves the other at the record's. A range that runs
     backwards is `days: range runs backwards: <from> > <to>`, exit 2, the reference's own message.
+
+## Found while implementing `people` (openlogbook main at 176e6a7, 2026-10-04; docs/people.md, RFC 0006)
+
+`people` was written from docs/people.md's two examples and matched to the reference by running it on every
+fixture and on `logbook demo --seed 1` (`tests/fixtures/demo-seed1`). None of this is written down:
+
+74. **The `people` report is not written down beyond docs/people.md's two examples.** The head is
+    `<n> people · <since> – <until>` with ` · tier <t>` when there is one (`0 people · 2026-03-01 –
+    2026-03-08` on the conformance sample, no tier; this implementation writes `people` for one as
+    well, which no fixture shows); a year with no days is `no people: the record has no days in
+    <year>`, with `{"window": null, "tier": null, "people": []}`. A row is two spaces, the name padded
+    to the longest name, two spaces, then parts joined by ` · `: the channels as `<channel> <lines>`
+    in the order messages, calls, mail, calendar, transcripts, faces — joined by ` · ` into one part
+    even when empty, so a person with days together and no channel reads `Ola Nordmann   · 1 day · …`
+    with a leading separator, as trips-sample shows — then `<n> day(s)` and `<n> night(s)` when more
+    than none, `last real contact <day> (<via>)` when there is one, and the places joined by `, `.
+    Under `--json`: `window` (`since`, `until`, no `days`), `tier`, `people`, each `id`, `name`,
+    `refs`, `tier`, `birthday`, `first_contact`, `last_contact`, `last_real_contact` (`day`, `via`,
+    `line`, or `null`), `channels` (present ones only, in the same order, each `lines`, `first`,
+    `last`, `tier`, `last_line`), `days`, `nights`, `places` (`where`, `days`) and `lines`. The order
+    is days together descending, then `last_contact` descending, then the name by code point.
+
+75. **The channels, where the prose leaves a choice.** The name is the label of the first standing
+    resolution line that mints the entity, as docs/people.md says (the Day takes the label of the
+    ref's own line); `refs` are every standing ref whose walk reaches the entity, in `seq` order,
+    which on the demo is email, phone, provider id. A channel's `last_line` is the line with the
+    latest `at`, the higher `seq` on a tie; its `first` and `last` are local days. The owner's
+    message in a direct chat goes to the one person who sent a message in that chat within the
+    window, else to the person the chat's `id` resolves to (`<digits>@s.whatsapp.net` as the phone
+    `+<digits>`, an address as an email, a `+` number as a phone); a chat given as a string names no
+    one. A calendar entry counts once per person however many times it lists them, and not when
+    another line names it under `supersedes` (any kind, which is the superseded set this
+    implementation keeps) or the attendee's `response` or `status` is `declined`. A transcript
+    participant with no ref the record resolves is matched by name: the whole label, case aside, when
+    exactly one person has it, else the first word when exactly one person's label begins with it;
+    `Speaker A`, `me`, `them` and `Unknown` are nobody. A real contact on one day is the meeting when
+    there was one, else the later of the last message and the last answered call that day; the
+    `line` of a meeting is the earliest confirming evidence line of the day (Marta Keller's is the
+    midday transcript, not the evening dinner), of a message or call that line itself. The window of
+    the whole record is the first to the last local day of a listed line (a retraction line is not
+    one), which this implementation already keeps for `show`.
+
+76. **A day together, a night and a place, read from the window reader.** The confirmed evidence of
+    a stay is read per unit — a stay; in a run aboard each inner stay with what fell in it and the
+    run with what fell in no inner stay — and dated by the evidence line's own local day; a person's
+    `lines` are the confirming lines only, so Ola Nordmann's tagged face of day-sample's 2026-04-08,
+    which the Day lists beside his note, is not among them. The night of a day is together when its
+    row is one the person was confirmed at by evidence dated that day, whichever unit of the row
+    held the evidence (Anders Vik, confirmed at the Marina inside the yacht's run, has the night at
+    anchor). The place of a unit is its stay's named place; else `aboard <asset id>` when the stay is
+    aboard or the unit is the run itself (the note at an unnamed anchorage inside Solvind's run reads
+    `aboard solvind`, the one at the Marina inside Nordlys's reads `Marina`); else the coordinates
+    with `near <place>, x km` or the nearest large airport's city — never the airport's own `CPH,
+    Copenhagen`, which a trip's route gives the same stay (trips-sample's airport hotel is
+    `55.6200,12.6500 (Copenhagen)` here). Places are ordered by days there, then by the label.

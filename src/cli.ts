@@ -4,6 +4,7 @@ import { readDay } from "./day.js";
 import { type DaysOptions, readDayRows, renderDayRow } from "./days.js";
 import { renderDay } from "./dayText.js";
 import { renderNights, rollupNights } from "./nights.js";
+import { readPeople, renderPeople } from "./people.js";
 import type { WindowOptions } from "./reading.js";
 import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
@@ -39,6 +40,12 @@ export const USAGE = `usage:
                                       and who was there, what was placed nowhere, the health line,
                                       the sources; today in the record's zone when no day is given;
                                       --json prints the Day as one object, every row with its lines
+  logbook-ts people <root> [--year YYYY] [--json]
+                                      everyone the record names, never the owner, as the reference's
+                                      \`logbook people\` prints it: the channels they are heard on,
+                                      the days and nights together (the confirmed set only), the
+                                      last real contact and the places shared; the whole record, or
+                                      one year; --json prints the report as one object
   logbook-ts days <root> [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]
                                       a window of days one line each, as the reference's \`logbook
                                       days\` prints it: the night after and the country, the
@@ -168,6 +175,16 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         }
         const read = readDay(root, { day: day ?? today(root) });
         io.stdout(json ? `${JSON.stringify(read)}\n` : renderDay(read));
+        return 0;
+      }
+      case "people": {
+        if (root === undefined) return usage(io);
+        const flags = parseWindowFlags(rest);
+        if (flags === undefined || flags.since !== undefined || flags.until !== undefined)
+          return usage(io);
+        const { json, ...window } = flags;
+        const people = readPeople(root, window);
+        io.stdout(json ? `${JSON.stringify(people)}\n` : renderPeople(people, window));
         return 0;
       }
       case "days": {
