@@ -1038,15 +1038,20 @@ export function ownerIdentity(
   return { ids, names };
 }
 
-interface Found {
+/** One piece of evidence that someone was at a stay: a calendar entry's attendee, a transcript's participant, a note's `with`, a tagged face. */
+export interface Evidence {
   person: string | null;
   name: string;
   source: string;
   reason: string;
   line: string;
+  /** The line the evidence is: the first entry of a folded calendar entry, the transcript, the note, the photo. */
+  entry: Entry;
   confirms: boolean;
   confidence: number;
 }
+
+type Found = Evidence;
 
 /** Someone evidence names: a person the record resolves, or a name alone (`id` null) when it does not. */
 interface Someone {
@@ -1139,6 +1144,11 @@ export interface RowEvidence {
  * face the library tagged. The owner is never their own company.
  */
 export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Company {
+  return mergeCompany(evidenceOf(stays, p, ctx));
+}
+
+/** The evidence of who was at the stay, one entry per person per line, in the order the rules find it. */
+export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Evidence[] {
   const found: Found[] = [];
   for (const event of p.events) {
     const first = event.entries[0] as Entry;
@@ -1150,6 +1160,7 @@ export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Comp
         source: "calendar",
         reason: `attendee of ${event.title}`,
         line: event.line,
+        entry: first,
         confirms: true,
         confidence: CONFIDENCE.calendar as number,
       });
@@ -1184,6 +1195,7 @@ export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Comp
         source: "transcript",
         reason: `spoke in ${title}`,
         line: t.line.id,
+        entry: t,
         confirms: true,
         confidence: CONFIDENCE.transcript as number,
       });
@@ -1197,6 +1209,7 @@ export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Comp
         source: "note",
         reason: `note says with ${who.name}`,
         line: n.line.id,
+        entry: n,
         confirms: true,
         confidence: CONFIDENCE.note as number,
       });
@@ -1221,12 +1234,18 @@ export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Comp
         source: "photo",
         reason: `face in ${name}`,
         line: photo.line.id,
+        entry: photo,
         confirms: false,
         confidence: CONFIDENCE.photo as number,
       });
     }
   }
 
+  return found;
+}
+
+/** The evidence merged per person (by entity id, else by name): confirmed when any line confirms, the surest first. */
+export function mergeCompany(found: Evidence[]): Company {
   const people = new Map<string, Person & { order: number; confirms: boolean }>();
   let order = 0;
   for (const f of found) {

@@ -1,0 +1,73 @@
+{
+  "window": {
+    "since": "2026-03-14",
+    "until": "2026-04-01"
+  },
+  "tier": 2,
+  "people": [
+    {
+      "id": "019c0000-0000-7000-8000-000000000001",
+      "name": "Ines Holm-Berg",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "ines@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-03-14",
+      "last_contact": "2026-03-14",
+      "last_real_contact": null,
+      "channels": {
+        "calendar": {
+          "lines": 1,
+          "first": "2026-03-14",
+          "last": "2026-03-14",
+          "tier": 1,
+          "last_line": "00000000-0000-4000-8000-000000000204"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    },
+    {
+      "id": "019c0000-0000-7000-8000-000000000002",
+      "name": "Ola Nordmann",
+      "refs": [
+        {
+          "kind": "phone",
+          "value": "+4790000001"
+        },
+        {
+          "kind": "handle",
+          "value": "236000000000001@lid"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-03-14",
+      "last_contact": "2026-03-14",
+      "last_real_contact": {
+        "day": "2026-03-14",
+        "via": "message",
+        "line": "00000000-0000-4000-8000-000000000206"
+      },
+      "channels": {
+        "messages": {
+          "lines": 1,
+          "first": "2026-03-14",
+          "last": "2026-03-14",
+          "tier": 2,
+          "last_line": "00000000-0000-4000-8000-000000000206"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    }
+  ]
+}

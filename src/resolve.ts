@@ -29,6 +29,11 @@ export interface Resolver {
   people(): Map<string, string>;
   /** The retraction that hides the line with this id, the highest `seq` winning (RFC 0003 rule 4). */
   retractedBy(id: string): Line | undefined;
+  /**
+   * Every ref whose walk reaches the entity, with the line standing for it, in `seq` order: the
+   * lines that mint the entity and the alias lines that lead to it.
+   */
+  refsOf(id: string): Array<{ ref: Ref; line: Line }>;
 }
 
 /** Reads a ref object out of a payload field; undefined unless it has string `kind` and `value`. */
@@ -104,6 +109,7 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
   };
 
   let known: Map<string, string> | undefined;
+  let byEntity: Map<string, Array<{ ref: Ref; line: Line }>> | undefined;
 
   return {
     name(ref) {
@@ -123,6 +129,22 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
     },
     retractedBy(id) {
       return retractions.get(id);
+    },
+    refsOf(id) {
+      if (byEntity === undefined) {
+        byEntity = new Map();
+        const lines = [...standing.values()].sort((a, b) => a.seq - b.seq);
+        for (const line of lines) {
+          const ref = asRef(line.payload.ref);
+          if (ref === undefined) continue;
+          const found = entity(ref);
+          if (found === undefined) continue;
+          const list = byEntity.get(found.id) ?? [];
+          list.push({ ref, line });
+          byEntity.set(found.id, list);
+        }
+      }
+      return byEntity.get(id) ?? [];
     },
   };
 }

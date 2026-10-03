@@ -63,6 +63,17 @@ export {
   rollupNights,
 } from "./nights.js";
 export {
+  CHANNELS,
+  type Channel,
+  type ChannelName,
+  type People,
+  type PeopleOptions,
+  type PersonReport,
+  type RealContact,
+  readPeople,
+  renderPeople,
+} from "./people.js";
+export {
   type DayReading,
   type FlightLine,
   type Night,

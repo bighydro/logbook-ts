@@ -2,10 +2,12 @@ import { airportCode, nearestAirport } from "./airports.js";
 import { addDays, checkTimezone, isDay, localOf, localToMs, monthKey } from "./clock.js";
 import {
   type Company,
-  company,
   type Entry,
+  type Evidence,
+  evidenceOf,
   type Folded,
   foldEvents,
+  mergeCompany,
   type OwnerIdentity,
   ownerIdentity,
   type PeopleContext,
@@ -62,6 +64,17 @@ export interface WindowRow {
    * merged here; the readers merge them by person.
    */
   people: Company;
+  /** The units the company was read in, with the evidence of each: the stay; in a run aboard, each inner stay and the run. */
+  units: RowUnit[];
+}
+
+/** A unit a row's company is read in, with every piece of evidence found there and the local day of each. */
+export interface RowUnit {
+  /** The stay, or the stays inside the run when `whole`. */
+  stays: Stay[];
+  /** True for the run aboard itself: what fell in no inner stay. */
+  whole: boolean;
+  evidence: Evidence[];
 }
 
 /** The night after a day: the row with the longest part inside the night window, and where in it. */
@@ -115,7 +128,12 @@ const YEAR = /^\d{4}$/;
  * and last day of the owner's track, and the window clipped to those days. The record's zone is
  * the clock.
  */
-export function openWindow(root: string, options: WindowOptions): Opened {
+/** What a default window covers: the days with a location line (the track), or the days with any line. */
+export interface OpenOptions {
+  coverage?: "track" | "lines";
+}
+
+export function openWindow(root: string, options: WindowOptions, open: OpenOptions = {}): Opened {
   const { year, since, until } = options;
   if (year !== undefined && (since !== undefined || until !== undefined))
     throw new LogbookError("give --year, or --since and --until, not both");
@@ -144,10 +162,11 @@ export function openWindow(root: string, options: WindowOptions): Opened {
   const owner = ownerIdentity(judgements.resolver, policy, ownerEmails, meta.owner_id);
 
   let window: Window | null = null;
-  const { firstLocation, lastLocation } = judgements;
-  if (firstLocation !== undefined && lastLocation !== undefined) {
-    const first = localOf(Date.parse(firstLocation), timezone).day;
-    const last = localOf(Date.parse(lastLocation), timezone).day;
+  const firstAt = open.coverage === "lines" ? judgements.first : judgements.firstLocation;
+  const lastAt = open.coverage === "lines" ? judgements.last : judgements.lastLocation;
+  if (firstAt !== undefined && lastAt !== undefined) {
+    const first = localOf(Date.parse(firstAt), timezone).day;
+    const last = localOf(Date.parse(lastAt), timezone).day;
     const from = since ?? (year === undefined ? first : `${year}-01-01`);
     const to = until ?? (year === undefined ? last : `${year}-12-31`);
     const start = from > first ? from : first;
@@ -383,28 +402,31 @@ class Machine {
     const attached = this.evidence.filter((e) => within(e, startMs, endMs));
     // The units the company is merged in: the stay; in a run aboard, each inner stay with what falls
     // in it, and the run with what falls in no inner stay (a note written under way).
-    const units: Array<{ stays: Stay[]; evidence: Entry[] }> =
+    const units: Array<{ stays: Stay[]; whole: boolean; evidence: Entry[] }> =
       segments.length === 1
-        ? [{ stays, evidence: attached }]
+        ? [{ stays, whole: false, evidence: attached }]
         : [
             ...stays.map((stay) => ({
               stays: [stay],
+              whole: false,
               evidence: attached.filter((e) => within(e, stay.startMs, stay.endMs)),
             })),
             {
               stays,
+              whole: true,
               evidence: attached.filter(
                 (e) => !stays.some((stay) => within(e, stay.startMs, stay.endMs)),
               ),
             },
           ];
     const people: Company = { confirmed: [], proposed: [] };
+    const read: RowUnit[] = [];
     for (const unit of units) {
       const timed = unit.evidence.filter(
         (e) => e.line.kind === "event" && payloadOf(e.line).all_day !== true,
       );
       const events: Folded[] = foldEvents(timed);
-      const found = company(
+      const evidence = evidenceOf(
         unit.stays,
         {
           events,
@@ -414,8 +436,10 @@ class Machine {
         },
         this.ctx,
       );
+      const found = mergeCompany(evidence);
       people.confirmed.push(...found.confirmed);
       people.proposed.push(...found.proposed);
+      read.push({ stays: unit.stays, whole: unit.whole, evidence });
     }
     return {
       kind: segments.length > 1 ? "aboard" : "stay",
@@ -426,6 +450,7 @@ class Machine {
       first: first.kind === "move" ? first.first : first.first,
       last: last.kind === "move" ? last.last : last.last,
       people,
+      units: read,
     };
   }
 

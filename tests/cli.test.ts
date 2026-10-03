@@ -284,6 +284,40 @@ describe("logbook-ts days", () => {
   });
 });
 
+describe("logbook-ts people", () => {
+  const root = join(FIXTURES, "demo-seed-1");
+  const expected = (name: string) => expectedWindows(root, "people").find((w) => w.name === name);
+
+  it("prints the people as the reference does, and the same report as JSON", () => {
+    const text = run(["people", root]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(expected("all")?.text);
+    const json = run(["people", root, "--year=2026", "--json"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(expected("2026")?.json);
+  });
+
+  it("says so when the year has no days, and exits 0", () => {
+    const { code, out } = run(["people", root, "--year", "2025"]);
+    expect(code).toBe(0);
+    expect(out).toBe("no people: the record has no days in 2025\n");
+  });
+
+  it("prints usage and exits 2 on a range, a bad year, a flag it does not know, or no root", () => {
+    for (const argv of [
+      ["people", root, "--since", "2026-06-01", "--until", "2026-06-30"],
+      ["people", root, "--year", "26"],
+      ["people", root, "--merge"],
+      ["people"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toMatch(/^usage:/);
+    }
+  });
+});
+
 describe("logbook-ts usage", () => {
   it("prints usage and exits 2 without a command, with an unknown command, or with missing args", () => {
     for (const argv of [[], ["frobnicate"], ["verify"], ["add"], ["add", SAMPLE]]) {
