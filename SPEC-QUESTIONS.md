@@ -326,8 +326,10 @@ record built to have a case of every rule (`tests/fixtures/trips-sample`, sevent
     Worth a paragraph in docs/rollups.md, since a third implementation would read the Day's rule and
     get the lines wrong.
 
-64. **The window.** Clipped to the first and last local day of the owner's own location lines (an
-    asset's do not count), whatever `--since`/`--until` ask beyond them; `--year` with a bound is
+64. **The window.** Clipped to the first and last local day with a location line — an asset's AIS fix
+    counts, as the conformance sample shows (its last day holds only the yacht's fix, and the window runs
+    to it), a note does not; this entry first said an asset's did not, and a probe put that right on
+    2026-10-03 — whatever `--since`/`--until` ask beyond them; `--year` with a bound is
     refused (`give --year, or --since and --until, not both`, exit 2); a window with no days prints
     `no trips: the record has no days` with `{"window": null, "trips": []}`, and for the rollup
     `countries` / `nothing in the window` with `{"since": null, "until": null, "days": []}` and no
@@ -358,3 +360,54 @@ record built to have a case of every rule (`tests/fixtures/trips-sample`, sevent
     between the two fixes around each when they are at most twice `aboard_window_s` apart, else from
     the nearest fix within the window. The demo record and both probes agree under either rule.
 
+
+## Found while implementing `rollup nights` (openlogbook main at 77b994c, 2026-10-03; docs/rollups.md "Countries, flights, nights", docs/day.md's home-region rule, ADR 0019)
+
+`rollup nights` was written from the one sentence docs/rollups.md gives it and matched to the reference by
+running it: on `tests/fixtures/nights-sample`, on the other fixtures, on the conformance sample, on
+`logbook demo --seed 1` (committed as `tests/fixtures/demo-seed1`) and on probe records built for each
+question below. None of this is written down:
+
+67. **What the longest trip is.** ADR 0019 says the rollup's longest trip "derives from the same `trips`
+    function, so they agree", and docs/rollups.md calls it "the longest run of nights not at home". The
+    second is what the output shows, and the two differ: the longest trip counts a run made of nights in
+    transit alone, which `trips` says is no trip (question 58) — the conformance sample, whose eight nights
+    are all in transit, has no trips and a longest trip of eight nights with no lines; a record whose last
+    day's tracker fell silent before the night has a longest trip of that one night when every other night
+    was at home. A run is clipped to the calendar year, so a trip over New Year is two longest trips, one
+    per year (`2025-12-30 – 2025-12-31 (2 nights)` and `2026-01-01 – 2026-01-04 (4 nights)` for one run
+    of six), and a run the window cuts starts on the window's first day. Of two runs as long the earlier
+    is named; a year whose every night is at home has no longest trip (`longest_trip: null`, nothing in
+    the text). This implementation does the same, and `trips` and `rollup nights` therefore disagree on
+    purpose about a run of nights in transit, as the reference's do.
+
+68. **The counts, the text and the lines.** A night is home by `trips`' rule (a place of kind `home`
+    holding the stay, or within 400 m of its centre, question 66), in transit when no stay reaches the
+    night window, else away; without a place of kind `home` every night with a stay is away and the
+    nights in transit still count apart, under the warning `(no place of kind home in places.json: every
+    night counts as away)` printed on its own line between the heading and the years, carried as
+    `warning` and left out of an empty window. The text is `  <year>  N home · N away · N in transit`,
+    every one of the three printed, then `N night(s) aboard <asset id>` for each asset with a night,
+    by id (not by name, not by nights: `1 night aboard alpha · 2 nights aboard zeta`), then `longest
+    trip <start> – <end> (N night(s))`; an empty window is `nights` over `  nothing in the window` with
+    `{"since": null, "until": null, "days": []}` and `years: []`. Under `--json` a year's `lines` are the
+    first and last point of each night's stay (a run aboard counted as one stay) in day order, a stay
+    repeated for every night spent there and nothing for a night in transit — not de-duplicated as a
+    trip's `lines` are — and `longest_trip.lines` are those of its nights. `aboard` is keyed by asset id.
+
+69. **Three things found beside it.** (a) `trips` orders the nights aboard several assets by asset id in
+    the text and the JSON alike (`(1 aboard Alpha, 2 aboard Zeta)`, `{"alpha": 1, "zeta": 2}`), not by the
+    order boarded; this implementation did the latter until 2026-10-03. (b) Since b2009f5 (`logbook
+    trip`) every `trips` row ends with the trip's id; the JSON is unchanged. (c) Since 03a8c98 (`logbook
+    ledger`) the Day carries `spend` — `null` with no `transaction/v1` line on the day, else `count`,
+    `deleted`, `totals` per currency (`spent`, `received`, `net`), `merchants` and `lines` — and the text
+    a `spend` line after `health`: the currencies by code with the net to two decimals and a thousands
+    separator, `N transaction(s)`, `N deleted` when any, the first four merchants and `+N` for the rest.
+    docs/ledger.md says a retracted line is out and a correction stands in its place, which holds; what
+    it does not say is that a line the source marks deleted (`extra.deleted`) is listed under `lines`
+    and counted under `deleted` but never under `count`, `totals` or `merchants`; that `status`
+    (`pending`) does not matter; that the day is the local day of `at`, not the line's `date`, so a card
+    swipe at 00:30 counts for the day it was made on, not the day the bank files it under; and that the
+    lines, and so the merchants, come in file order (`seq`), not clock order. What `spend` is on a day
+    whose only transaction lines are superseded by a correction dated another day is not known; this
+    implementation prints `null`.

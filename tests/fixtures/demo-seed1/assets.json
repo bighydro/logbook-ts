@@ -1,0 +1,11 @@
+{
+  "assets": [
+    {
+      "id": "nordlys",
+      "kind": "yacht",
+      "name": "Nordlys",
+      "mmsi": "970123456",
+      "registration": "ZZ-NLY"
+    }
+  ]
+}
