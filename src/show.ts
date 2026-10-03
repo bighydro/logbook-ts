@@ -302,7 +302,7 @@ export interface Judgements {
   /** The first and last instant a listed line has, as written. */
   first: string | undefined;
   last: string | undefined;
-  /** The first and last instant of the owner's own location lines: the days the track covers. */
+  /** The first and last instant of the location lines, an asset's included: the days the track covers. */
   firstLocation: string | undefined;
   lastLocation: string | undefined;
 }
@@ -336,7 +336,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
       if (Number.isNaN(ms)) continue;
       if (first === undefined || ms < first.ms) first = { at: line.at, ms };
       if (last === undefined || ms > last.ms) last = { at: line.at, ms };
-      if (line.kind === "location" && (payloadOf(line).subject ?? null) === null) {
+      if (line.kind === "location") {
         if (firstLocation === undefined || ms < firstLocation.ms)
           firstLocation = { at: line.at, ms };
         if (lastLocation === undefined || ms > lastLocation.ms) lastLocation = { at: line.at, ms };

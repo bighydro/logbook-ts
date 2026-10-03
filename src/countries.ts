@@ -36,7 +36,8 @@ export const COUNTRIES_METHOD =
  * Days per country per year from the overnight stay, as the reference's `logbook rollup countries`
  * sums them: the country of a night is its place's own `country`, else the zone of the nearest large
  * airport within 300 km; nights in transit and nights whose country is unknown are kept apart. The
- * window is clipped to the days the owner's track covers. Nothing is written.
+ * window is clipped to the days the track covers (the first to the last location line, an asset's
+ * included). Nothing is written.
  */
 export function rollupCountries(
   root: string,
