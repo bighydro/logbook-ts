@@ -324,7 +324,8 @@ at a camp no airport is near), on the two day fixtures, and on the whole demo re
 `tests/fixtures/*/expected-trips/` and `expected-countries/` are the reference's output for the whole
 record, a year and a range, captured by `tests/fixtures/capture-expected-trips.mjs` and never edited by
 hand; `expected-nights/` beside every fixture, the conformance sample and the seed-1 demo record among
-them, the same for the nights, captured by `capture-expected-readers.mjs`. Every choice the prose left
+them, the same for the nights, and `expected-countries/` beside those two as well, captured by
+`capture-expected-readers.mjs`. Every choice the prose left
 open is in SPEC-QUESTIONS.md 55–64 and 71.
 
 ```bash

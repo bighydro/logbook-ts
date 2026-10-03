@@ -380,3 +380,28 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts count the s
     }, 300_000);
   }
 });
+
+describe.skipIf(!ready)(
+  "the reference implementation and logbook-ts count the same countries on the conformance sample and the seed-1 demo",
+  () => {
+    // trips-sample, day-sample and demo-sample are covered with the trips above; these four are the rest.
+    for (const fixture of ["sample-logbook", "demo-seed-1", "show-sample", "profiles-sample"]) {
+      it(`agrees on every window of ${fixture}, as text and as JSON, and the vendored files are that output`, () => {
+        const copy = copyOf(fixture);
+        const root = join(FIXTURES, fixture);
+        for (const expected of expectedWindows(root, "countries")) {
+          const flags = windowFlags(expected.name);
+          const text = reference(copy, ["rollup", "countries", ...flags]);
+          const json = JSON.parse(
+            reference(copy, ["rollup", "countries", ...flags, "--json"]),
+          ) as unknown;
+          expect(text).toBe(expected.text);
+          expect(json).toEqual(expected.json);
+          const ours = rollupCountries(root, expected.options);
+          expect(renderCountries(ours)).toBe(text);
+          expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
+        }
+      }, 300_000);
+    }
+  },
+);
