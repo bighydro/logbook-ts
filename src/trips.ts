@@ -115,11 +115,14 @@ function tripOf(run: DayReading[], after: DayReading | undefined, places: Place[
   const until = addDays(last.day, 1);
   const nights = run.length;
   const inTransit = run.filter((d) => d.night === undefined).length;
-  const aboard: Record<string, number> = {};
+  // The nights aboard, by asset id, as the reference orders them in the text and the JSON alike.
+  const counted = new Map<string, number>();
   for (const d of run) {
     const asset = d.night?.row.asset;
-    if (asset !== undefined) aboard[asset.id] = (aboard[asset.id] ?? 0) + 1;
+    if (asset !== undefined) counted.set(asset.id, (counted.get(asset.id) ?? 0) + 1);
   }
+  const aboard: Record<string, number> = {};
+  for (const id of [...counted.keys()].sort()) aboard[id] = counted.get(id) as number;
   const assets = Object.keys(aboard);
   const asset =
     assets.length === 1 && (aboard[assets[0] as string] as number) + inTransit === nights

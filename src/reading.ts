@@ -28,7 +28,7 @@ import { markSegmentAboard, type Point, type Segment, SegmentStream, type Stay }
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
 import type { Line } from "./types.js";
 
-/** A window of local days: one calendar year, a range, or the whole record; clipped to the days the track covers. */
+/** A window of local days: one calendar year, a range, or the whole record; clipped to the days with a location line. */
 export interface WindowOptions {
   year?: string;
   since?: string;
@@ -112,8 +112,8 @@ const YEAR = /^\d{4}$/;
 /**
  * Opens a record for a reader over a window: the options checked, the settings read, one pass over
  * every file for the judgements (who a ref is, what is hidden, what was replaced) and for the first
- * and last day of the owner's track, and the window clipped to those days. The record's zone is
- * the clock.
+ * and last day with a location line (an asset's counts), and the window clipped to those days. The
+ * record's zone is the clock.
  */
 export function openWindow(root: string, options: WindowOptions): Opened {
   const { year, since, until } = options;
