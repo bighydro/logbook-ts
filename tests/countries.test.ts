@@ -8,7 +8,14 @@ afterEach(cleanup);
 const TRIPS_SAMPLE = join(FIXTURES, "trips-sample");
 
 describe("rollup countries, as the reference prints it", () => {
-  for (const name of ["trips-sample", "day-sample", "demo-sample"]) {
+  for (const name of [
+    "trips-sample",
+    "nights-sample",
+    "day-sample",
+    "demo-sample",
+    "sample-logbook",
+    "demo-seed1",
+  ]) {
     const root = join(FIXTURES, name);
     for (const expected of expectedWindows(root, "countries")) {
       it(`prints ${name} (${expected.name}) as the reference does, as text and as JSON`, () => {

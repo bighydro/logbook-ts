@@ -6,10 +6,10 @@ The Logbook spec says it should be small enough to implement in an afternoon, an
 implementations must agree before v1.0 is frozen. This is the second one. It was written from
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
-and `day` print a day, and its `trips` and `rollup countries` sum a window up, exactly as the reference
-implementation (openlogbook, main at 996642f, 2026-10-02; `trips` and `rollup countries` at 36a7d62) does,
-matched against the reference's output on synthetic records and on its own demo record, never its
-source, and checked by a cross-implementation test.
+and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
+the reference implementation (openlogbook, main at 77b994c, 2026-10-03) does, matched against the
+reference's output on synthetic records, on the conformance sample and on its own demo record, never
+its source, and checked by a cross-implementation test.
 
 Zero runtime dependencies. RFC 8785 canonical JSON, SHA-256 chaining and UUIDv7 are implemented by hand on
 Node's built-ins.
@@ -89,6 +89,7 @@ SPEC §6, the conformance rule, and four readers.
 | `logbook-ts sources <root> --gaps [--since YYYY-MM-DD] [--expect <source>…] [--json]` | Where each source went quiet, as the reference prints it: per source with lines, its last line, the longest silence and the days with no line folded into runs, from its first line (or `--since`) to today. `--expect` lists only those sources, marks one silent a day or more, or with no line, with `!`, and exits 1. See below. |
 | `logbook-ts trips <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | The trips of the window, as the reference's `logbook trips` prints them: every run of nights away from home or in transit, with its nights (aboard an asset when they were), its route, the flights in and out, the named places and who was there. The whole record when no window is given, clipped to the days the track covers. Only reads. See below. |
 | `logbook-ts rollup countries <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | Days per country per year from the overnight stay, in transit and unknown apart, with the method. Only reads. See below. |
+| `logbook-ts rollup nights <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | Per year: the nights at home, away and in transit, the nights aboard each asset, and the longest run of nights not at home. Only reads. See below. |
 
 The hash is SPEC §3 to the letter:
 
@@ -265,7 +266,7 @@ node dist/bin.js day tests/fixtures/day-sample 2026-04-06          # a stop, a g
 node dist/bin.js day tests/fixtures/day-sample 2026-04-08 --json | jq '.timeline[] | select(.kind == "aboard") | .inside[].where'
 ```
 
-## Trips and countries
+## Trips, countries and nights
 
 `trips` is the reader ADR 0019 and the README of the spec repo describe ("Trips are derived, never
 written"), written from that prose, [docs/rollups.md](https://github.com/bighydro/logbook/blob/main/docs/rollups.md)
@@ -296,9 +297,20 @@ airport within 300 km is filed under in zone.tab, coarse near borders and far fr
 method line says. Nights in transit and nights no airport is near are counted apart. Under `--json` each
 country has its `days`, `dates`, `lines` and `by` (`place` or `airport`).
 
-The **window** of both is the whole record, `--year YYYY`, or `--since` and `--until` (not both), clipped
-to the first and last day the owner's track covers, in the record's zone; a window with no days says so.
-Both read the window in one pass over the month files it can touch: a file's lines in the window are taken
+`rollup nights` counts the nights of each year of the window: **home** when the night's stay lies in a
+place of kind `home` or within 400 m of one (docs/day.md's home-region rule, whatever that place's
+radius), **in transit** when no stay reaches the night window, else **away**; the nights **aboard** each
+asset, by id; and the **longest trip**, the longest run of consecutive nights not at home — nights in
+transit counted in, so a run the tracker slept through is one, unlike for `trips` — clipped to the year,
+the earlier of two as long, left out when every night was at home. Without a place of kind `home` every
+night with a stay is away, and the rollup says so under the heading. Under `--json` each year carries
+`home`, `away`, `in_transit`, `aboard`, `lines` (the first and last point of each night's stay, in day
+order, a stay repeated for every night spent there) and `longest_trip` (`start`, `end`, `nights`, `lines`,
+or `null`).
+
+The **window** of the three is the whole record, `--year YYYY`, or `--since` and `--until` (not both),
+clipped to the first and last local day with a location line — an asset's AIS fix counts, a note does not —
+in the record's zone; a window with no days says so. All three read the window in one pass over the month files it can touch: a file's lines in the window are taken
 in time order and fed to the stays engine, which derives segment by segment as the points arrive, so what is
 held is one month's lines, the open stay, and the rows and evidence of the days still open — the memory
 does not grow with the record (`tests/reading.test.ts` checks the high-water mark of an eight-month record
@@ -309,21 +321,28 @@ the turn of the year with a case of every rule: a trip across the year boundary 
 middle and out, two nights in one hotel as two stays and two more as one, a night at an airport hotel, a
 calendar entry of thirteen guests, a confirmed person's photos and a face tagged the day after, a trip aboard a yacht with a night at each of two anchorages and a last
 night at a flat 600 m from home, a night the tracker slept through, a night 300 m from home, two nights
-at a camp no airport is near), on the two day fixtures, and on the whole demo record of the reference;
-`tests/fixtures/*/expected-trips/` and `expected-countries/` are the reference's output for the whole
-record, a year and a range, captured by `tests/fixtures/capture-expected-trips.mjs` and never edited by
-hand. Every choice the prose left open is in SPEC-QUESTIONS.md 55–64.
+at a camp no airport is near), on `tests/fixtures/nights-sample` (eleven days with the cases the nights
+rollup adds: a year with every night at home, nights aboard two yachts, two runs away of three nights
+each), on the two day fixtures, on the conformance sample (no home place, every night in transit), on
+`tests/fixtures/demo-seed1` — the reference's own `logbook demo --seed 1 --out`, a month of a person
+who does not exist, 12,772 lines, committed whole so the diff covers a record of the reference's own
+making — and on the seed-7 demo record the test writes into a temp folder; `tests/fixtures/*/expected-trips/`,
+`expected-countries/` and `expected-nights/` are the reference's output for the whole record, a year
+and a range, captured by `tests/fixtures/capture-expected-trips.mjs` and never edited by hand. Every
+choice the prose left open is in SPEC-QUESTIONS.md 58–69.
 
 ```bash
 node dist/bin.js trips tests/fixtures/trips-sample                       # three trips, one across the year boundary
 node dist/bin.js trips tests/fixtures/trips-sample --year 2026 --json | jq '.trips[].route'
 node dist/bin.js rollup countries tests/fixtures/trips-sample            # DE and NO in 2025; NO, DK, in transit and unknown in 2026
+node dist/bin.js rollup nights tests/fixtures/nights-sample              # a year at home; two yachts and a tie in the next
+node dist/bin.js rollup nights tests/fixtures/demo-seed1 --json | jq '.years[0].longest_trip'
 ```
 
 ## As a library
 
 ```ts
-import { addNote, buildResolver, canonicalize, hashLine, readDay, readTrips, renderDay, renderTrips, rollupCountries, showDay, showDays, verifyLogbook } from "logbook-ts";
+import { addNote, buildResolver, canonicalize, hashLine, readDay, readTrips, renderDay, renderNights, renderTrips, rollupCountries, rollupNights, showDay, showDays, verifyLogbook } from "logbook-ts";
 ## What the record holds
 
 `stats` and `sources --gaps` are the reference's two counting readers, printed here as it prints them:
@@ -420,6 +439,7 @@ statsText(stats); gapsText(gaps); // the screens
 const trips = readTrips("/path/to/root", { year: "2026" }); // { window, trips, warning? }, as `trips --json` prints it
 trips.trips[0]?.route; // ["aboard Nordlys", "59.9193,10.7522 near Home, 0.6 km"]
 rollupCountries("/path/to/root", {}).years[0]?.countries; // [{ country: "NO", days: 25, dates, lines, by }, …]
+rollupNights("/path/to/root", { year: "2026" }).years[0]; // { year, home, away, in_transit, aboard, lines, longest_trip }
 buildResolver(lines).name({ kind: "email", value: "ines@example.org" }); // "Ines Holm-Berg" or undefined
 canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
 ```
@@ -436,7 +456,7 @@ pnpm check         # all four
 pre-commit install # lint, format, gitleaks, no commits to main
 ```
 
-To diff `show`, `day`, `stats`, `sources --gaps`, `trips` and `rollup countries` against the reference
+To diff `show`, `day`, `stats`, `sources --gaps`, `trips`, `rollup countries` and `rollup nights` against the reference
 implementation, clone it and point the test at the clone; `uv run` installs the clone's own environment,
 and the test writes the reference's demo record into a temp folder to read and count it with both:
 
@@ -447,14 +467,16 @@ LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
 
 `tests/fixtures/capture-expected-show.mjs`, `capture-expected-day.mjs` and `capture-expected-trips.mjs`
 re-capture a fixture's expected output from the reference; `tests/fixtures/demo-sample/make.mjs` rebuilds the demo excerpt from the
-reference's `logbook demo`; `scripts/make-tables.mjs` regenerates `src/tables.ts` from its data tables.
-All take `LOGBOOK_REF`.
+reference's `logbook demo`; `tests/fixtures/demo-seed1` is `logbook demo --seed 1 --out` as the reference
+wrote it, without its `index.sqlite`; `scripts/make-tables.mjs` regenerates `src/tables.ts` from its data
+tables. All take `LOGBOOK_REF`.
 
 CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
 tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture
 is still the one on the spec repo's main and that `verify` prints the head published there; and a
-fourth runs the cross-implementation diff against the reference at main, on the fixtures and on the
-reference's demo record.
+fourth runs the cross-implementation diff against the reference at main, on the fixtures, on the
+conformance sample and on the reference's demo record, so a divergence in `trips`, `rollup countries` or
+`rollup nights` fails the build.
 
 Rules for anyone (or any agent) changing this repo are in [CLAUDE.md](./CLAUDE.md). Nothing in the
 fixtures is real; the sample person lives in Oslo and does not exist.

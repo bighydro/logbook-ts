@@ -1,0 +1,102 @@
+{
+  "kind": "countries",
+  "window": {
+    "since": "2026-06-08",
+    "until": "2026-06-20",
+    "days": [
+      "2026-06-08",
+      "2026-06-09",
+      "2026-06-10",
+      "2026-06-11",
+      "2026-06-12",
+      "2026-06-13",
+      "2026-06-14",
+      "2026-06-15",
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20"
+    ]
+  },
+  "method": "country of the overnight stay: a place with a country in places.json when the stay lies in it, else the nearest large airport within 300 km (airports table) and its zone's country (zone.tab); coarse near borders and far from airports",
+  "years": [
+    {
+      "year": "2026",
+      "countries": [
+        {
+          "country": "NO",
+          "days": 10,
+          "dates": [
+            "2026-06-11",
+            "2026-06-12",
+            "2026-06-13",
+            "2026-06-14",
+            "2026-06-15",
+            "2026-06-16",
+            "2026-06-17",
+            "2026-06-18",
+            "2026-06-19",
+            "2026-06-20"
+          ],
+          "lines": [
+            "019eb7f2-c040-72b2-9157-d447a5c87390",
+            "019eba4a-6be0-74af-a247-b0e405132caf",
+            "019ebc8b-3420-7ecb-bf05-e336daca1935",
+            "019ebfde-a4e0-7727-9bb8-cf429353d21e",
+            "019ec11f-1420-7ee4-b0ce-2121e0a8a29f",
+            "019ec520-7820-742c-b8d7-fbf3fb2e0b5f",
+            "019ec592-e900-7467-884b-d4fb40b0c491",
+            "019ec9f4-6e60-7b1d-9efe-12dde7526c28",
+            "019eca06-bde0-73f3-ae83-d982ee3d9785",
+            "019ed9f0-d6a0-7e2e-b303-f6a6f9541f71",
+            "019eca06-bde0-73f3-ae83-d982ee3d9785",
+            "019ed9f0-d6a0-7e2e-b303-f6a6f9541f71",
+            "019eca06-bde0-73f3-ae83-d982ee3d9785",
+            "019ed9f0-d6a0-7e2e-b303-f6a6f9541f71",
+            "019eda75-9700-7561-bb17-5c1a71418f6b",
+            "019ee8c3-b300-77ae-828f-fc88f46fcf1e",
+            "019eda75-9700-7561-bb17-5c1a71418f6b",
+            "019ee8c3-b300-77ae-828f-fc88f46fcf1e",
+            "019eda75-9700-7561-bb17-5c1a71418f6b",
+            "019ee8c3-b300-77ae-828f-fc88f46fcf1e"
+          ],
+          "by": {
+            "place": 4,
+            "airport": 6
+          }
+        },
+        {
+          "country": "CH",
+          "days": 3,
+          "dates": [
+            "2026-06-08",
+            "2026-06-09",
+            "2026-06-10"
+          ],
+          "lines": [
+            "019ea65a-5b40-7fbd-8950-48715b6eebcb",
+            "019eab0e-4660-7f64-8834-e448a07a0733",
+            "019eacf8-1500-7f6f-8029-bf563bf5443f",
+            "019eb050-19a0-7c77-a47e-6ae0158816a0",
+            "019eb255-5f80-7a2c-9b74-4ef5a09807e8",
+            "019eb6c0-0ca0-7cc1-817b-5e0621b4115e"
+          ],
+          "by": {
+            "airport": 3
+          }
+        }
+      ],
+      "in_transit": {
+        "days": 0,
+        "dates": [],
+        "lines": []
+      },
+      "unknown": {
+        "days": 0,
+        "dates": [],
+        "lines": []
+      }
+    }
+  ]
+}

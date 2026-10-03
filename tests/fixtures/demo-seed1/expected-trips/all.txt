@@ -1,0 +1,5 @@
+trips 2026-06-01 – 2026-06-30: 4 trips
+  2026-06-06 – 2026-06-06  1 night · route Cabin · places Cabin · with Ola Nordmann · trip:2026-06-06:2026-06-06
+  2026-06-08 – 2026-06-10  3 nights · route 47.3769,8.5417 (Zurich) · in XY 561 OSL → ZRH · out XY 562 ZRH → OSL · with Marta Keller, Jonas Weber · trip:2026-06-08:2026-06-10
+  2026-06-15 – 2026-06-20  6 nights aboard Nordlys · route aboard Nordlys · places Marina · with Anders Vik, Ola Nordmann · trip:2026-06-15:2026-06-20
+  2026-06-25 – 2026-06-26  2 nights · route 55.6850,12.5500 (Copenhagen) · in XY 571 OSL → CPH · out XY 572 CPH → OSL · places Office · with Freja Lund, Liv Berg, Per Hansen · trip:2026-06-25:2026-06-26

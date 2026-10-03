@@ -6,6 +6,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
 import { renderDay } from "../src/dayText.js";
+import { renderNights, rollupNights } from "../src/nights.js";
 import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
@@ -24,7 +25,8 @@ import {
 /**
  * The two implementations must print the same day. This test runs the reference implementation
  * (openlogbook, Python) on a copy of each fixture and diffs its `show`, `day`, `stats`, `sources --gaps`,
- * `trips` and `rollup countries` output against ours, and against the expected files we vendor. It needs a clone of https://github.com/bighydro/logbook
+ * `trips`, `rollup countries` and `rollup nights` output against ours, and against the expected files we
+ * vendor. It needs a clone of https://github.com/bighydro/logbook
  * named by LOGBOOK_REF, with `uv` on the path (`uv run` installs the clone's own environment);
  * without LOGBOOK_REF it is skipped, so the default `pnpm test` never spawns anything.
  */
@@ -234,10 +236,19 @@ function windowFlags(name: string): string[] {
 }
 
 describe.skipIf(!ready)(
-  "the reference implementation and logbook-ts derive the same trips and countries",
+  "the reference implementation and logbook-ts derive the same trips, countries and nights",
   () => {
-    // trips-sample has a case of every rule; the other two are the day fixtures, read over their days.
-    for (const fixture of ["trips-sample", "day-sample", "demo-sample"]) {
+    // trips-sample and nights-sample have a case of every rule; day-sample and demo-sample are the day
+    // fixtures, read over their days; sample-logbook is the conformance sample (no home place, every
+    // night in transit); demo-seed1 is the reference's own `logbook demo --seed 1`, a month whole.
+    for (const fixture of [
+      "trips-sample",
+      "nights-sample",
+      "day-sample",
+      "demo-sample",
+      "sample-logbook",
+      "demo-seed1",
+    ]) {
       it(`agrees on every window of ${fixture}, as text and as JSON, and the vendored files are that output`, () => {
         const copy = copyOf(fixture);
         const root = join(FIXTURES, fixture);
@@ -264,10 +275,22 @@ describe.skipIf(!ready)(
           expect(renderCountries(ours)).toBe(text);
           expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
         }
-      }, 300_000);
+        for (const expected of expectedWindows(root, "nights")) {
+          const flags = windowFlags(expected.name);
+          const text = reference(copy, ["rollup", "nights", ...flags]);
+          const json = JSON.parse(
+            reference(copy, ["rollup", "nights", ...flags, "--json"]),
+          ) as unknown;
+          expect(text).toBe(expected.text);
+          expect(json).toEqual(expected.json);
+          const ours = rollupNights(root, expected.options);
+          expect(renderNights(ours)).toBe(text);
+          expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
+        }
+      }, 600_000);
     }
 
-    it("agrees on the demo record (`logbook demo --days 30 --seed 7`): four trips, three countries, as text and as JSON", () => {
+    it("agrees on the demo record (`logbook demo --days 30 --seed 7`): four trips, three countries, eighteen nights at home, as text and as JSON", () => {
       const demo = join(tempDir(), "demo");
       reference(REF as string, ["demo", "--days", "30", "--seed", "7", "--out", demo]);
       for (const flags of [
@@ -291,6 +314,11 @@ describe.skipIf(!ready)(
         expect(renderCountries(countries)).toBe(reference(demo, ["rollup", "countries", ...flags]));
         expect(JSON.parse(JSON.stringify(countries))).toEqual(
           JSON.parse(reference(demo, ["rollup", "countries", ...flags, "--json"])),
+        );
+        const nights = rollupNights(demo, options);
+        expect(renderNights(nights)).toBe(reference(demo, ["rollup", "nights", ...flags]));
+        expect(JSON.parse(JSON.stringify(nights))).toEqual(
+          JSON.parse(reference(demo, ["rollup", "nights", ...flags, "--json"])),
         );
       }
     }, 300_000);
