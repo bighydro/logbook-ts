@@ -153,7 +153,7 @@ export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
   return root;
 }
 
-/** A window a trips or countries expectation was captured for: the whole record, one year, or a range. */
+/** A window a trips, countries or nights expectation was captured for: the whole record, one year, or a range. */
 export interface ExpectedWindow {
   name: string;
   options: { year?: string; since?: string; until?: string };
@@ -161,7 +161,7 @@ export interface ExpectedWindow {
   json: unknown;
 }
 
-/** `all`, `YYYY` or `YYYY-MM-DD..YYYY-MM-DD` as the options `readTrips` and `rollupCountries` take. */
+/** `all`, `YYYY` or `YYYY-MM-DD..YYYY-MM-DD` as the options `readTrips`, `rollupCountries` and `rollupNights` take. */
 export function windowOptions(name: string): ExpectedWindow["options"] {
   if (name === "all") return {};
   if (/^\d{4}$/.test(name)) return { year: name };
@@ -170,8 +170,11 @@ export function windowOptions(name: string): ExpectedWindow["options"] {
   return { since: m[1] as string, until: m[2] as string };
 }
 
-/** The `<window>.txt` and `<window>.json` files of `expected-trips/` or `expected-countries/` beside a fixture. */
-export function expectedWindows(root: string, kind: "trips" | "countries"): ExpectedWindow[] {
+/** The `<window>.txt` and `<window>.json` files of `expected-trips/`, `expected-countries/` or `expected-nights/` beside a fixture. */
+export function expectedWindows(
+  root: string,
+  kind: "trips" | "countries" | "nights",
+): ExpectedWindow[] {
   const dir = join(root, `expected-${kind}`);
   let names: string[];
   try {
