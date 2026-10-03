@@ -285,6 +285,7 @@ export function renderTrips(trips: Trips, assets: Asset[]): string {
     for (const f of t.flights_out) parts.push(`out ${flightText(f)}`);
     if (t.places.length) parts.push(`places ${t.places.join(", ")}`);
     if (t.people.length) parts.push(`with ${t.people.map((p) => p.name).join(", ")}`);
+    parts.push(t.id);
     lines.push(`  ${t.start} ${DASH} ${t.end}  ${parts.join(" · ")}`);
   }
   return `${lines.join("\n")}\n`;
