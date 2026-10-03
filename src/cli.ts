@@ -2,6 +2,7 @@ import { localOf } from "./clock.js";
 import { renderCountries, rollupCountries } from "./countries.js";
 import { readDay } from "./day.js";
 import { renderDay } from "./dayText.js";
+import { renderNights, rollupNights } from "./nights.js";
 import type { WindowOptions } from "./reading.js";
 import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
@@ -56,6 +57,11 @@ export const USAGE = `usage:
   logbook-ts rollup countries <root> [--year YYYY | --since YYYY-MM-DD --until YYYY-MM-DD] [--json]
                                       days per country per year from the overnight stay, in transit
                                       and unknown apart, with the method; --json as one object
+  logbook-ts rollup nights <root> [--year YYYY | --since YYYY-MM-DD --until YYYY-MM-DD] [--json]
+                                      per year: nights at home (in a place of kind home, or within
+                                      400 m of one), away and in transit, the nights aboard each
+                                      asset, and the longest run of nights not at home; --json as
+                                      one object, every number with its lines
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 `;
@@ -129,10 +135,16 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
       }
       case "rollup": {
         const [rollupRoot, ...flagsGiven] = rest;
-        if (root !== "countries" || rollupRoot === undefined) return usage(io);
+        if ((root !== "countries" && root !== "nights") || rollupRoot === undefined)
+          return usage(io);
         const flags = parseWindowFlags(flagsGiven);
         if (flags === undefined) return usage(io);
         const { json, ...window } = flags;
+        if (root === "nights") {
+          const nights = rollupNights(rollupRoot, window);
+          io.stdout(json ? `${JSON.stringify(nights)}\n` : renderNights(nights));
+          return 0;
+        }
         const countries = rollupCountries(rollupRoot, window);
         io.stdout(json ? `${JSON.stringify(countries)}\n` : renderCountries(countries));
         return 0;

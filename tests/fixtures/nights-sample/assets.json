@@ -1,0 +1,16 @@
+{
+  "assets": [
+    {
+      "id": "zeta",
+      "kind": "yacht",
+      "name": "Zeta",
+      "mmsi": "999000011"
+    },
+    {
+      "id": "alpha",
+      "kind": "yacht",
+      "name": "Alpha",
+      "mmsi": "999000012"
+    }
+  ]
+}
