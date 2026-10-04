@@ -360,6 +360,11 @@ took
     const root = freshLogbook("Europe/Oslo", "logbook/0.1");
     expect(() => collectStats(root)).toThrow(/logbook\/0\.1/);
   });
+
+  it("reads a logbook/0.3 record, which hashes by the same rule, and prints its format (SPEC §3.1)", () => {
+    const root = freshLogbook("Europe/Oslo", "logbook/0.3");
+    expect(statsText(collectStats(root))).toMatch(/^logbook\/0\.3 {2}head 0{64}\n/);
+  });
 });
 
 describe("logbook-ts stats", () => {

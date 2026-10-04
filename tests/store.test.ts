@@ -88,6 +88,67 @@ describe("verifyLogbook — format", () => {
     expect(result.errors[0]).toMatch(/logbook\/0\.2/);
   });
 
+  it("reads a logbook/0.3 record as it is: the chain rule is 0.2's (SPEC §3.1)", () => {
+    const root = copySample();
+    writeMeta(root, { ...readMetaFile(root), format: "logbook/0.3" });
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+    expect(result.lines).toBe(EXPECTED.seq);
+    expect(result.head).toBe(EXPECTED.head);
+  });
+
+  it("verifies a sealed line of a logbook/0.3 record: payload_enc is outside the hash and preserved (SPEC §2)", () => {
+    const root = copySample();
+    const lines = readLines(root).map((x) => JSON.parse(x) as Line);
+    const last = lines[lines.length - 1] as Line;
+    const sealed: Line = {
+      id: "00000000-0000-7000-8000-000000000032",
+      seq: last.seq + 1,
+      at: "2026-03-08T21:00:00Z",
+      end: null,
+      tz: "Europe/Oslo",
+      source: "manual",
+      kind: "note",
+      tier: 2,
+      payload: { schema: "sealed/v1", of: "note/v1", digest: "ab".repeat(32) },
+      recorded_at: "2026-03-08T21:00:00Z",
+      prev: last.hash,
+      hash: "",
+      payload_enc: "YWdlLWVuY3J5cHRpb24ub3JnL3YxCg==",
+    };
+    sealed.hash = hashLine(sealed);
+    writeLines(
+      root,
+      [...lines, sealed].map((x) => JSON.stringify(x)),
+    );
+    writeMeta(root, {
+      ...readMetaFile(root),
+      format: "logbook/0.3",
+      recipients: ["age1x5ut7lplvtgkzcnvtjux674z32mu5q72r6ffaxemxtg9g08p7g5qa8ytxl"],
+      seq: sealed.seq,
+      head: sealed.hash,
+    });
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+    expect(result.lines).toBe(EXPECTED.seq + 1);
+    expect(result.head).toBe(sealed.hash);
+    // a tampered sealed payload still breaks the chain; a changed payload_enc does not (no key here)
+    const tampered = { ...sealed, payload: { ...sealed.payload, digest: "cd".repeat(32) } };
+    writeLines(
+      root,
+      [...lines, tampered].map((x) => JSON.stringify(x)),
+    );
+    expect(verifyLogbook(root).valid).toBe(false);
+    const resealed = { ...sealed, payload_enc: "YWdlLWVuY3J5cHRpb24ub3JnL3YxCnh5eg==" };
+    writeLines(
+      root,
+      [...lines, resealed].map((x) => JSON.stringify(x)),
+    );
+    expect(verifyLogbook(root).valid).toBe(true);
+  });
+
   it("refuses an unknown format and a missing format", () => {
     const root = copySample();
     writeMeta(root, { ...readMetaFile(root), format: "logbook/9.9" });
@@ -310,6 +371,27 @@ describe("addNote", () => {
     expect(raw.split("\n").filter(Boolean)).toHaveLength(1);
     expect((JSON.parse(raw) as Line).payload.text).toBe(text);
     expect(verifyLogbook(root).valid).toBe(true);
+  });
+
+  it("appends to a logbook/0.3 record that names no recipients, and keeps its format", () => {
+    const root = copySample();
+    writeMeta(root, { ...readMetaFile(root), format: "logbook/0.3", recipients: [] });
+    const line = addNote(root, "plain, as a 0.2 record is");
+    expect(line.seq).toBe(32);
+    expect(readMetaFile(root)).toMatchObject({ format: "logbook/0.3", recipients: [], seq: 32 });
+    expect(verifyLogbook(root).valid).toBe(true);
+  });
+
+  it("refuses a logbook/0.3 record that names recipients, since it cannot seal, and writes nothing", () => {
+    const root = copySample();
+    writeMeta(root, {
+      ...readMetaFile(root),
+      format: "logbook/0.3",
+      recipients: ["age1x5ut7lplvtgkzcnvtjux674z32mu5q72r6ffaxemxtg9g08p7g5qa8ytxl", "age1…"],
+    });
+    expect(() => addNote(root, "no")).toThrow(/recipients/);
+    expect(readLines(root)).toHaveLength(31);
+    expect(readMetaFile(root).seq).toBe(31);
   });
 
   it("refuses a logbook/0.1 record and writes nothing", () => {

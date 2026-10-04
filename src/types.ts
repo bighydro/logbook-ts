@@ -1,5 +1,12 @@
-/** The format this implementation carries. Anything else is refused (SPEC §3.1, ADR 0014). */
+/** The format this implementation carries and writes (SPEC §3.1, ADR 0014). */
 export const FORMAT = "logbook/0.2";
+
+/**
+ * The format that hashes by the same rule and adds sealed lines (SPEC §3.1, RFC 0029). A record of
+ * it is read and verified as it is, `payload_enc` preserved as an unknown field and never opened;
+ * one that names recipients is never written to, since nothing here can seal.
+ */
+export const SEALED_FORMAT = "logbook/0.3";
 
 export type JsonValue =
   | null
@@ -52,6 +59,8 @@ export interface Meta {
   seq: number;
   head: string;
   lineage?: Array<{ from_format: string; from_head: string; migrated_at: string }>;
+  /** The age recipients tiers 2–3 are sealed to; present, with two at least, in a record that seals (SPEC §1). */
+  recipients?: string[];
   [extra: string]: JsonValue | undefined;
 }
 

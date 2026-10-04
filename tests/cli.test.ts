@@ -51,6 +51,16 @@ describe("logbook-ts verify", () => {
     expect(err).toMatch(/seq 1/);
   });
 
+  it("verifies a logbook/0.3 record and exits 0", () => {
+    const root = copySample();
+    const meta = JSON.parse(readLines(root, "logbook.json").join("")) as Record<string, unknown>;
+    writeLines(root, [JSON.stringify({ ...meta, format: "logbook/0.3" })], "logbook.json");
+    const { code, out, err } = run(["verify", root]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out).toBe(`valid — ${EXPECTED.seq} lines, head ${EXPECTED.head}\n`);
+  });
+
   it("refuses a record whose format is not logbook/0.2 and exits 1", () => {
     const root = copySample();
     const meta = JSON.parse(readLines(root, "logbook.json").join("")) as Record<string, unknown>;
