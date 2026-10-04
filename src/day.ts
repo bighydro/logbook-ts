@@ -233,6 +233,12 @@ export interface Day {
   timeline: TimelineEntry[];
   flights: FlightEntry[];
   unplaced: UnplacedEntry[];
+  /**
+   * The stories about the day, from the `story/v1` lines (RFC 0028, a draft) whose `refers_to` holds
+   * it, as the reference's Day lists them since 1da4a09. Only the empty list is read here: a record
+   * with story lines is not matched yet (SPEC-QUESTIONS 69).
+   */
+  stories: never[];
   /** null when no health line is on the day. */
   health: DayHealth | null;
   /** null when no transaction line is on the day. */
@@ -244,6 +250,12 @@ export interface Day {
    */
   weather: null;
   sources: SourceCount[];
+  /**
+   * The pages the circle shared for the day (RFC 0025, `received/v1`), as the reference's Day lists
+   * them since b57436a. Only the empty list is read here: a record that received a page is not
+   * matched yet (SPEC-QUESTIONS 69).
+   */
+  received: never[];
 }
 
 /** A line read for the day, with its instant and span in ms. */
@@ -411,10 +423,12 @@ export function readDay(root: string, options: DayOptions): Day {
     timeline,
     flights,
     unplaced,
+    stories: [],
     health: health(entries.filter(standing), ctx),
     spend: spend(dayStanding),
     weather: null,
     sources: sources(dayStanding),
+    received: [],
   };
 }
 

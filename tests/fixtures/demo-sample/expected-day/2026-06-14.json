@@ -320,6 +320,7 @@
   ],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": {
     "sleep_h": 6.2,
     "steps": 10627,
@@ -469,5 +470,6 @@
       "first": "2026-06-14T14:00:00Z",
       "newest": "2026-06-14T14:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }
