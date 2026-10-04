@@ -421,4 +421,13 @@ question below. None of this is written down:
     0025) `received`, the pages the circle shared for it; both are empty lists on every fixture, the
     demo record included, and the text is unchanged without them. Only the empty list is read here.
     A reference that grows a field a day is the cost of matching its `--json` whole; the cross-impl
-    job clones it at main and says so the day it happens.
+    job clones it at main and says so the day it happens. (f) Where the spec stands on (c)–(e),
+    checked at 176e6a7 (2026-10-04): SPEC §3.2.7's output list names eleven keys of the Day (`day`,
+    `weekday`, `tz`, `nights`, `country`, `all_day`, `timeline`, `flights`, `unplaced`, `health`,
+    `sources`) and none of `spend`, `weather`, `stories` and `received`, which the reference's
+    `day --json` carries and its docs/day.md documents. §6.1 compares `day --json` whole, and §7 says
+    §3.2 "is the readings the reference ships, written down so that a second implementation can agree
+    with them": the spec lags its reference, the reference does not break the spec, and this
+    implementation follows the reference. §3.2.7 should list the four. The trip id at the end of a
+    `trips` row is text, which §3.2 leaves to each reader (the JSON `id` is the contract); it is
+    matched here because this repository diffs the text byte for byte.
