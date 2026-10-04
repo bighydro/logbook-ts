@@ -1,3 +1,3 @@
 trips 2025-12-31 – 2026-01-06: 2 trips
-  2025-12-31 – 2026-01-03  4 nights · route 53.5700,10.0130 (Hamburg) → CPH, Copenhagen → 55.6850,12.5500 (Copenhagen) · out CPH → ENGM · places Messe, Office · with Freja Lund, Guest 01, Liv Berg, Anders Vik, Guest 02, Guest 03, Guest 04, Guest 05, Guest 06, Guest 07, Guest 08, Guest 09
-  2026-01-05 – 2026-01-06  2 nights aboard Solvind (1 in transit) · route aboard Solvind · places Marina · with Ola Nordmann
+  2025-12-31 – 2026-01-03  4 nights · route 53.5700,10.0130 (Hamburg) → CPH, Copenhagen → 55.6850,12.5500 (Copenhagen) · out CPH → ENGM · places Messe, Office · with Freja Lund, Guest 01, Liv Berg, Anders Vik, Guest 02, Guest 03, Guest 04, Guest 05, Guest 06, Guest 07, Guest 08, Guest 09 · trip:2025-12-31:2026-01-03
+  2026-01-05 – 2026-01-06  2 nights aboard Solvind (1 in transit) · route aboard Solvind · places Marina · with Ola Nordmann · trip:2026-01-05:2026-01-06

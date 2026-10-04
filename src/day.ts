@@ -202,6 +202,19 @@ export interface DayHealth {
   lines: string[];
 }
 
+/** The day's transactions: the totals per currency, how many, the merchants (docs/ledger.md, *The Day*). */
+export interface DaySpend {
+  /** The transaction lines standing on the day, the deleted ones apart. */
+  count: number;
+  /** The lines the source marks deleted (`extra.deleted`): listed under `lines`, never counted or summed. */
+  deleted: number;
+  /** Per currency: the money that left (negative), the money that came in, and their sum. */
+  totals: Record<string, { spent: number; received: number; net: number }>;
+  /** The merchants named, each once, in file order. */
+  merchants: string[];
+  lines: string[];
+}
+
 export interface SourceCount {
   source: string;
   lines: number;
@@ -220,9 +233,29 @@ export interface Day {
   timeline: TimelineEntry[];
   flights: FlightEntry[];
   unplaced: UnplacedEntry[];
+  /**
+   * The stories about the day, from the `story/v1` lines (RFC 0028, a draft) whose `refers_to` holds
+   * it, as the reference's Day lists them since 1da4a09. Only the empty list is read here: a record
+   * with story lines is not matched yet (SPEC-QUESTIONS 69).
+   */
+  stories: never[];
   /** null when no health line is on the day. */
   health: DayHealth | null;
+  /** null when no transaction line is on the day. */
+  spend: DaySpend | null;
+  /**
+   * The day's weather row, from its `weather/v1` lines (RFC 0026), as the reference's Day has it
+   * since a4a9b0c; null when the day has none. Only null is read here: a record with weather lines
+   * is not matched yet (SPEC-QUESTIONS 69).
+   */
+  weather: null;
   sources: SourceCount[];
+  /**
+   * The pages the circle shared for the day (RFC 0025, `received/v1`), as the reference's Day lists
+   * them since b57436a. Only the empty list is read here: a record that received a page is not
+   * matched yet (SPEC-QUESTIONS 69).
+   */
+  received: never[];
 }
 
 /** A line read for the day, with its instant and span in ms. */
@@ -390,8 +423,12 @@ export function readDay(root: string, options: DayOptions): Day {
     timeline,
     flights,
     unplaced,
+    stories: [],
     health: health(entries.filter(standing), ctx),
+    spend: spend(dayStanding),
+    weather: null,
     sources: sources(dayStanding),
+    received: [],
   };
 }
 
@@ -1474,6 +1511,54 @@ function health(entries: Entry[], ctx: Context): DayHealth | null {
 }
 
 /** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
+/**
+ * The day's spend from the `transaction/v1` lines standing on it, in file order: a correction that
+ * `supersedes` a line stands in its place; a line the source marks deleted is listed and marked,
+ * never counted or summed; the day is the local day of `at`, whatever the line's `date` says.
+ */
+function spend(lines: Entry[]): DaySpend | null {
+  const all = lines
+    .filter((e) => e.line.kind === "transaction" && payloadOf(e.line).schema === "transaction/v1")
+    .sort((a, b) => a.line.seq - b.line.seq);
+  const corrected = new Set<string>();
+  for (const e of all) {
+    const s = payloadOf(e.line).supersedes;
+    if (typeof s === "string") corrected.add(s);
+  }
+  const standing = all.filter((e) => !corrected.has(e.line.id));
+  if (standing.length === 0) return null;
+  const out: DaySpend = { count: 0, deleted: 0, totals: {}, merchants: [], lines: [] };
+  const sums = new Map<string, { spent: number; received: number }>();
+  for (const e of standing) {
+    const p = payloadOf(e.line);
+    out.lines.push(e.line.id);
+    const extra = p.extra;
+    if (
+      extra !== null &&
+      typeof extra === "object" &&
+      !Array.isArray(extra) &&
+      extra.deleted === true
+    ) {
+      out.deleted += 1;
+      continue;
+    }
+    out.count += 1;
+    const merchant = text(p.merchant);
+    if (merchant !== undefined && !out.merchants.includes(merchant)) out.merchants.push(merchant);
+    const currency = text(p.currency);
+    if (typeof p.amount !== "number" || currency === undefined) continue;
+    const sum = sums.get(currency) ?? { spent: 0, received: 0 };
+    if (p.amount < 0) sum.spent += p.amount;
+    else sum.received += p.amount;
+    sums.set(currency, sum);
+  }
+  for (const currency of [...sums.keys()].sort()) {
+    const sum = sums.get(currency) as { spent: number; received: number };
+    out.totals[currency] = { ...sum, net: sum.spent + sum.received };
+  }
+  return out;
+}
+
 function sources(lines: Entry[]): SourceCount[] {
   const counts = new Map<string, SourceCount & { firstMs: number; newestMs: number }>();
   for (const e of lines) {

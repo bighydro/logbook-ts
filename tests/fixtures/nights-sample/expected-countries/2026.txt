@@ -1,0 +1,3 @@
+countries 2026-01-01 – 2026-01-08
+  2026  NO 8 days · in transit 0
+  method: country of the overnight stay: a place with a country in places.json when the stay lies in it, else the nearest large airport within 300 km (airports table) and its zone's country (zone.tab); coarse near borders and far from airports

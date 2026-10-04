@@ -30,6 +30,7 @@ export {
   type DayHealth,
   type DayNight,
   type DayOptions,
+  type DaySpend,
   type FlightEntry,
   isHome,
   type Person,
@@ -118,6 +119,7 @@ export {
   readMeta,
   rfc3339,
   verifyLogbook,
+  writeRefusal,
 } from "./store.js";
 export {
   labelOf,
@@ -135,6 +137,7 @@ export {
   type Line,
   type Meta,
   type Payload,
+  SEALED_FORMAT,
   type VerifyResult,
 } from "./types.js";
 export { uuidV7 } from "./uuid.js";

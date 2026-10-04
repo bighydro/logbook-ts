@@ -1,10 +1,11 @@
-// Re-captures a fixture's expected-trips and expected-countries files from the reference implementation:
+// Re-captures a fixture's expected-trips, expected-countries and expected-nights files from the reference implementation:
 //   LOGBOOK_REF=/path/to/clone/of/bighydro/logbook node tests/fixtures/capture-expected-trips.mjs <fixture> [window ...]
 // A window is `all` (the whole record), a year `YYYY` (`--year`), or `YYYY-MM-DD..YYYY-MM-DD` (`--since`
 // and `--until`). Without windows, the windows already in expected-trips/ are captured again. For each,
 // `logbook trips` of the reference goes to expected-trips/<window>.txt and `--json` to <window>.json,
-// `logbook rollup countries` to expected-countries/ the same way, run on a disposable copy of the
-// fixture (the reference writes index.sqlite beside the record). Never edit the files by hand.
+// `logbook rollup countries` to expected-countries/ and `logbook rollup nights` to expected-nights/ the
+// same way, run on a disposable copy of the fixture (the reference writes index.sqlite beside the
+// record). Never edit the files by hand.
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,8 +21,10 @@ if (!ref || !fixture) {
 const root = join(dirname(fileURLToPath(import.meta.url)), fixture);
 const trips = join(root, "expected-trips");
 const countries = join(root, "expected-countries");
+const nights = join(root, "expected-nights");
 mkdirSync(trips, { recursive: true });
 mkdirSync(countries, { recursive: true });
+mkdirSync(nights, { recursive: true });
 const windows = given.length
   ? given
   : [...new Set(readdirSync(trips).filter((f) => /\.(txt|json)$/.test(f)).map((f) => f.replace(/\.(txt|json)$/, "")))];
@@ -37,7 +40,7 @@ const copy = mkdtempSync(join(tmpdir(), "logbook-ts-capture-"));
 try {
   cpSync(root, copy, { recursive: true, filter: (src) => !src.includes("expected-") });
   for (const name of windows) {
-    for (const [dir, command] of [[trips, ["trips"]], [countries, ["rollup", "countries"]]]) {
+    for (const [dir, command] of [[trips, ["trips"]], [countries, ["rollup", "countries"]], [nights, ["rollup", "nights"]]]) {
       for (const json of [false, true]) {
         const args = ["run", "--project", ref, "logbook", ...command, ...windowFlags(name), ...(json ? ["--json"] : [])];
         const result = spawnSync("uv", args, {

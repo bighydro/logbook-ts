@@ -126,7 +126,10 @@
   ],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": null,
+  "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "sim-phone",
@@ -140,5 +143,6 @@
       "first": "2026-04-08T22:00:00Z",
       "newest": "2026-04-09T21:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }

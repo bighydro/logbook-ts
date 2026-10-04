@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { hashLine, ZERO_HASH } from "./chain.js";
 import { canonicalize } from "./jcs.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
-import { FORMAT, type Line, type Meta, type VerifyResult } from "./types.js";
+import { FORMAT, type Line, type Meta, SEALED_FORMAT, type VerifyResult } from "./types.js";
 import { uuidV7 } from "./uuid.js";
 
 export class LogbookError extends Error {
@@ -35,11 +35,32 @@ export function readMeta(root: string): Meta {
   return parsed as Meta;
 }
 
-/** Why this record is refused, or undefined when its format is the one carried here. */
+/**
+ * Why this record cannot be read, or undefined when it can: its format is the one carried here, or
+ * logbook/0.3, which hashes by the same rule (SPEC §3.1). A 0.1 record must be migrated forward.
+ */
 export function formatRefusal(meta: Meta): string | undefined {
-  if (meta.format === FORMAT) return undefined;
+  if (meta.format === FORMAT || meta.format === SEALED_FORMAT) return undefined;
   const found = typeof meta.format === "string" ? meta.format : "missing";
-  return `logbook.json: format is ${found}; this implementation carries ${FORMAT} only (SPEC §3.1); migrate the record first`;
+  return `logbook.json: format is ${found}; this implementation carries ${FORMAT} (and reads ${SEALED_FORMAT}) only (SPEC §3.1); migrate the record first`;
+}
+
+/**
+ * Why this record cannot be written to, or undefined when it can. A logbook/0.3 record that names
+ * recipients seals every tier 2–3 line (SPEC §2, §4), which nothing here can do; one that names none
+ * is written plain, as a 0.2 record is.
+ */
+export function writeRefusal(meta: Meta): string | undefined {
+  const refusal = formatRefusal(meta);
+  if (refusal) return refusal;
+  if (
+    meta.format === SEALED_FORMAT &&
+    Array.isArray(meta.recipients) &&
+    meta.recipients.length > 0
+  ) {
+    return `logbook.json: the record names recipients, so every tier 2–3 line is sealed (SPEC §4); this implementation cannot seal and appends nothing to it`;
+  }
+  return undefined;
 }
 
 interface Located {
@@ -87,7 +108,8 @@ function envelopeErrors(line: Line): string[] {
 
 /**
  * SPEC §3: take every line from every file, order by seq, check seq, prev, hash, and that
- * logbook.json seq/head match the last line. Refuses any format but logbook/0.2.
+ * logbook.json seq/head match the last line. Reads logbook/0.2 and logbook/0.3, which hash by
+ * one rule; a sealed line's `payload_enc` is outside the hash and is never opened here.
  */
 export function verifyLogbook(root: string): VerifyResult {
   const meta = readMeta(root);
@@ -162,12 +184,13 @@ export interface AddOptions {
 
 /**
  * Append one `note/v1` line (tier 2, source manual, tz from logbook.json) and update
- * logbook.json atomically. Refuses a record that is not logbook/0.2 or does not verify.
+ * logbook.json atomically. Refuses a record that is not logbook/0.2 or logbook/0.3 without
+ * recipients, or that does not verify.
  */
 export function addNote(root: string, text: string, options: AddOptions = {}): Line {
   if (text.trim() === "") throw new LogbookError("nothing to add: the note is empty");
   const meta = readMeta(root);
-  const refusal = formatRefusal(meta);
+  const refusal = writeRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
   if (typeof meta.timezone !== "string" || meta.timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing");

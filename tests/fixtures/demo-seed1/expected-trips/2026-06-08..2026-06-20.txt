@@ -1,0 +1,3 @@
+trips 2026-06-08 – 2026-06-20: 2 trips
+  2026-06-08 – 2026-06-10  3 nights · route 47.3769,8.5417 (Zurich) · in XY 561 OSL → ZRH · out XY 562 ZRH → OSL · with Marta Keller, Jonas Weber · trip:2026-06-08:2026-06-10
+  2026-06-15 – 2026-06-20  6 nights aboard Nordlys · route aboard Nordlys · places Marina · with Anders Vik, Ola Nordmann · trip:2026-06-15:2026-06-20
