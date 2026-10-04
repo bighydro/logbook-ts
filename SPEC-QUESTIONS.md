@@ -361,7 +361,7 @@ record built to have a case of every rule (`tests/fixtures/trips-sample`, sevent
     the nearest fix within the window. The demo record and both probes agree under either rule.
 
 
-## Found while implementing `rollup nights` (openlogbook main at bf9ed76, 2026-10-03; docs/rollups.md "Countries, flights, nights", docs/day.md's home-region rule, ADR 0019)
+## Found while implementing `rollup nights` (openlogbook main at 3e99943, 2026-10-04; docs/rollups.md "Countries, flights, nights", docs/day.md's home-region rule, ADR 0019)
 
 `rollup nights` was written from the one sentence docs/rollups.md gives it and matched to the reference by
 running it: on `tests/fixtures/nights-sample`, on the other fixtures, on the conformance sample, on
@@ -416,4 +416,9 @@ question below. None of this is written down:
     the changelog). No fixture here has a weather line — the demo record has none, since `sync
     weather` asks a third party — so only `null` is read and matched; a record with weather lines
     would print a `weather` row in the reference and none here, and that reader is left for its own
-    task.
+    task. (e) The same again a day later: since 1da4a09 (`add story`, RFC 0028, a draft) the Day
+    carries `stories`, the `story/v1` lines about the day, and since b57436a (the shared trip, RFC
+    0025) `received`, the pages the circle shared for it; both are empty lists on every fixture, the
+    demo record included, and the text is unchanged without them. Only the empty list is read here.
+    A reference that grows a field a day is the cost of matching its `--json` whole; the cross-impl
+    job clones it at main and says so the day it happens.

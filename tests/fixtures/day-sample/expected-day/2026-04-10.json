@@ -145,6 +145,7 @@
   ],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": null,
   "spend": null,
   "weather": null,
@@ -167,5 +168,6 @@
       "first": "2026-04-10T10:00:00Z",
       "newest": "2026-04-10T10:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }
