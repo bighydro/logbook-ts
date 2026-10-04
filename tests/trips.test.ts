@@ -9,7 +9,14 @@ import { cleanup, copySample, expectedWindows, FIXTURES, tempDir } from "./helpe
 afterEach(cleanup);
 
 const TRIPS_SAMPLE = join(FIXTURES, "trips-sample");
-const FIXTURE_NAMES = ["trips-sample", "day-sample", "demo-sample"];
+const FIXTURE_NAMES = [
+  "trips-sample",
+  "nights-sample",
+  "day-sample",
+  "demo-sample",
+  "sample-logbook",
+  "demo-seed1",
+];
 
 /** A writable copy of a fixture, without the expected output beside it. */
 function copyOf(name: string): string {

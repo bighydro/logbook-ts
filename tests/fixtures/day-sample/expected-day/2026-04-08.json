@@ -326,6 +326,7 @@
   ],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": {
     "sleep_h": 7.0,
     "steps": null,
@@ -335,6 +336,8 @@
       "00000000-0000-4000-8000-0000000004745"
     ]
   },
+  "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "sim-phone",
@@ -372,5 +375,6 @@
       "first": "2026-04-07T22:00:00Z",
       "newest": "2026-04-07T22:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }

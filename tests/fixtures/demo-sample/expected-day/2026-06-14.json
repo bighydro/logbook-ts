@@ -320,6 +320,7 @@
   ],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": {
     "sleep_h": 6.2,
     "steps": 10627,
@@ -400,6 +401,8 @@
       "019ec449-5200-7b69-96d4-a181e975464b"
     ]
   },
+  "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "dawarich",
@@ -467,5 +470,6 @@
       "first": "2026-06-14T14:00:00Z",
       "newest": "2026-06-14T14:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }

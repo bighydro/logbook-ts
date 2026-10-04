@@ -60,6 +60,12 @@ export interface Trip {
   flights_out: TripFlight[];
   flights: TripFlight[];
   lines: string[];
+  /**
+   * The weather of the trip's days, first to return day, as the reference summarises its `weather/v1`
+   * lines (RFC 0026) since a4a9b0c; null when the record has none. Only null is read here: a record
+   * with weather lines is not matched yet (SPEC-QUESTIONS 69).
+   */
+  weather: null;
 }
 
 /** What `trips --json` prints. */
@@ -115,11 +121,14 @@ function tripOf(run: DayReading[], after: DayReading | undefined, places: Place[
   const until = addDays(last.day, 1);
   const nights = run.length;
   const inTransit = run.filter((d) => d.night === undefined).length;
-  const aboard: Record<string, number> = {};
+  // The nights aboard, by asset id, as the reference orders them in the text and the JSON alike.
+  const counted = new Map<string, number>();
   for (const d of run) {
     const asset = d.night?.row.asset;
-    if (asset !== undefined) aboard[asset.id] = (aboard[asset.id] ?? 0) + 1;
+    if (asset !== undefined) counted.set(asset.id, (counted.get(asset.id) ?? 0) + 1);
   }
+  const aboard: Record<string, number> = {};
+  for (const id of [...counted.keys()].sort()) aboard[id] = counted.get(id) as number;
   const assets = Object.keys(aboard);
   const asset =
     assets.length === 1 && (aboard[assets[0] as string] as number) + inTransit === nights
@@ -193,6 +202,7 @@ function tripOf(run: DayReading[], after: DayReading | undefined, places: Place[
     flights_out: flightsOut,
     flights,
     lines,
+    weather: null,
   };
 }
 
@@ -285,6 +295,7 @@ export function renderTrips(trips: Trips, assets: Asset[]): string {
     for (const f of t.flights_out) parts.push(`out ${flightText(f)}`);
     if (t.places.length) parts.push(`places ${t.places.join(", ")}`);
     if (t.people.length) parts.push(`with ${t.people.map((p) => p.name).join(", ")}`);
+    parts.push(t.id);
     lines.push(`  ${t.start} ${DASH} ${t.end}  ${parts.join(" · ")}`);
   }
   return `${lines.join("\n")}\n`;

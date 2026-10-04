@@ -40,7 +40,10 @@
   "timeline": [],
   "flights": [],
   "unplaced": [],
+  "stories": [],
   "health": null,
+  "spend": null,
+  "weather": null,
   "sources": [
     {
       "source": "sim-phone",
@@ -48,5 +51,6 @@
       "first": "2026-04-10T22:00:00Z",
       "newest": "2026-04-10T22:00:00Z"
     }
-  ]
+  ],
+  "received": []
 }

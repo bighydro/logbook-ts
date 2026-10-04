@@ -1,7 +1,7 @@
 {
   "name": "logbook-ts",
   "version": "0.1.0",
-  "description": "An independent TypeScript implementation of the Logbook format (logbook/0.2): verify the hash chain, append a note, show a day's lines, read the Day back, count the record and its sources, and derive the trips and the countries of a window, as the reference prints them.",
+  "description": "An independent TypeScript implementation of the Logbook format (logbook/0.2): verify the hash chain, append a note, show a day's lines, read the Day back, count the record and its sources, and derive the trips, the countries and the nights of a window, as the reference prints them.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

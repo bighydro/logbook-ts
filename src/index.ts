@@ -30,6 +30,7 @@ export {
   type DayHealth,
   type DayNight,
   type DayOptions,
+  type DaySpend,
   type FlightEntry,
   isHome,
   type Person,

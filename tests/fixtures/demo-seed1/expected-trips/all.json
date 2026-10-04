@@ -1,0 +1,331 @@
+{
+  "window": {
+    "since": "2026-06-01",
+    "until": "2026-06-30",
+    "days": [
+      "2026-06-01",
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04",
+      "2026-06-05",
+      "2026-06-06",
+      "2026-06-07",
+      "2026-06-08",
+      "2026-06-09",
+      "2026-06-10",
+      "2026-06-11",
+      "2026-06-12",
+      "2026-06-13",
+      "2026-06-14",
+      "2026-06-15",
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-24",
+      "2026-06-25",
+      "2026-06-26",
+      "2026-06-27",
+      "2026-06-28",
+      "2026-06-29",
+      "2026-06-30"
+    ]
+  },
+  "trips": [
+    {
+      "id": "trip:2026-06-06:2026-06-06",
+      "start": "2026-06-06",
+      "end": "2026-06-06",
+      "until": "2026-06-07",
+      "nights": 1,
+      "in_transit": 0,
+      "asset": null,
+      "nights_aboard": {},
+      "route": [
+        "Cabin"
+      ],
+      "places": [
+        "Cabin"
+      ],
+      "people": [
+        {
+          "id": "4f8c85f9-0e6a-56f0-a9db-0d09bfdd3d56",
+          "name": "Ola Nordmann",
+          "confidence": 1.0,
+          "lines": [
+            "019e9c60-0900-7443-9e26-7d3ccf9878d2",
+            "019e9de0-8e80-7185-9543-006342f68ec2",
+            "019e9dc5-1740-7fc3-8e90-8e36c4dba13c",
+            "019ea14f-7680-78a4-9ca3-3dcef48e7654"
+          ]
+        }
+      ],
+      "flights_in": [],
+      "flights_out": [],
+      "flights": [],
+      "lines": [
+        "019e9c60-0900-7a9b-bef3-0866cdce9850",
+        "019ea1ef-ae20-74c8-8010-ee2a1d4332a6",
+        "019e9c60-0900-7443-9e26-7d3ccf9878d2",
+        "019e9de0-8e80-7185-9543-006342f68ec2",
+        "019e9dc5-1740-7fc3-8e90-8e36c4dba13c",
+        "019ea14f-7680-78a4-9ca3-3dcef48e7654"
+      ],
+      "weather": null
+    },
+    {
+      "id": "trip:2026-06-08:2026-06-10",
+      "start": "2026-06-08",
+      "end": "2026-06-10",
+      "until": "2026-06-11",
+      "nights": 3,
+      "in_transit": 0,
+      "asset": null,
+      "nights_aboard": {},
+      "route": [
+        "47.3769,8.5417 (Zurich)"
+      ],
+      "places": [],
+      "people": [
+        {
+          "id": "60cf12c9-37de-5ef9-b6cc-2cc0a440feba",
+          "name": "Marta Keller",
+          "confidence": 0.9,
+          "lines": [
+            "019eab2e-5180-79e6-9476-bb22d551215e",
+            "019ead53-a280-7476-a9f8-66883822b39f"
+          ]
+        },
+        {
+          "id": "e5d7466a-c8ad-5b74-a418-e8a89975507b",
+          "name": "Jonas Weber",
+          "confidence": 0.9,
+          "lines": [
+            "019eab2e-5180-79e6-9476-bb22d551215e"
+          ]
+        }
+      ],
+      "flights_in": [
+        {
+          "date": "2026-06-08",
+          "carrier": "XY",
+          "number": "561",
+          "from": "OSL",
+          "to": "ZRH",
+          "evidence": "tracked",
+          "lines": [
+            "019ea59e-ac60-77e0-ac2e-83ec0553d5dd"
+          ]
+        }
+      ],
+      "flights_out": [
+        {
+          "date": "2026-06-11",
+          "carrier": "XY",
+          "number": "562",
+          "from": "ZRH",
+          "to": "OSL",
+          "evidence": "inferred",
+          "lines": [
+            "019eb72d-e9a0-7a93-9eb2-83a714b72b9e"
+          ]
+        }
+      ],
+      "flights": [
+        {
+          "date": "2026-06-08",
+          "carrier": "XY",
+          "number": "561",
+          "from": "OSL",
+          "to": "ZRH",
+          "evidence": "tracked",
+          "lines": [
+            "019ea59e-ac60-77e0-ac2e-83ec0553d5dd"
+          ]
+        },
+        {
+          "date": "2026-06-11",
+          "carrier": "XY",
+          "number": "562",
+          "from": "ZRH",
+          "to": "OSL",
+          "evidence": "inferred",
+          "lines": [
+            "019eb72d-e9a0-7a93-9eb2-83a714b72b9e"
+          ]
+        }
+      ],
+      "lines": [
+        "019ea65a-5b40-7fbd-8950-48715b6eebcb",
+        "019eab0e-4660-7f64-8834-e448a07a0733",
+        "019eacf8-1500-7f6f-8029-bf563bf5443f",
+        "019eb050-19a0-7c77-a47e-6ae0158816a0",
+        "019eb255-5f80-7a2c-9b74-4ef5a09807e8",
+        "019eb6c0-0ca0-7cc1-817b-5e0621b4115e",
+        "019ea59e-ac60-77e0-ac2e-83ec0553d5dd",
+        "019eb72d-e9a0-7a93-9eb2-83a714b72b9e",
+        "019eab2e-5180-79e6-9476-bb22d551215e",
+        "019ead53-a280-7476-a9f8-66883822b39f"
+      ],
+      "weather": null
+    },
+    {
+      "id": "trip:2026-06-15:2026-06-20",
+      "start": "2026-06-15",
+      "end": "2026-06-20",
+      "until": "2026-06-21",
+      "nights": 6,
+      "in_transit": 0,
+      "asset": "nordlys",
+      "nights_aboard": {
+        "nordlys": 6
+      },
+      "route": [
+        "aboard Nordlys"
+      ],
+      "places": [
+        "Marina"
+      ],
+      "people": [
+        {
+          "id": "ca2acbe4-46f5-567d-a961-74420028c869",
+          "name": "Anders Vik",
+          "confidence": 1.0,
+          "lines": [
+            "019eca4f-fbe0-7519-a534-56ce8517c417"
+          ]
+        },
+        {
+          "id": "4f8c85f9-0e6a-56f0-a9db-0d09bfdd3d56",
+          "name": "Ola Nordmann",
+          "confidence": 1.0,
+          "lines": [
+            "019eca4f-fbe0-7519-a534-56ce8517c417"
+          ]
+        }
+      ],
+      "flights_in": [],
+      "flights_out": [],
+      "flights": [],
+      "lines": [
+        "019eca06-bde0-73f3-ae83-d982ee3d9785",
+        "019ed9f0-d6a0-7e2e-b303-f6a6f9541f71",
+        "019eda75-9700-7561-bb17-5c1a71418f6b",
+        "019ee92c-fc20-7917-a837-f6604843921b",
+        "019eca4f-fbe0-7519-a534-56ce8517c417"
+      ],
+      "weather": null
+    },
+    {
+      "id": "trip:2026-06-25:2026-06-26",
+      "start": "2026-06-25",
+      "end": "2026-06-26",
+      "until": "2026-06-27",
+      "nights": 2,
+      "in_transit": 0,
+      "asset": null,
+      "nights_aboard": {},
+      "route": [
+        "55.6850,12.5500 (Copenhagen)"
+      ],
+      "places": [
+        "Office"
+      ],
+      "people": [
+        {
+          "id": "5c0361bd-8103-5f5f-b3ad-da3f2889870e",
+          "name": "Freja Lund",
+          "confidence": 1.0,
+          "lines": [
+            "019f0328-4a80-724e-a4f9-13c8dd329fad",
+            "019f0396-2780-7cb2-a64d-aec9a886bdce",
+            "019f0584-8a00-7b82-af1b-49bacb1463f9"
+          ]
+        },
+        {
+          "id": "2e18aa2a-d3b0-553e-ba40-ed41bccccf6d",
+          "name": "Liv Berg",
+          "confidence": 0.8,
+          "lines": [
+            "019efd94-1180-7601-a4de-2752522eee3e"
+          ]
+        },
+        {
+          "id": "33072822-5482-58ba-bc63-8f198e35d71e",
+          "name": "Per Hansen",
+          "confidence": 0.8,
+          "lines": [
+            "019efd94-1180-7601-a4de-2752522eee3e"
+          ]
+        }
+      ],
+      "flights_in": [
+        {
+          "date": "2026-06-25",
+          "carrier": "XY",
+          "number": "571",
+          "from": "OSL",
+          "to": "CPH",
+          "evidence": "tracked",
+          "lines": [
+            "019eff14-9700-7848-abc5-1ed5501b2f34"
+          ]
+        }
+      ],
+      "flights_out": [
+        {
+          "date": "2026-06-27",
+          "carrier": "XY",
+          "number": "572",
+          "from": "CPH",
+          "to": "OSL",
+          "evidence": "declared",
+          "lines": [
+            "019f0885-9500-7cbc-b660-87f573b28107"
+          ]
+        }
+      ],
+      "flights": [
+        {
+          "date": "2026-06-25",
+          "carrier": "XY",
+          "number": "571",
+          "from": "OSL",
+          "to": "CPH",
+          "evidence": "tracked",
+          "lines": [
+            "019eff14-9700-7848-abc5-1ed5501b2f34"
+          ]
+        },
+        {
+          "date": "2026-06-27",
+          "carrier": "XY",
+          "number": "572",
+          "from": "CPH",
+          "to": "OSL",
+          "evidence": "declared",
+          "lines": [
+            "019f0885-9500-7cbc-b660-87f573b28107"
+          ]
+        }
+      ],
+      "lines": [
+        "019eff9d-eb40-7de2-acfd-860b9b40b482",
+        "019f02ec-c820-7f7b-a7df-68e62c3c5038",
+        "019f0456-6a40-76ac-b5d6-85e8ec9d4d57",
+        "019f0813-2420-7eba-bbd5-944cb40d0826",
+        "019eff14-9700-7848-abc5-1ed5501b2f34",
+        "019f0885-9500-7cbc-b660-87f573b28107",
+        "019f0328-4a80-724e-a4f9-13c8dd329fad",
+        "019f0396-2780-7cb2-a64d-aec9a886bdce",
+        "019f0584-8a00-7b82-af1b-49bacb1463f9",
+        "019efd94-1180-7601-a4de-2752522eee3e"
+      ],
+      "weather": null
+    }
+  ]
+}

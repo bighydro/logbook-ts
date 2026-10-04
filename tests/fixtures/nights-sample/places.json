@@ -1,0 +1,27 @@
+{
+  "Home": {
+    "lat": 59.9139,
+    "lon": 10.7522,
+    "radius_m": 120,
+    "kind": "home",
+    "country": "NO"
+  },
+  "Marina": {
+    "lat": 59.905,
+    "lon": 10.735,
+    "radius_m": 150,
+    "kind": "asset-berth",
+    "tags": [
+      "boat"
+    ]
+  },
+  "Berth": {
+    "lat": 59.9,
+    "lon": 10.72,
+    "radius_m": 150,
+    "kind": "asset-berth",
+    "tags": [
+      "boat"
+    ]
+  }
+}

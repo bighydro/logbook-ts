@@ -2,8 +2,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { addDays } from "../src/clock.js";
+import { rollupNights } from "../src/nights.js";
 import { readTrips } from "../src/trips.js";
-import { cleanup, tempDir, writeMeta } from "./helpers.js";
+import { cleanup, tempDir, writeMeta, writeRecord } from "./helpers.js";
 
 afterEach(cleanup);
 
@@ -98,5 +99,53 @@ describe("the reading of a window", () => {
     // Four times the record, the same high-water mark: one month file's lines plus what is open.
     expect(long.peakHeld).toBeLessThanOrEqual(short.peakHeld * 1.05);
     expect(long.peakHeld).toBeLessThan(31 * 145 * 1.5);
+  });
+});
+
+describe("the window of the readers over a window", () => {
+  const point = (at: string, lat: number, lon: number, subject?: string) => ({
+    at,
+    source: subject === undefined ? "sim-phone" : "ais",
+    kind: "location",
+    tier: 1 as const,
+    payload: {
+      schema: "location/v1",
+      lat,
+      lon,
+      accuracy_m: 10,
+      ...(subject === undefined ? {} : { subject, tracker: "aisstream" }),
+    },
+  });
+
+  it("runs from the first to the last local day with a location line, an asset's included, a note's not", () => {
+    // The yacht reports two days before the owner's first point and three days after the last; a note later still.
+    const points = [
+      point("2026-01-01T10:00:00Z", 59.905, 10.735, "zeta"),
+      point("2026-01-07T10:00:00Z", 59.905, 10.735, "zeta"),
+      {
+        at: "2026-01-09T12:00:00Z",
+        source: "manual",
+        kind: "note",
+        tier: 2 as const,
+        payload: { schema: "note/v1", text: "later" },
+      },
+    ];
+    for (
+      let ms = Date.parse("2026-01-03T11:00:00Z");
+      ms <= Date.parse("2026-01-04T22:50:00Z");
+      ms += 600_000
+    ) {
+      points.push(point(new Date(ms).toISOString().replace(".000Z", "Z"), HOME.lat, HOME.lon));
+    }
+    const root = writeRecord(points);
+    writeFileSync(
+      join(root, "places.json"),
+      JSON.stringify({ Home: { ...HOME, radius_m: 120, kind: "home", country: "NO" } }),
+      "utf-8",
+    );
+    const nights = rollupNights(root, {});
+    expect(nights.window).toMatchObject({ since: "2026-01-01", until: "2026-01-07" });
+    expect(nights.years[0]).toMatchObject({ home: 2, away: 0, in_transit: 5 });
+    expect(readTrips(root, {}).window?.days).toHaveLength(7);
   });
 });
