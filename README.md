@@ -33,8 +33,18 @@ node dist/bin.js verify /tmp/mine
 # change one byte inside any line and it is no longer a logbook
 sed -i.bak 's/"accuracy_m": 12/"accuracy_m": 13/' /tmp/mine/logbook/2026/03.jsonl
 node dist/bin.js verify /tmp/mine
-#  invalid — 1 error
+#  invalid — 1 error; 32 lines read, head <new hex>
 #    logbook/2026/03.jsonl line 1: seq 1 — hash 129e6cdc… does not recompute (got cd36ca92…)
+
+# a crash can cut a month file inside the line being written: the lines before the cut still verify,
+# and the owner learns which prefix of the chain is intact (SPEC §3, truncation)
+cp -R tests/fixtures/sample-logbook /tmp/torn
+head -c -200 /tmp/torn/logbook/2026/03.jsonl > /tmp/torn/cut && mv /tmp/torn/cut /tmp/torn/logbook/2026/03.jsonl
+node dist/bin.js verify /tmp/torn
+#  invalid — 3 errors; 30 lines read, head f50a9f8dd3ef872371396ab9326aa7488ee60b3ccf5afa788ac6927d82e6a890
+#    logbook/2026/03.jsonl line 31: the file ends inside this line (cut short)
+#    logbook.json: seq 31 does not match the last line (30)
+#    logbook.json: head 035a74e0… does not match the last line (f50a9f8d…)
 
 # the day read back whole: nights, country, stays and moves with what attached to each and who was there
 node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
@@ -79,7 +89,7 @@ SPEC §6, the conformance rule, and the readers.
 
 | Command | Does |
 |---|---|
-| `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or the errors on stderr and exits 1. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. |
+| `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or `invalid — N errors; M lines read, head <hex>` and the errors on stderr and exits 1: the seq and head of the lines read, so a record whose month file a crash cut inside a line (SPEC §3, truncation) reports the last whole line and its hash, never 0 and GENESIS while the first line is whole, and names the cut line `<file> line N: the file ends inside this line (cut short)`. A line that is not one is reported by file and line number and its file is read no further; a last line whole but for its newline is a line. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. |
 | `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |

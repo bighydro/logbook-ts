@@ -1,12 +1,16 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
 import { hashLine, ZERO_HASH } from "../src/chain.js";
 import { addNote, LogbookError, verifyLogbook } from "../src/store.js";
 import type { Line } from "../src/types.js";
 import {
   cleanup,
+  copyFixture,
   copySample,
+  cutInsideLastLine,
+  type Draft,
   EXPECTED,
   freshLogbook,
   readLines,
@@ -15,6 +19,7 @@ import {
   SAMPLE_MONTH,
   writeLines,
   writeMeta,
+  writeRecord,
 } from "./helpers.js";
 
 afterEach(cleanup);
@@ -422,5 +427,156 @@ describe("addNote", () => {
     writeMeta(root, { ...readMetaFile(root), head: "b".repeat(64) });
     expect(() => addNote(root, "onto a broken head")).toThrow(LogbookError);
     expect(readLines(root)).toHaveLength(32);
+  });
+});
+
+describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation; §6)", () => {
+  const SEED1_MONTH = join("logbook", "2026", "06.jsonl");
+
+  it("the seed-1 demo cut inside its last line: the 12,771 lines before it, their head, and the cut line named", () => {
+    const root = copyFixture("demo-seed1");
+    const { row, seq, head } = cutInsideLastLine(root, SEED1_MONTH);
+    expect(seq).toBe(12771);
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([
+      `${SEED1_MONTH} line ${row}: the file ends inside this line (cut short)`,
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.lines).toBe(12771);
+    expect(result.head).toBe(head);
+    expect(result.head).not.toBe(ZERO_HASH);
+  });
+
+  it("a last line whole but for its newline is a line, and the file cut there is valid", () => {
+    const root = copySample();
+    const file = join(root, SAMPLE_MONTH);
+    writeFileSync(file, readFileSync(file, "utf-8").replace(/\n$/, ""), "utf-8");
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([]);
+    expect(result.lines).toBe(EXPECTED.seq);
+    expect(result.head).toBe(EXPECTED.head);
+  });
+
+  it("a last row with no newline that is JSON but not an object is not cut short: it is said as what it is", () => {
+    const root = copySample();
+    const file = join(root, SAMPLE_MONTH);
+    writeFileSync(file, `${readFileSync(file, "utf-8")}[1]`, "utf-8");
+    const result = verifyLogbook(root);
+    expect(result.lines).toBe(EXPECTED.seq);
+    expect(result.head).toBe(EXPECTED.head);
+    expect(result.errors).toEqual([`${SAMPLE_MONTH} line 32: not a JSON object`]);
+  });
+
+  it("a file whose only line is cut: no whole line remains, so 0 and GENESIS", () => {
+    const root = writeRecord([
+      {
+        at: "2026-04-01T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "one" },
+      },
+    ]);
+    const rel = join("logbook", "2026", "04.jsonl");
+    const { row, seq } = cutInsideLastLine(root, rel);
+    expect([row, seq]).toEqual([1, 0]);
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([`${rel} line 1: the file ends inside this line (cut short)`]);
+    expect(result.lines).toBe(0);
+    expect(result.head).toBe(ZERO_HASH);
+  });
+
+  it("cut inside any line of a record: seq and head are those of the whole lines before the cut, never 0 and GENESIS while the first line is whole", () => {
+    // The reference's property (tests/properties/test_hash_chain.py, truncation inside a line) here:
+    // one to three lines in one month, the file cut at any byte; the lines the cut leaves whole are a
+    // chained prefix, so verify reports their count and the last one's hash, and names the cut line.
+    // A cut at a row boundary leaves only logbook.json ahead (SPEC §3, write order); a cut right
+    // before a newline leaves the line whole (§1.1: the chain covers lines, not bytes).
+    const rel = join("logbook", "2026", "04.jsonl");
+    const drafts = fc
+      .array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 3 })
+      .map((texts): Draft[] =>
+        texts.map((text, i) => ({
+          at: `2026-04-0${i + 1}T10:00:00Z`,
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text },
+        })),
+      );
+    fc.assert(
+      fc.property(drafts, fc.nat(), (made, pick) => {
+        const root = writeRecord(made);
+        const file = join(root, rel);
+        const bytes = readFileSync(file);
+        const rows = bytes.toString("utf-8").slice(0, -1).split("\n");
+        const hashes = rows.map((r) => String((JSON.parse(r) as Line).hash));
+        const cut = pick % bytes.length;
+        writeFileSync(file, bytes.subarray(0, cut));
+
+        // The oracle: the rows whose text the cut left whole, and whether bytes follow them.
+        let offset = 0;
+        let whole = 0;
+        for (const row of rows) {
+          const length = Buffer.byteLength(row, "utf-8");
+          if (offset + length > cut) break;
+          whole += 1;
+          offset += length + 1;
+        }
+        const torn = cut > offset;
+
+        const result = verifyLogbook(root);
+        expect(result.valid).toBe(false);
+        expect(result.lines).toBe(whole);
+        expect(result.head).toBe(whole ? hashes[whole - 1] : ZERO_HASH);
+        const ofFiles = result.errors.filter((e) => !e.startsWith("logbook.json"));
+        expect(ofFiles).toEqual(
+          torn ? [`${rel} line ${whole + 1}: the file ends inside this line (cut short)`] : [],
+        );
+        expect(result.errors.some((e) => e.startsWith("logbook.json"))).toBe(true);
+        cleanup();
+      }),
+      { numRuns: 60 },
+    );
+  });
+
+  it("a line that is not one, mid-file: named by file and line number, the file read no further, the lines before it and every other file's still counted", () => {
+    // What the reference does (its tests/test_streaming.py): the seqs the file held after the bad
+    // line are then missing from the chain, and said so. SPEC-QUESTIONS 81.
+    const root = writeRecord([
+      {
+        at: "2026-04-01T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "one" },
+      },
+      {
+        at: "2026-04-02T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "two" },
+      },
+      {
+        at: "2026-04-03T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "three" },
+      },
+      {
+        at: "2026-05-01T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "four" },
+      },
+    ]);
+    const april = join("logbook", "2026", "04.jsonl");
+    const rows = readLines(root, april);
+    const third = JSON.parse(rows[2] as string) as Line;
+    writeLines(root, [rows[0] as string, "{oops", rows[2] as string], april);
+    const result = verifyLogbook(root);
+    expect(result.lines).toBe(2); // seq 1 of April, seq 4 of May; seq 3 was after the cut
+    expect(result.head).toBe(String(readMetaFile(root).head));
+    expect(result.errors[0]).toMatch(/^logbook[\\/]2026[\\/]04\.jsonl line 2: not JSON/);
+    expect(result.errors.some((e) => /seq 4 — expected seq 2/.test(e))).toBe(true);
+    expect(result.errors.some((e) => /seq 3/.test(e))).toBe(false);
+    expect(result.errors.some((e) => e.includes(`prev ${third.hash}`))).toBe(true); // seq 4's prev is unmet
   });
 });
