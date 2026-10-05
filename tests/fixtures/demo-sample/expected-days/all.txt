@@ -1,0 +1,5 @@
+2026-06-12  Fri  Home                             1.0 km  4 stays (4 attached) · with 2 · sleep 7.5 h · 7,588 steps · resting 58 bpm
+2026-06-13  Sat  Home                             2.7 km  3 stays (8 attached) · with 3 · sleep 6.8 h · 8,320 steps · resting 60 bpm
+2026-06-14  Sun  Home                             6.4 km  3 stays (5 attached) · sleep 6.2 h · 10,627 steps · resting 53 bpm
+2026-06-15  Mon  aboard Nordlys NO               11.1 km  2 stays (2 attached) · with 2 · sleep 6.2 h · 6,671 steps · resting 54 bpm
+2026-06-16  Tue  in transit                       0.0 km  1 stay · sleep 6.2 h · 481 steps · resting 56 bpm · gap ios-calendar, safari

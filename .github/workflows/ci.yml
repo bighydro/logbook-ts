@@ -50,6 +50,14 @@ jobs:
           node dist/bin.js rollup nights tests/fixtures/nights-sample --year 2026 --json
           node dist/bin.js trips tests/fixtures/demo-seed1
           node dist/bin.js rollup nights tests/fixtures/demo-seed1 --since 2026-06-08 --until 2026-06-20
+      - name: the built binary reads the days of the demo record, whole and a range, as text and as JSON Lines
+        run: |
+          node dist/bin.js days tests/fixtures/demo-seed1
+          node dist/bin.js days tests/fixtures/demo-seed1 --from 2026-06-14 --to 2026-06-21 --json
+      - name: the built binary lists the people of the demo record, whole and one year, as text and as JSON
+        run: |
+          node dist/bin.js people tests/fixtures/demo-seed1
+          node dist/bin.js people tests/fixtures/demo-seed1 --year 2026 --json
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own tag.
@@ -124,10 +132,11 @@ jobs:
     # bighydro/logbook at main on every expected-show fixture (the two synthetic records and the
     # conformance sample), `logbook day` on every expected-day fixture and on three days of the
     # reference's demo record, `logbook stats` and `logbook sources --gaps` on the fixtures and on the
-    # demo record, and `logbook trips`, `logbook rollup countries` and `logbook rollup nights` on every
+    # demo record, `logbook trips`, `logbook rollup countries` and `logbook rollup nights` on every
     # expected-trips fixture — the two probe records, the two day fixtures, the conformance sample and
-    # the vendored `logbook demo --seed 1` — and on the whole seed-7 demo record, and diffs them against
-    # ours and against the vendored expected files.
+    # the vendored `logbook demo --seed 1` — and on the whole seed-7 demo record, and `logbook days` and
+    # `logbook people` on every expected-days and expected-people fixture — the conformance sample and
+    # the seed-1 demo among them — and diffs them against ours and against the vendored expected files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

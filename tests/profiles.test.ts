@@ -49,7 +49,7 @@ function theLine(record: string): Line {
 
 /**
  * Profiles whose `show` row this implementation does not print as the reference does yet
- * (SPEC-QUESTIONS 76). `it.fails` holds the difference: the case turns red the day it is fixed, so
+ * (SPEC-QUESTIONS 77). `it.fails` holds the difference: the case turns red the day it is fixed, so
  * the entry here is removed with the fix, never left behind.
  */
 const SHOW_DIFFERS = new Set(["received/v1", "story/v1"]);

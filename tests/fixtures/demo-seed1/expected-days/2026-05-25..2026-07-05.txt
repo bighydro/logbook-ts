@@ -1,0 +1,42 @@
+2026-05-25  Mon  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-26  Tue  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-27  Wed  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-28  Thu  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-29  Fri  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-30  Sat  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-05-31  Sun  Home                             0.0 km  0 stays · gap ais, apple-health, dawarich, safari, whatsapp
+2026-06-01  Mon  Home                             1.1 km  3 stays (4 attached) · with 2 · 8,762 steps · resting 52 bpm
+2026-06-02  Tue  Home                             1.1 km  3 stays (3 attached) · with 1 · sleep 6.4 h · 8,389 steps · resting 56 bpm
+2026-06-03  Wed  Home                             4.3 km  5 stays (10 attached) · with 1 · sleep 6.5 h · 8,571 steps · resting 55 bpm
+2026-06-04  Thu  Home                             1.1 km  3 stays (5 attached) · with 2 · sleep 6.2 h · 8,390 steps · resting 59 bpm
+2026-06-05  Fri  Home                             1.3 km  3 stays (4 attached) · with 2 · sleep 7.0 h · 8,140 steps · resting 53 bpm
+2026-06-06  Sat  Cabin NO                         119 km  2 stays (7 attached) · with 1 · sleep 7.3 h · 12,224 steps · resting 53 bpm
+2026-06-07  Sun  Home                             119 km  2 stays (5 attached) · sleep 6.4 h · 12,143 steps · resting 55 bpm
+2026-06-08  Mon  47.3769,8.5417 (Zurich) CH     1,471 km  XY 561 OSL→ZRH · 4 stays (6 attached) · sleep 6.1 h · 7,839 steps · resting 57 bpm
+2026-06-09  Tue  47.3769,8.5417 (Zurich) CH       2.3 km  3 stays (5 attached) · with 2 · sleep 6.6 h · 12,001 steps · resting 52 bpm
+2026-06-10  Wed  47.3769,8.5417 (Zurich) CH       3.9 km  4 stays (6 attached) · sleep 6.1 h · 11,131 steps · resting 53 bpm
+2026-06-11  Thu  Home                           1,471 km  XY 562 ZRH→OSL · 4 stays (4 attached) · sleep 6.7 h · 8,261 steps · resting 56 bpm
+2026-06-12  Fri  Home                             1.0 km  3 stays (4 attached) · with 2 · sleep 6.8 h · 7,935 steps · resting 60 bpm
+2026-06-13  Sat  Home                             2.7 km  3 stays (8 attached) · with 3 · sleep 7.0 h · 7,928 steps · resting 58 bpm
+2026-06-14  Sun  Home                             6.4 km  3 stays (5 attached) · sleep 6.9 h · 10,914 steps · resting 53 bpm
+2026-06-15  Mon  aboard Nordlys NO               11.1 km  2 stays (2 attached) · with 2 · sleep 6.6 h · 6,445 steps · resting 53 bpm · gap whatsapp
+2026-06-16  Tue  aboard Nordlys NO               47.2 km  1 stay (4 attached) · sleep 7.3 h · 6,763 steps · resting 52 bpm
+2026-06-17  Wed  aboard Nordlys NO               49.4 km  1 stay (3 attached) · sleep 6.7 h · 6,602 steps · resting 56 bpm
+2026-06-18  Thu  aboard Nordlys NO                2.0 km  3 stays (3 attached) · sleep 7.5 h · 6,019 steps · resting 55 bpm
+2026-06-19  Fri  aboard Nordlys NO               94.6 km  1 stay (5 attached) · sleep 7.0 h · 6,883 steps · resting 53 bpm
+2026-06-20  Sat  aboard Nordlys NO                9.7 km  1 stay (3 attached) · sleep 6.1 h · 6,538 steps · resting 58 bpm
+2026-06-21  Sun  Home                             1.4 km  2 stays (3 attached) · sleep 6.5 h · 6,568 steps · resting 53 bpm · gap whatsapp
+2026-06-22  Mon  Home                             1.1 km  3 stays (3 attached) · with 1 · sleep 7.3 h · 7,878 steps · resting 59 bpm
+2026-06-23  Tue  Home                             4.1 km  5 stays (11 attached) · with 1 · sleep 6.0 h · 7,400 steps · resting 52 bpm
+2026-06-24  Wed  Home                             1.0 km  3 stays (4 attached) · with 2 · sleep 7.3 h · 8,595 steps · resting 60 bpm
+2026-06-25  Thu  55.6850,12.5500 (Copenhagen) DK     564 km  XY 571 OSL→CPH · 5 stays (6 attached) · with 2 · sleep 6.5 h · 8,246 steps · resting 60 bpm
+2026-06-26  Fri  55.6850,12.5500 (Copenhagen) DK     3.4 km  3 stays (6 attached) · with 1 · sleep 6.3 h · 11,612 steps · resting 55 bpm
+2026-06-27  Sat  Home                             563 km  XY 572 CPH→OSL · 4 stays (5 attached) · sleep 7.7 h · 8,479 steps · resting 57 bpm
+2026-06-28  Sun  Home                             6.4 km  3 stays (5 attached) · sleep 6.7 h · 10,396 steps · resting 59 bpm
+2026-06-29  Mon  Home                             1.2 km  3 stays (5 attached) · with 2 · sleep 7.1 h · 7,866 steps · resting 59 bpm
+2026-06-30  Tue  Home                             1.3 km  3 stays (3 attached) · with 1 · sleep 7.3 h · 7,837 steps · resting 55 bpm
+2026-07-01  Wed  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-07-02  Thu  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-07-03  Fri  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-07-04  Sat  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
+2026-07-05  Sun  no location                      0.0 km  nothing logged · gap ais, apple-health, dawarich, safari, whatsapp
