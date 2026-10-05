@@ -5,7 +5,9 @@ import { localOf } from "../src/clock.js";
 import { verifyLogbook } from "../src/store.js";
 import {
   cleanup,
+  copyFixture,
   copySample,
+  cutInsideLastLine,
   EXPECTED,
   expectedDays,
   expectedDaysWindows,
@@ -50,6 +52,32 @@ describe("logbook-ts verify", () => {
     expect(out).toBe("");
     expect(err).toMatch(/^invalid/);
     expect(err).toMatch(/seq 1/);
+  });
+
+  it("verify on the seed-1 demo cut inside its last line: exit 1, the lines read and their head, one plain sentence naming the cut line", () => {
+    // SPEC §3, truncation: the seq and head of the last whole line, never 0 and GENESIS; the
+    // sentence is the reference's (`logbook verify`, #214), without the JSON decoder's position.
+    const root = copyFixture("demo-seed1");
+    const rel = join("logbook", "2026", "06.jsonl");
+    const { row, head } = cutInsideLastLine(root, rel);
+    const { code, out, err } = run(["verify", root]);
+    expect(code).toBe(1);
+    expect(out).toBe("");
+    expect(err).toBe(
+      `invalid — 1 error; 12771 lines read, head ${head}\n` +
+        `  ${rel} line ${row}: the file ends inside this line (cut short)\n`,
+    );
+  });
+
+  it("verify names the lines read and their head on every invalid record", () => {
+    const root = copySample();
+    const lines = readLines(root);
+    writeLines(root, [...lines, lines[30] as string]);
+    const { code, err } = run(["verify", root]);
+    expect(code).toBe(1);
+    expect(err.split("\n")[0]).toMatch(
+      new RegExp(`^invalid — \\d+ errors; 32 lines read, head ${EXPECTED.head}$`),
+    );
   });
 
   it("verifies a logbook/0.3 record and exits 0", () => {

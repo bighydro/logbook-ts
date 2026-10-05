@@ -78,6 +78,41 @@ export function writeLines(root: string, lines: string[], rel = SAMPLE_MONTH): v
   writeFileSync(join(root, rel), `${lines.join("\n")}\n`, "utf-8");
 }
 
+/** A writable copy of a fixture's record: `logbook.json`, the month files and what else it holds, without the expected output beside it. */
+export function copyFixture(name: string): string {
+  const dir = join(tempDir(), name);
+  cpSync(join(FIXTURES, name), dir, {
+    recursive: true,
+    filter: (src) => !src.includes("expected-"),
+  });
+  return dir;
+}
+
+/**
+ * The torn record a crash leaves (SPEC §3, truncation): the month file `rel` cut halfway into its
+ * last row, and `logbook.json` behind the files, never ahead (SPEC §3, write order), naming the line
+ * before the cut. Returns the number of the cut row in its file, and the `seq` and `hash` of the last
+ * whole line (0 and sixty-four zeros when the file held one line and it is cut).
+ */
+export function cutInsideLastLine(
+  root: string,
+  rel: string,
+): { row: number; seq: number; head: string } {
+  const file = join(root, rel);
+  const bytes = readFileSync(file);
+  const text = bytes.toString("utf-8");
+  const rows = text.endsWith("\n") ? text.slice(0, -1).split("\n") : text.split("\n");
+  const last = Buffer.from(rows[rows.length - 1] as string, "utf-8");
+  const kept = bytes.subarray(0, bytes.length - last.length - (text.endsWith("\n") ? 1 : 0));
+  writeFileSync(file, Buffer.concat([kept, last.subarray(0, Math.floor(last.length / 2))]));
+  const before =
+    rows.length > 1 ? (JSON.parse(rows[rows.length - 2] as string) as Line) : undefined;
+  const seq = before ? before.seq : 0;
+  const head = before ? String(before.hash) : "0".repeat(64);
+  writeMeta(root, { ...readMetaFile(root), seq, head });
+  return { row: rows.length, seq, head };
+}
+
 export function cleanup(): void {
   while (made.length) {
     const dir = made.pop();

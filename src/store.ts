@@ -68,15 +68,25 @@ interface Located {
   where: string;
 }
 
-/** Every line from every `logbook/<YYYY>/<MM>.jsonl`, in file order, with parse errors reported. */
+/**
+ * Every line from every `logbook/<YYYY>/<MM>.jsonl`, in file order. Bytes that are not a line are
+ * reported by file and line number and that file is read no further (SPEC §3, truncation; the
+ * reference does the same, SPEC-QUESTIONS 81): the lines before them and every other file's are
+ * still taken, so a torn write still yields the whole lines as a chained prefix. A last row the
+ * file ends inside — no newline, and not JSON — is said plainly, without the parser's position.
+ */
 function readAllLines(root: string, errors: string[]): Located[] {
   const found: Located[] = [];
   for (const month of monthFiles(root)) {
-    for (const { raw, row } of eachLine(month.file)) {
+    for (const { raw, row, newline } of eachLine(month.file)) {
       const where = `${month.rel} line ${row}`;
       const parsed = parseLine(raw, where);
-      if ("error" in parsed) errors.push(parsed.error);
-      else found.push({ line: parsed.line, where });
+      if ("error" in parsed) {
+        const cut = !newline && parsed.reason === "not-json";
+        errors.push(cut ? `${where}: the file ends inside this line (cut short)` : parsed.error);
+        break;
+      }
+      found.push({ line: parsed.line, where });
     }
   }
   return found;

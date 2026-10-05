@@ -589,3 +589,21 @@ the RFC's words is written here. The RFC's example is synthetic and the fixtures
     `the page has changed since` unless the same lines fall on it; without `--tz` (the default, the
     record's zone) the digest is the reference's. `day` always reads in the record's zone.
 
+81. **A line that is not one, and the lines after it.** SPEC §3's *Truncation* paragraph (the reference's
+    #214, ffd2f97, 2026-10-04) says bytes that are not a line make the record invalid, that a verifier
+    MUST report *each* by file and line number, and that `seq` and `head` are "those of the lines it
+    read". What it does not say is whether a file is read past a line that is not one. Run on a file
+    whose fourth row is cut but newline-terminated, the reference reports that row, reads the file no
+    further (`3 lines read`, the head of seq 3) and lets the chain name the seqs the file held after it
+    as missing; `verify` on the conformance sample so cut prints `INVALID — 2 problem(s); 3 lines read,
+    head 7a120eb9…`. This implementation does the same, so the two agree on `seq` and `head` for any
+    cut, not only the torn write §6 names; before, it skipped the bad row and read on, and a file torn
+    in its middle counted the lines after the tear. Two readings of "each" are open: every bad row in
+    the file (read on), or each bad row found (stop at the first, since the rows after bytes that are
+    not a line have no trustworthy row number). The reference takes the second; the spec should say
+    so. Also found: the reference's `logbook verify` prints its INVALID line to stdout with the lines
+    read and the head (`INVALID — N problem(s); M lines read, head <hex>:`); this implementation keeps
+    its lowercase `invalid — N errors` on stderr and adds `; M lines read, head <hex>` to it. §3 fixes
+    what is reported, not the text; the per-problem sentence for the cut line is matched byte for byte,
+    and `tests/cross-impl.test.ts` holds the reference and this implementation to the same `seq`, `head`
+    and sentences on the conformance sample and the seed-1 demo, whole and cut.
