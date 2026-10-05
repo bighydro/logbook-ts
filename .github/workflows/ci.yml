@@ -141,4 +141,4 @@ jobs:
       - name: install the reference
         run: uv sync --project ref
       - name: both implementations print the same day and count the same record
-        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts tests/profiles.test.ts

@@ -431,3 +431,19 @@ question below. None of this is written down:
     implementation follows the reference. §3.2.7 should list the four. The trip id at the end of a
     `trips` row is text, which §3.2 leaves to each reader (the JSON `id` is the contract); it is
     matched here because this repository diffs the text byte for byte.
+
+## Found while running the per-profile fixtures (openlogbook #223, RFC 0031, 2026-10-05)
+
+76. **Two `show` rows differ from the reference's.** `conformance/profiles/<profile>/` holds one
+    record per frozen profile with the row the reference prints (SPEC §6.1). `tests/profiles.test.ts`
+    passes `verify`, the canonical form and both hashes for all nineteen, and `show` for seventeen;
+    the two below are held by `it.fails` until fixed. (a) `received/v1` (RFC 0030): the reference
+    prints `from Ola Nordmann: photo immich · asset_id=…, faces=1, …` (the sender, then the inner
+    line's kind, source and payload); this implementation prints the payload as `extra={…},
+    line={…}, raw_id=…`. RFC 0030 rule 1 gives the form: "`show` lists them on their day as
+    `from <sender>: <kind> <source> · …`". (b) `story/v1` (RFC 0028): the reference prints
+    `📖 refers to 1961 — told by Ola Nordmann to Kari Nordmann` (`refers_to.text`, the teller, the
+    listener); this implementation prints the story's `text`. RFC 0028 does not give a `show` row
+    yet; the reference's is the one above, and §3.2 leaves the text to each reader, so this is
+    matched here only because this repository diffs `show` byte for byte. Both are this
+    implementation's to fix from the RFCs' words; the fixtures are the reference's.
