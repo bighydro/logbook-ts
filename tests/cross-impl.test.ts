@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
@@ -166,9 +166,15 @@ describe.skipIf(!ready)(
     // seq and head of the last whole line (§3, truncation). The conformance sample and the seed-1 demo,
     // whole and then cut halfway into the last line of their last month file, with logbook.json as a
     // crash leaves it: the two must agree on the seq, the head and the sentence naming the cut line.
-    for (const [fixture, month] of [
-      ["sample-logbook", join("logbook", "2026", "03.jsonl")],
-      ["demo-seed1", join("logbook", "2026", "06.jsonl")],
+    // The reference names the file with `/`; ours names it as node:path joins it, so each is held to
+    // the sentence built from the same parts, never one string against the other.
+    const cutShort = (parts: readonly string[], row: number): { theirs: string; ours: string } => ({
+      theirs: `${posix.join(...parts)} line ${row}: the file ends inside this line (cut short)`,
+      ours: `${join(...parts)} line ${row}: the file ends inside this line (cut short)`,
+    });
+    for (const [fixture, parts] of [
+      ["sample-logbook", ["logbook", "2026", "03.jsonl"]],
+      ["demo-seed1", ["logbook", "2026", "06.jsonl"]],
     ] as const) {
       it(`${fixture}: whole, then cut inside its last line`, () => {
         const copy = copyOf(fixture);
@@ -177,27 +183,25 @@ describe.skipIf(!ready)(
         expect(whole.status).toBe(0);
         expect([ours.lines, ours.head, ours.errors]).toEqual([whole.lines, whole.head, []]);
 
-        const { row, seq, head } = cutInsideLastLine(copy, month);
+        const { row, seq, head } = cutInsideLastLine(copy, join(...parts));
         const torn = referenceVerify(copy);
         const tornOurs = verifyLogbook(copy);
+        const sentence = cutShort(parts, row);
         expect(torn.status).toBe(1);
-        expect([torn.lines, torn.head]).toEqual([seq, head]);
-        expect(torn.errors).toEqual([
-          `${month} line ${row}: the file ends inside this line (cut short)`,
-        ]);
+        expect([torn.lines, torn.head, torn.errors]).toEqual([seq, head, [sentence.theirs]]);
         expect(tornOurs.valid).toBe(false);
         expect([tornOurs.lines, tornOurs.head, tornOurs.errors]).toEqual([
           torn.lines,
           torn.head,
-          torn.errors,
+          [sentence.ours],
         ]);
       }, 120_000);
     }
 
     it("sample-logbook cut inside its first line: no whole line remains, and both say 0 and GENESIS", () => {
       const copy = copyOf("sample-logbook");
-      const month = join("logbook", "2026", "03.jsonl");
-      const file = join(copy, month);
+      const parts = ["logbook", "2026", "03.jsonl"] as const;
+      const file = join(copy, ...parts);
       const first = readFileSync(file, "utf-8").split("\n")[0] as string;
       writeFileSync(file, first.slice(0, Math.floor(first.length / 2)), "utf-8");
       const meta = JSON.parse(readFileSync(join(copy, "logbook.json"), "utf-8")) as Record<
@@ -211,12 +215,17 @@ describe.skipIf(!ready)(
       );
       const theirs = referenceVerify(copy);
       const ours = verifyLogbook(copy);
+      const sentence = cutShort(parts, 1);
       expect(theirs.status).toBe(1);
-      expect([theirs.lines, theirs.head]).toEqual([0, "0".repeat(64)]);
+      expect([theirs.lines, theirs.head, theirs.errors]).toEqual([
+        0,
+        "0".repeat(64),
+        [sentence.theirs],
+      ]);
       expect([ours.lines, ours.head, ours.errors]).toEqual([
         theirs.lines,
         theirs.head,
-        theirs.errors,
+        [sentence.ours],
       ]);
     });
   },

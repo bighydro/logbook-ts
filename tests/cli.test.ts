@@ -76,7 +76,7 @@ describe("logbook-ts verify", () => {
     const { code, err } = run(["verify", root]);
     expect(code).toBe(1);
     expect(err.split("\n")[0]).toMatch(
-      new RegExp(`^invalid — \\d+ errors; 32 lines read, head ${EXPECTED.head}$`),
+      new RegExp(`^invalid — \\d+ errors; ${EXPECTED.seq + 1} lines read, head ${EXPECTED.head}$`),
     );
   });
 

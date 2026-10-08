@@ -17,6 +17,7 @@ import {
   readMetaFile,
   SAMPLE,
   SAMPLE_MONTH,
+  writeBareRecord,
   writeLines,
   writeMeta,
   writeRecord,
@@ -464,7 +465,7 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
     const result = verifyLogbook(root);
     expect(result.lines).toBe(EXPECTED.seq);
     expect(result.head).toBe(EXPECTED.head);
-    expect(result.errors).toEqual([`${SAMPLE_MONTH} line 32: not a JSON object`]);
+    expect(result.errors).toEqual([`${SAMPLE_MONTH} line ${EXPECTED.seq + 1}: not a JSON object`]);
   });
 
   it("a file whose only line is cut: no whole line remains, so 0 and GENESIS", () => {
@@ -490,7 +491,8 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
     // one to three lines in one month, the file cut at any byte; the lines the cut leaves whole are a
     // chained prefix, so verify reports their count and the last one's hash, and names the cut line.
     // A cut at a row boundary leaves only logbook.json ahead (SPEC §3, write order); a cut right
-    // before a newline leaves the line whole (§1.1: the chain covers lines, not bytes).
+    // before a newline leaves the line whole (§1.1: the chain covers lines, not bytes), and right
+    // before the last one leaves the record whole and valid.
     const rel = join("logbook", "2026", "04.jsonl");
     const drafts = fc
       .array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 3 })
@@ -504,7 +506,7 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
       );
     fc.assert(
       fc.property(drafts, fc.nat(), (made, pick) => {
-        const root = writeRecord(made);
+        const root = writeBareRecord(made);
         const file = join(root, rel);
         const bytes = readFileSync(file);
         const rows = bytes.toString("utf-8").slice(0, -1).split("\n");
@@ -522,21 +524,39 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
           offset += length + 1;
         }
         const torn = cut > offset;
+        const complete = whole === rows.length; // every row whole: only the last newline is gone
 
         const result = verifyLogbook(root);
-        expect(result.valid).toBe(false);
+        expect(result.valid).toBe(complete);
         expect(result.lines).toBe(whole);
         expect(result.head).toBe(whole ? hashes[whole - 1] : ZERO_HASH);
         const ofFiles = result.errors.filter((e) => !e.startsWith("logbook.json"));
         expect(ofFiles).toEqual(
           torn ? [`${rel} line ${whole + 1}: the file ends inside this line (cut short)`] : [],
         );
-        expect(result.errors.some((e) => e.startsWith("logbook.json"))).toBe(true);
+        expect(result.errors.some((e) => e.startsWith("logbook.json"))).toBe(!complete);
         cleanup();
       }),
-      { numRuns: 60 },
+      {
+        numRuns: 60,
+        // Replayed on every run: one line of four spaces, cut 382 bytes into its 383 — right before
+        // its newline, so the record is whole and valid (CI on Windows, seed -286592326, 2026-10-05).
+        examples: [
+          [
+            [
+              {
+                at: "2026-04-01T10:00:00Z",
+                source: "manual",
+                kind: "note",
+                payload: { schema: "note/v1", text: "    " },
+              },
+            ],
+            1528781267,
+          ],
+        ],
+      },
     );
-  });
+  }, 60_000);
 
   it("a line that is not one, mid-file: named by file and line number, the file read no further, the lines before it and every other file's still counted", () => {
     // What the reference does (its tests/test_streaming.py): the seqs the file held after the bad
@@ -574,7 +594,7 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
     const result = verifyLogbook(root);
     expect(result.lines).toBe(2); // seq 1 of April, seq 4 of May; seq 3 was after the cut
     expect(result.head).toBe(String(readMetaFile(root).head));
-    expect(result.errors[0]).toMatch(/^logbook[\\/]2026[\\/]04\.jsonl line 2: not JSON/);
+    expect(result.errors[0]?.startsWith(`${april} line 2: not JSON`)).toBe(true);
     expect(result.errors.some((e) => /seq 4 — expected seq 2/.test(e))).toBe(true);
     expect(result.errors.some((e) => /seq 3/.test(e))).toBe(false);
     expect(result.errors.some((e) => e.includes(`prev ${third.hash}`))).toBe(true); // seq 4's prev is unmet
