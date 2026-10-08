@@ -1,4 +1,4 @@
-2026-03-15
+2026-03-15  unsigned
   10:00  resolution ios-contacts   entity={'id': '019c0000-0000-7000-8000-000000000001', 'registry': 'logbook', 'type': 'person'}, label=Ines Holm, method=exact, ref={'kind': 'email', 'value': 'ines@example.org'}
   10:00  resolution ios-contacts   entity={'id': '019c0000-0000-7000-8000-000000000002', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=exact, ref={'kind': 'phone', 'value': '+4790000001'}
   10:00  resolution whatsapp-contacts alias_of={'kind': 'phone', 'value': '+4790000001'}, label=Ola N, method=exact, ref={'kind': 'handle', 'value': '236000000000001@lid'}

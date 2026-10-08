@@ -1,4 +1,4 @@
-2026-03-03
+2026-03-03  unsigned
   00:00  transaction copilot        account=acct_0000000000000001, amount=-42.5, category=restaurants, currency=USD, date=2026-03-03, extra={'original_name': 'HARBOUR CAFE OSLO', 'recurring': False, 'type': 'regular'}, merchant=Harbour Cafe, provider=copilot, raw_id=6f1c2a9e-0000-4000-8000-000000000001, status=posted
   00:30  health     apple-health   device=Watch7,1, raw_id=sleep:1042, stage=deep, type=sleep, unit=s, value=3600
   08:00  health     apple-health   device=Watch7,1, extra={'samples': 3}, raw_id=steps:2026-03-03T07:00:00Z:Watch7,1, source_name=Apple Watch, type=steps, unit=count, value=250

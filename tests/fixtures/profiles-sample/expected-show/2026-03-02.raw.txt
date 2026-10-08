@@ -1,4 +1,4 @@
-2026-03-02
+2026-03-02  unsigned
   06:10  flight     flighty        XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot
   06:12  flight     manual         superseded by #2
   09:04  call       ios-calls      ← +4790000001, 7 min, cellular

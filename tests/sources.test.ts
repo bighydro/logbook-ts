@@ -37,10 +37,10 @@ const D = 24 * H;
 const iso = (ms: number): string => `${new Date(ms).toISOString().slice(0, 19)}Z`;
 const ago = (ms: number): string => iso(NOW.getTime() - ms);
 
-// `logbook sources --gaps` of the reference on the conformance sample, 2026-10-02 13:05 Oslo; the
+// `logbook sources --gaps` of the reference on the conformance sample (32 lines since RFC 0034), 2026-10-02 13:05 Oslo; the
 // footer's "counted through the index" is "counted from the month files" here (SPEC-QUESTIONS 43).
 const SAMPLE_GAPS = `  source            lines  last              longest silence                  missing days
-  manual                4  2026-03-07 22:30  208d 13h since 2026-03-07 22:30  212  2026-03-02, 2026-03-04, 2026-03-06, +1 run
+  manual                5  2026-03-08 20:30  207d 15h since 2026-03-08 20:30  211  2026-03-02, 2026-03-04, 2026-03-06, +1 run
   sim-calendar          3  2026-03-07 19:00  208d 17h since 2026-03-07 19:00  213  2026-03-02..2026-03-04, 2026-03-06, 2026-03-08..2026-10-02
   google-takeout        2  2026-03-08 10:00  208d 2h since 2026-03-08 10:00   208  2026-03-09..2026-10-02
   sim-bank              2  2026-03-08 12:00  208d 0h since 2026-03-08 12:00   213  2026-03-03..2026-03-07, 2026-03-09..2026-10-02
@@ -66,8 +66,8 @@ since each source's first line, today 2026-10-02 (Europe/Oslo); counted from the
 `;
 
 const SAMPLE_GAPS_SINCE = `  source          lines  last              longest silence                  missing days
+  manual              3  2026-03-08 20:30  207d 15h since 2026-03-08 20:30  209  2026-03-06, 2026-03-09..2026-10-02
   google-takeout      2  2026-03-08 10:00  208d 2h since 2026-03-08 10:00   211  2026-03-05..2026-03-07, 2026-03-09..2026-10-02
-  manual              2  2026-03-07 22:30  208d 13h since 2026-03-07 22:30  210  2026-03-06, 2026-03-08..2026-10-02
   sim-calendar        2  2026-03-07 19:00  208d 17h since 2026-03-07 19:00  210  2026-03-06, 2026-03-08..2026-10-02
   sim-flights         2  2026-03-08 14:10  207d 21h since 2026-03-08 14:10  210  2026-03-06..2026-03-07, 2026-03-09..2026-10-02
   ais                 1  2026-03-08 07:00  208d 5h since 2026-03-08 07:00   211  2026-03-05..2026-03-07, 2026-03-09..2026-10-02
@@ -99,23 +99,23 @@ describe("sources --gaps on the conformance sample, as the reference prints it",
     const manual = report.sources[0];
     expect(manual).toMatchObject({
       source: "manual",
-      lines: 4,
+      lines: 5,
       first: "2026-03-01T21:00:00Z",
-      last: "2026-03-07T21:30:00Z",
-      silence: { from: "2026-03-07T21:30:00Z", to: null },
+      last: "2026-03-08T19:30:00Z",
+      silence: { from: "2026-03-08T19:30:00Z", to: null },
       flagged: true,
     });
     expect(manual?.silence?.seconds).toBeCloseTo(
-      (NOW.getTime() - Date.parse("2026-03-07T21:30:00Z")) / 1000,
+      (NOW.getTime() - Date.parse("2026-03-08T19:30:00Z")) / 1000,
       3,
     );
     expect(manual?.missing_days.slice(0, 4)).toEqual([
       "2026-03-02",
       "2026-03-04",
       "2026-03-06",
-      "2026-03-08",
+      "2026-03-09",
     ]);
-    expect(manual?.missing_days).toHaveLength(212);
+    expect(manual?.missing_days).toHaveLength(211);
     expect(manual?.missing_days.at(-1)).toBe("2026-10-02");
   });
 
@@ -327,15 +327,15 @@ describe("sources without --gaps lists the record's sources", () => {
     expect(listed.timezone).toBe("Europe/Oslo");
     expect(listed.sources[0]).toEqual({
       source: "manual",
-      lines: 4,
+      lines: 5,
       first: "2026-03-01T21:00:00Z",
-      last: "2026-03-07T21:30:00Z",
+      last: "2026-03-08T19:30:00Z",
     });
     expect(listed.sources).toHaveLength(20);
     const text = sourcesText(listed);
     expect(text.split("\n").slice(0, 3)).toEqual([
       "  source            lines  first             last",
-      "  manual                4  2026-03-01 22:00  2026-03-07 22:30",
+      "  manual                5  2026-03-01 22:00  2026-03-08 20:30",
       "  sim-calendar          3  2026-03-01 10:00  2026-03-07 19:00",
     ]);
     expect(text).toMatch(/\n\n20 sources with lines\n$/);
@@ -411,7 +411,7 @@ describe("logbook-ts sources", () => {
   it("without --gaps lists the sources, and refuses --since, --expect and --json then", () => {
     const plain = run(["sources", SAMPLE]);
     expect(plain.code).toBe(0);
-    expect(plain.out).toMatch(/^ {2}source {12}lines {2}first {13}last\n {2}manual {16}4 {2}/);
+    expect(plain.out).toMatch(/^ {2}source {12}lines {2}first {13}last\n {2}manual {16}5 {2}/);
     for (const extra of [["--since", "2026-03-05"], ["--expect", "manual"], ["--json"]]) {
       const refused = run(["sources", SAMPLE, ...extra]);
       expect(refused.code).toBe(2);

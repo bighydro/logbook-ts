@@ -114,6 +114,20 @@ export {
   showRange,
 } from "./show.js";
 export {
+  isSignedDay,
+  pageDigest,
+  pageOf,
+  SIGNED_DAY_KIND,
+  SIGNED_DAY_SCHEMA,
+  type SignedState,
+  signedDayProblems,
+  signedDayRow,
+  signedState,
+  signedStateText,
+  sortPage,
+  standingSignatures,
+} from "./signing.js";
+export {
   BadRange,
   type GapsOptions,
   type GapsReport,

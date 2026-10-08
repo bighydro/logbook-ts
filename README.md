@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (openlogbook, main at 176e6a7, 2026-10-04) does, matched against the
+the reference implementation (openlogbook, main at 3092b60, 2026-10-08) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test.
 
@@ -22,7 +22,7 @@ pnpm install && pnpm build
 
 # the conformance sample from the spec repo: one week of a fictional person in Oslo
 node dist/bin.js verify tests/fixtures/sample-logbook
-#  valid — 31 lines, head 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
+#  valid — 32 lines, head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
 
 # append a note to a copy; the chain still verifies
 cp -R tests/fixtures/sample-logbook /tmp/mine
@@ -109,7 +109,8 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 `show` prints the lines whose `at` falls on the given calendar day in a timezone: `--tz` if given, else
 the owner's `timezone` from `logbook.json`. The zone comes from Node's built-in ICU (`Intl`), not from a
 dependency. The output is, row for row, what `logbook show` of the reference implementation prints
-on the same record: a heading with the day, then `  HH:MM  kind  source  summary` with the kind
+on the same record: a heading with the day and whether the owner signed it (`2026-03-01  signed 2026-03-08 20:30`
+or `2026-03-01  unsigned`; see *The signed day* below), then `  HH:MM  kind  source  summary` with the kind
 padded to ten columns and the source to fourteen, then, when `notes/<YYYY>/<day>.md` exists,
 `  — note —` and the file two spaces in. A day with no lines prints `<day>: nothing logged`. Rows
 are ordered by the instant `at` denotes, then by `seq` (SPEC §3.2). A day with a `keeper/v1` line
@@ -132,10 +133,34 @@ The summary depends on the kind; names come from the record's own `resolution/v1
 | `highlight` | `“quote” — title · note`; a bookmark is `bookmark — title @ location`. |
 | `trip` | `from → to, mode, provider, 58.00 CHF, cancelled, 1 change, ticket`. |
 | `crossing` | `crossed to hermes: 6 lines (tier 1: 2, tier 2: 4)`. |
+| `signed-day` | `signed 2026-03-01: 7 lines confirmed of 7 · A quiet Sunday.`, listed on the day the owner signed, not the day signed. |
 | `task`, `browse`, `watch`, `listen`, `commitment` and any other kind | `text`, else `title` (a page's `url`), else every payload field but `schema` as `key=value`, spelled as Python's `str()` spells it, which is what the reference prints for `photo`, `health`, `transaction`, `resolution` and `commitment-close` lines. |
 
 A line hidden by a `retraction/v1` line (RFC 0003) stays in its place as `  22:30  retracted #11: typo`;
 the retraction itself is not listed on its own day.
+
+### The signed day
+
+`signed-day/v1` (RFC 0034, *The signed day*) is the line the owner appends when they have read a day's page
+and confirm it as the day's facts: tier 1, source `manual`, with the local day signed, the owner as `subject`,
+the ids of the lines `confirmed`, the digest of the `page` as shown and how many lines were on it, an
+optional one-line `note`, and `supersedes` when it replaces an earlier signature of the same day. The page
+is every line of the local day but the retractions and the signatures, a retracted line included, by
+instant then `seq`; its digest is `sha256(canonical_json({"day", "tz", "lines": [the lines' hashes]}))`,
+so any implementation recomputes it from the record alone and the 32nd line of the conformance sample
+reproduces byte for byte (`tests/signing.test.ts`). The **standing signature** of a day is the latest
+`signed-day` line by `seq` naming it whose subject is the owner and that is not retracted; `show` and
+`day` print `signed <local day and minute>` in the day's header, with `, the page has changed since` when
+the page no longer digests to what was signed (a line appended with an `at` on that day), else `unsigned`.
+`day --json` carries the same under `signed`. Nothing here signs: the reference's `logbook day sign` is the
+one producer, and no agent can sign (RFC 0034 rule 1). `signedDayProblems` in the library says why a line
+is not a signature; this implementation has no profile validator in `verify`, so the profile's rules live
+in `src/signing.ts` with its readers.
+
+`signed-day/v1` is **new, not frozen**: it is not one of the nineteen profiles RFC 0031 freezes, its schema
+may change while RFC 0034 is a draft, and it becomes frozen only by RFC 0031's process (a reader, a fixture
+in both implementations under `conformance/profiles/signed-day/`, a schema pass and one dated amendment
+to that RFC). This implementation follows the fixture when it lands.
 
 People are named from the record's own `resolution/v1` lines (RFC 0006), never from a contact list:
 for each ref (`{kind, value}`, such as a phone number or an email address) the last resolution line in
@@ -185,7 +210,10 @@ is the next day in Oslo; `tests/fixtures/profiles-sample` has one line of every 
 (flight, call, transcript, mail, voice-memo, highlight, task, browse, watch, listen, trip, transaction,
 health-sample, location with a subject, event, photo, message, note, commitment, crossing, resolution)
 in the RFC examples' shapes; `tests/fixtures/sample-logbook` is `conformance/sample-logbook` of the spec
-repo at v0.5.0 (31 lines, one of every profile), vendored unchanged. `make.mjs` beside each synthetic
+repo at 3092b60 (32 lines, one of every profile, the first day signed on the last evening, RFC 0034), vendored
+unchanged, and `tests/fixtures/sample-logbook-sealed` its Level 2 twin (the same week, tiers 2–3 sealed to
+two recipients; `verify` reads it keyless to the head in `expected-sealed.json`, and cannot open it, having
+nothing to decrypt with). `make.mjs` beside each synthetic
 record regenerates it. Beside each, `expected-show/` holds what `logbook show` of the reference printed
 for every day, with and without `--raw` (the conformance sample whole, all eight days, since the
 reference at b3cd8c5 reads each as SPEC §3.2 says; SPEC-QUESTIONS 40); the unit tests check our output
@@ -245,13 +273,18 @@ in `logbook.json`, the resolution lines naming those, `policy/owner.json`). The 
 `flight/v1` lines standing. What fell inside no stay or move is **unplaced**. The **health** line is the
 night's sleep (the union of the asleep stages per device, the longest device), the day's steps (the larger
 device per quarter hour) and resting heart rate (the day's mean), corrections honoured. The **sources** are
-every source with a line standing on the day, how many, and its newest. Airports and zones come from the
+every source with a line standing on the day, how many, and its newest. The header says after the weekday
+whether the owner **signed** the day (`2026-03-01  Sunday · signed 2026-03-08 20:30`, else `· unsigned`;
+RFC 0034, *The signed day* above). Airports and zones come from the
 reference's own tables (OurAirports and zone.tab, public domain; `src/tables.ts`, generated by
 `scripts/make-tables.mjs`), so both implementations name the same airport, city and country.
 
 `--json` prints the Day as the reference does: one object with `day`, `weekday`, `tz`, `nights`, `country`,
 `all_day`, `timeline` (every row with `within_day`, `attached`, `with` and the ids of its lines), `flights`,
-`unplaced`, `health` and `sources`. The text and the JSON are diffed against the reference on
+`unplaced`, `health`, `sources` and `signed` (null, or the signature: `at`, `at_local`, `line`, `seq`,
+`confirmed`, `lines`, `page_sha256`, `page_matches`, `note`, `supersedes`). The reference's `readiness`
+block (RFC 0034: per class of source, whether the day's lines are in) is not read here yet, and the
+comparison leaves it out (SPEC-QUESTIONS 79). The text and the JSON are diffed against the reference on
 `tests/fixtures/day-sample` (six days with a case of every rule) and on three days of the reference's own
 demo record (`logbook demo --days 30 --seed 7`, vendored as `tests/fixtures/demo-sample`, the lines the three
 days read, chained again); `tests/fixtures/*/expected-day/` is the reference's output on each, captured by
@@ -427,26 +460,26 @@ with the record. Nothing is written; no index is built.
 
 ```bash
 node dist/bin.js stats tests/fixtures/sample-logbook
-#  logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
-#  31 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:00:00Z
+#  logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
+#  32 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:30:00Z
 #
 #    kind         lines   first       last
 #    event            3   2026-03-01  2026-03-07   1 source
 #    location         3   2026-03-01  2026-03-08   2 sources
 #    …
 #    source            lines
-#    manual                4
+#    manual                5
 #    …
 #    year  lines
-#    2026     31  ████████████████████████████████████████████████████████████████████████████████████████████████████
+#    2026     32  ████████████████████████████████████████████████████████████████████████████████████████████████████
 #
 #    tier  lines
-#    1        14
+#    1        15
 #    2        12
 #    3         5
 #
 #    month    lines
-#    2026-03     31  ████████████████████████████████████████████████████████████████████████████████████████████████████
+#    2026-03     32  ████████████████████████████████████████████████████████████████████████████████████████████████████
 #
 #  0 retractions hiding 0 lines
 #  0 resolution lines minting 0 entities

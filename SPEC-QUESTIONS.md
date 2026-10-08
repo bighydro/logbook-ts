@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, and at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, and at 3092b60 (2026-10-08, RFC 0034) for the signed day.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -554,3 +554,38 @@ fixture and on `logbook demo --seed 1` (`tests/fixtures/demo-seed1`). None of th
     yet; the reference's is the one above, and §3.2 leaves the text to each reader, so this is
     matched here only because this repository diffs `show` byte for byte. Both are this
     implementation's to fix from the RFCs' words; the fixtures are the reference's.
+
+## Found while porting RFC 0034, the signed day (openlogbook main at 3092b60, 2026-10-08; docs/rfcs/0034-the-signed-day.md)
+
+The port was asked to compute the page digest exactly as the reference does, so for this profile alone
+the reference's `logbook/core/signing.py` was read, as the task said, beside the RFC; what it added to
+the RFC's words is written here. The RFC's example is synthetic and the fixtures are the reference's.
+
+78. **Where the profile's rules are checked.** RFC 0034 says what the line MUST be (kind, tier 1, source
+    `manual`, `end` null, the payload's fields) and what a reader ignores (a subject that is not the
+    owner). This implementation has no per-profile validator in `verify` — SPEC §6 verifies the chain,
+    and the reference's `verify` on the 32-line sample reports only `valid` — so the rules live in
+    `src/signing.ts` as `signedDayProblems`, one message per rule broken, and the readers follow the
+    reference's looser reading of what a signature is: the kind and the schema, the subject as the
+    owner, a string `day`, not retracted (rule 3). A line that fails `signedDayProblems` but passes that
+    reading still stands as the reference's would; the function is for a writer, a test or a caller
+    that wants the RFC's shape held, and the day the spec says `verify` checks profiles it moves there.
+    RFC 0034 does not say what `confirmed` may name beyond "a subset of the page's lines"; with the page
+    given, an id not on it and a count that is not the page's are reported, and an id named twice is.
+79. **The Day's `readiness` block is not read here yet.** The same RFC adds `readiness` to the Day — per
+    class of source (mail, message, meeting, location, photo, calendar), whether the day has lines of
+    it, from which sources, and which usual sources (four in five of the logged days of the 28 ending on
+    the day, `policy/import.json` not disabling them) have not delivered — and a `readiness` row to the
+    text. It is the reference's own advice ("its window and share are the reader's own"), held to a
+    second implementation only once the profile freezes. This port is the signed day; `readiness` is
+    not implemented, the vendored `expected-day/` files carry it as the reference printed it, and
+    `tests/day.test.ts` and `tests/cross-impl.test.ts` compare the Day without that key and that row
+    (`comparableDayJson`, `comparableDayText` in tests/helpers.ts). A later change adds it and drops
+    the two helpers.
+80. **The zone of the page under `show --tz`.** The page digest is over the day and "the record's zone"
+    (SPEC §3.2). `show` here takes `--tz` (SPEC-QUESTIONS 41, this implementation's flag), which moves
+    the day's boundaries; the reference's `show` has no such flag. With `--tz` the page is the lines of
+    the day shown in that zone, digested with that zone, so a signed day read in another zone reads as
+    `the page has changed since` unless the same lines fall on it; without `--tz` (the default, the
+    record's zone) the digest is the reference's. `day` always reads in the record's zone.
+

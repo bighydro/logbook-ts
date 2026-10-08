@@ -1,3 +1,3 @@
-2026-03-03
+2026-03-03  unsigned
   18:00  workout    sim-watch      distance_km=9.8, sport=run
   22:00  note       manual         First 10k since the winter. Slow, happy.

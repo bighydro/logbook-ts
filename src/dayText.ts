@@ -12,6 +12,7 @@ import {
   type TimelineEntry,
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
+import { signedStateText } from "./signing.js";
 
 const DASH = "–";
 const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - [...s].length));
@@ -72,7 +73,8 @@ export function renderDay(day: Day): string {
   const span = (start: string, end: string | null): string =>
     end === null ? clock(start) : `${clock(start)}${DASH}${clock(end)}`;
 
-  const lines: string[] = [`${day.day}  ${day.weekday}`];
+  // The header says whether the owner signed the day (RFC 0034 rule 6), after the weekday.
+  const lines: string[] = [`${day.day}  ${day.weekday} · ${signedStateText(day.signed)}`];
   lines.push(header("night before", nightText(day.nights.before)));
   lines.push(header("night after", nightText(day.nights.after)));
   lines.push(header("country", countryText(day)));

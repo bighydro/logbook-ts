@@ -169,5 +169,88 @@
       "newest": "2026-04-10T10:00:00Z"
     }
   ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-03-14",
+      "until": "2026-04-10",
+      "logged_days": 7
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": true,
+        "lines": 194,
+        "sources": [
+          "ais",
+          "sim-phone"
+        ],
+        "usual": [
+          "sim-phone"
+        ],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
   "received": []
 }

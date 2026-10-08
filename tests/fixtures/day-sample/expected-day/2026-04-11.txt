@@ -1,4 +1,4 @@
-2026-04-11  Saturday
+2026-04-11  Saturday · unsigned
   night before  Home · home
   night after   in transit
   country       unknown
@@ -7,3 +7,4 @@
 
   health        no lines
   sources       sim-phone 1 line, last 00:00
+  readiness     mail none · message none · meeting none · location present · photo none · calendar none

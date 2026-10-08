@@ -1,4 +1,4 @@
-2026-06-15  Monday
+2026-06-15  Monday · unsigned
   night before  Home · home
   night after   aboard Nordlys · 59.8500,10.6000 · away
   country       NO (nearest airport OSL)
@@ -16,3 +16,4 @@
 
   health        sleep 6.2 h · 6,671 steps · resting 54 bpm
   sources       dawarich 286 lines, last 23:55 · ais 161 lines, last 23:50 · apple-health 80 lines, last 22:07 · ios-calendar 1 line, last 00:00 · ios-calls 1 line, last 17:33 · manual 1 line, last 10:05 · safari 1 line, last 10:22 · shazam 1 line, last 17:28 · voice-memos 1 line, last 16:00
+  readiness     mail none · message none · meeting none · location present · photo none · calendar present

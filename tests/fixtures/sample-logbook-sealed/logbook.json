@@ -1,0 +1,12 @@
+{
+  "format": "logbook/0.3",
+  "owner_id": "00000000-0000-4000-8000-000000000001",
+  "created_at": "2026-03-01T06:00:00Z",
+  "timezone": "Europe/Oslo",
+  "seq": 32,
+  "head": "0ab4c3e79bacc9a7c19d074094e81d1674fdf6967ceaf0d1711679e3c11481db",
+  "recipients": [
+    "age1x5ut7lplvtgkzcnvtjux674z32mu5q72r6ffaxemxtg9g08p7g5qa8ytxl",
+    "age1u5rrshgfc7553eh4kgzp85xnzmyfjgze9reeeqzkvmxmdv7udvrskr6xs0"
+  ]
+}
