@@ -183,12 +183,11 @@ export interface Draft {
   payload: Record<string, unknown>;
 }
 
-/**
- * A synthetic record under a fresh temp folder: the drafts chained in order (SPEC §3), each in the
- * month file of its `at`, and a logbook.json that names the head. Nothing in it is real.
- */
-export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
-  const root = freshLogbook(timezone);
+/** The drafts chained in order (SPEC §3): the text of each month file by its relative path, the seq and the head. */
+function chainDrafts(
+  drafts: Draft[],
+  timezone: string,
+): { files: Map<string, string>; seq: number; head: string } {
   const files = new Map<string, string>();
   let prev = "0".repeat(64);
   let seq = 0;
@@ -213,11 +212,46 @@ export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
     const rel = join("logbook", draft.at.slice(0, 4), `${draft.at.slice(5, 7)}.jsonl`);
     files.set(rel, `${files.get(rel) ?? ""}${canonicalize(line)}\n`);
   }
+  return { files, seq, head: prev };
+}
+
+function writeMonthFiles(root: string, files: Map<string, string>): void {
   for (const [rel, text] of files) {
     mkdirSync(join(root, rel, ".."), { recursive: true });
     writeFileSync(join(root, rel), text, "utf-8");
   }
-  writeMeta(root, { ...readMetaFile(root), seq, head: prev });
+}
+
+/**
+ * A synthetic record under a fresh temp folder: the drafts chained in order (SPEC §3), each in the
+ * month file of its `at`, and a logbook.json that names the head, beside the sample's places and
+ * settings. Nothing in it is real.
+ */
+export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
+  const root = freshLogbook(timezone);
+  const { files, seq, head } = chainDrafts(drafts, timezone);
+  writeMonthFiles(root, files);
+  writeMeta(root, { ...readMetaFile(root), seq, head });
+  return root;
+}
+
+/**
+ * The same record with nothing beside it: logbook.json and the month files only, no copy of the
+ * sample's folders, so a test that writes hundreds of records (a property) costs a few files each.
+ */
+export function writeBareRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
+  const root = join(tempDir(), "bare");
+  mkdirSync(root);
+  const { files, seq, head } = chainDrafts(drafts, timezone);
+  writeMonthFiles(root, files);
+  writeMeta(root, {
+    format: "logbook/0.2",
+    owner_id: "00000000-0000-4000-8000-000000000002",
+    created_at: "2026-01-01T00:00:00Z",
+    timezone,
+    seq,
+    head,
+  });
   return root;
 }
 
