@@ -1,4 +1,4 @@
-2026-04-07  Tuesday
+2026-04-07  Tuesday · unsigned
   night before  Home · home
   night after   60.3900,5.3200 near Berth, 0.8 km · away
   country       NO (nearest airport BGO)
@@ -22,3 +22,4 @@
 
   health        500 steps
   sources       sim-phone 266 lines, last 23:55 · ais 96 lines, last 23:50 · sim-calendar 5 lines, last 19:00 · apple-health 1 line, last 12:00 · flight-inference 1 line, last 17:00 · flighty 1 line, last 08:12 · manual 1 line, last 08:10
+  readiness     mail none · message none · meeting none · location present · photo none · calendar present

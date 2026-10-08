@@ -1,4 +1,4 @@
-2026-03-08
+2026-03-08  unsigned
   07:00  location   ais            solvind: 1 point
   07:30  health     apple-health   device=SimWatch, raw_id=steps:2026-03-08T06:30:00Z:SimWatch, source_name=Sim Watch, type=steps, unit=count, value=250
   08:05  call       ios-calls      ← +4790000001, 7 min, cellular
@@ -14,3 +14,4 @@
   16:00  highlight  apple-books    “They sailed west until the coast was a line and then was nothing.” — The Long Ships · the moment the book turns
   17:00  voice-memo voice-memos    Idea for the talk (1:42), not stored
   20:00  crossing   logbook        crossed to hermes: 8 lines (tier 1: 8, tier 2: 6, tier 3: 2)
+  20:30  signed-day manual         signed 2026-03-01: 7 lines confirmed of 7 · A quiet Sunday. Ines came for coffee.

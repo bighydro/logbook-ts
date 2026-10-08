@@ -1,4 +1,4 @@
-2026-04-06  Monday
+2026-04-06  Monday · unsigned
   night before  Home · home
   night after   Home · home
   country       NO (place Home)
@@ -33,3 +33,4 @@
 
   health        sleep 6.4 h · 370 steps · resting 57 bpm
   sources       sim-phone 241 lines, last 23:55 · apple-health 17 lines, last 22:30 · manual 4 lines, last 20:35 · ios-calls 3 lines, last 16:00 · mail 3 lines, last 16:30 · sim-calendar 3 lines, last 15:30 · granola 2 lines, last 17:00 · immich 2 lines, last 17:30 · whatsapp 2 lines, last 11:12 · keeper-inference 1 line, last 13:30
+  readiness     mail present · message present · meeting present · location present · photo present · calendar present

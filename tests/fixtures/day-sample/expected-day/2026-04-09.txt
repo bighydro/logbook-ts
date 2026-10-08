@@ -1,4 +1,4 @@
-2026-04-09  Thursday
+2026-04-09  Thursday · unsigned
   night before  aboard Solvind · 60.3000,5.2000 · away
   night after   in transit
   country       NO (nearest airport BGO) · from the longest stay
@@ -8,3 +8,4 @@
 
   health        no lines
   sources       sim-phone 25 lines, last 02:00 · ais 24 lines, last 23:00
+  readiness     mail none · message none · meeting none · location present · photo none · calendar none

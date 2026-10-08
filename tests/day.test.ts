@@ -205,7 +205,7 @@ describe("what the Day reads out of the record", () => {
   it("reads the conformance sample, which has no places, assets or policy, without a word about them", () => {
     const day = readDay(copySample(), { day: "2026-03-01" });
     expect(day.nights.after.home).toBe(false);
-    expect(renderDay(day)).toMatch(/^2026-03-01 {2}Sunday\n/);
+    expect(renderDay(day)).toMatch(/^2026-03-01 {2}Sunday · signed 2026-03-08 20:30\n/);
   });
 });
 

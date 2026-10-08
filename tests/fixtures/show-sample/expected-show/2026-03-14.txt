@@ -1,4 +1,4 @@
-2026-03-14
+2026-03-14  unsigned
   08:12–09:40  location   sim-phone      3 points
   10:00  event      sim-calendar   Coffee with Ines · with Ines Holm-Berg
   10:30  photo      sim-camera     file=IMG_0101.jpg

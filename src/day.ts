@@ -25,6 +25,7 @@ import {
   type StaySettings,
 } from "./settings.js";
 import { type Judgements, readJudgements } from "./show.js";
+import { SIGNED_DAY_KIND, type SignedState, signedState, standingSignatures } from "./signing.js";
 import {
   deriveSegments,
   judged,
@@ -256,6 +257,8 @@ export interface Day {
    * matched yet (SPEC-QUESTIONS 69).
    */
   received: never[];
+  /** The day's standing signature (RFC 0034 rule 6), or null when the day is unsigned. */
+  signed: SignedState | null;
 }
 
 /** A line read for the day, with its instant and span in ms. */
@@ -329,6 +332,8 @@ export interface DayReader {
   files: MonthFile[];
   judgements: Judgements;
   owner: OwnerIdentity;
+  /** The standing signature per day (RFC 0034 rule 3): the owner's latest `signed-day/v1` line naming it, not retracted. */
+  signatures: Map<string, Line>;
 }
 
 /** Opens a record for the Day: the settings and one pass over every file for the judgements. */
@@ -355,6 +360,11 @@ export function openDayReader(root: string): DayReader {
     files,
     judgements,
     owner: ownerIdentity(judgements.resolver, readOwnerPolicy(root), ownerEmails, meta.owner_id),
+    signatures: standingSignatures(
+      judgements.signatures,
+      { has: (id) => judgements.resolver.retractedBy(id) !== undefined },
+      typeof meta.owner_id === "string" ? meta.owner_id : undefined,
+    ),
   };
 }
 
@@ -463,6 +473,11 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   const nightBefore = nightOf(before, rows, ctx);
   const nightAfter = nightOf(day, rows, ctx);
 
+  // The page as shown (RFC 0034): the day's lines, the signatures aside, in the order read (by
+  // instant, then seq); whether it still digests to what the standing signature says.
+  const page = dayLines.filter((e) => e.line.kind !== SIGNED_DAY_KIND).map((e) => e.line);
+  const signed = signedState(reader.signatures.get(day), timezone, page, day);
+
   return {
     day,
     weekday: weekdayOf(day),
@@ -479,6 +494,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     weather: null,
     sources: sources(dayStanding),
     received: [],
+    signed,
   };
 }
 

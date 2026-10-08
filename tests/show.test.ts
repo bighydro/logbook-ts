@@ -104,7 +104,7 @@ describe("a day's hero line, as the reference prints it (RFC 0024 rule 4)", () =
     ]);
     expect(run(["show", root, "--day", "2026-03-20"]).out).toBe(
       [
-        "2026-03-20",
+        "2026-03-20  unsigned",
         "  hero  ASSET-2, ?, ?, A.jpg (art), L4 (art), 42 (art)",
         "  09:00  keeper     manual         hero photo (art): A.jpg",
         "  10:00  keeper     manual         hero photo (memory): ASSET-2",
@@ -142,10 +142,10 @@ describe("logbook-ts show prints a day exactly as the reference implementation d
 describe("logbook-ts show, beyond the reference", () => {
   it("takes the local day from --tz, or from logbook.json by default, across a month-file boundary", () => {
     expect(run(["show", SHOW, "--day", "2026-03-31", "--tz", "UTC"]).out).toBe(
-      "2026-03-31\n  22:30  location   sim-phone      1 point\n",
+      "2026-03-31  unsigned\n  22:30  location   sim-phone      1 point\n",
     );
     expect(run(["show", SHOW, "--tz=UTC", "--day=2026-04-01"]).out).toBe(
-      "2026-04-01\n  06:00  note       manual         April\n",
+      "2026-04-01  unsigned\n  06:00  note       manual         April\n",
     );
   });
 
@@ -154,7 +154,7 @@ describe("logbook-ts show, beyond the reference", () => {
     expect(code).toBe(0);
     expect(out).toBe(
       [
-        "2026-03-01",
+        "2026-03-01  signed 2026-03-08 20:30",
         "  hero  IMG_0001.jpg",
         // SPEC §3.2: the run ends at the last point's `end`; the reference does the same since b3cd8c5 (SPEC-QUESTIONS 25).
         "  08:30–09:40  location   sim-phone      2 points",
@@ -168,11 +168,11 @@ describe("logbook-ts show, beyond the reference", () => {
       ].join("\n"),
     );
     expect(run(["show", SAMPLE, "--day", "2026-03-06"]).out).toBe(
-      "2026-03-06\n  20:30  message    sim-messages   Ines: Landed? Dinner Sunday?\n",
+      "2026-03-06  unsigned\n  20:30  message    sim-messages   Ines: Landed? Dinner Sunday?\n",
     );
     expect(run(["show", SAMPLE, "--day", "2026-03-07"]).out).toBe(
       [
-        "2026-03-07",
+        "2026-03-07  unsigned",
         "  19:00  event      sim-calendar   Dinner with Ines",
         "  22:30  note       manual         Told her about Copenhagen. She laughed and said she'd visit by boat.",
         "  — note —",
@@ -273,13 +273,13 @@ describe("showDay", () => {
     expect(result.rows).toBe(2);
     expect(result.text.split("\n")).toHaveLength(4);
     expect(showDay(SHOW, { day: "2026-04-01", timezone: "UTC" }).text).toBe(
-      "2026-04-01\n  06:00  note       manual         April\n",
+      "2026-04-01  unsigned\n  06:00  note       manual         April\n",
     );
     expect(showDay(SHOW, { day: "2026-03-20" })).toEqual({
       text: "2026-03-20: nothing logged\n",
       timezone: "Europe/Oslo",
       rows: 0,
-      detail: { day: "2026-03-20", timezone: "Europe/Oslo", hero: [], rows: [] },
+      detail: { day: "2026-03-20", timezone: "Europe/Oslo", hero: [], rows: [], signed: null },
     });
   });
 });
@@ -309,10 +309,10 @@ describe("logbook-ts show --since/--until lists a range of local days", () => {
     const { out } = run(["show", SHOW, "--since=2026-03-31", "--until=2026-04-01", "--tz=UTC"]);
     expect(out).toBe(
       [
-        "2026-03-31",
+        "2026-03-31  unsigned",
         "  22:30  location   sim-phone      1 point",
         "",
-        "2026-04-01",
+        "2026-04-01  unsigned",
         "  06:00  note       manual         April",
         "",
       ].join("\n"),
@@ -382,7 +382,7 @@ describe("showDays streams", () => {
     addNote(root, "March", { now: new Date("2026-03-10T12:00:00Z") });
     const days = showDays(root, {});
     expect(days.next().value?.text).toBe(
-      "2026-01-10\n  12:00  note       manual         January\n",
+      "2026-01-10  unsigned\n  12:00  note       manual         January\n",
     );
     // January was produced before March's file was read: a line added to it now is still listed.
     const march = join("logbook", "2026", "03.jsonl");
@@ -395,7 +395,7 @@ describe("showDays streams", () => {
     };
     writeLines(root, [line, JSON.stringify(late)], march);
     expect(days.next().value?.text).toBe(
-      "2026-03-10\n  12:00  note       manual         March\n  12:00  note       manual         late\n",
+      "2026-03-10  unsigned\n  12:00  note       manual         March\n  12:00  note       manual         late\n",
     );
     expect(days.next().done).toBe(true);
   });
@@ -405,7 +405,7 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
   it("filters a day to one schema, before runs are collapsed and entries folded", () => {
     expect(run(["show", SHOW, "--day", "2026-03-14", "--profile", "message/v1"]).out).toBe(
       [
-        "2026-03-14",
+        "2026-03-14  unsigned",
         "  12:05  message    whatsapp       Ola Nordmann in Sailing club: Regatta moved to Sunday",
         "  12:07  message    whatsapp       Kari M: Hei, lunch?",
         "  12:09  message    whatsapp       me → Kari: On my way",
@@ -417,7 +417,7 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
   it("takes a profile without its version as every version of it, and a retracted line still shows its mark", () => {
     expect(run(["show", SHOW, "--day", "2026-03-14", "--profile", "note"]).out).toBe(
       [
-        "2026-03-14",
+        "2026-03-14  unsigned",
         "  21:30  note       manual         Regatta Sunday. … (+1 line)",
         "  22:30  retracted #11: typo",
         "",
@@ -427,7 +427,7 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
 
   it("takes several profiles, repeated or comma-separated", () => {
     const expected = [
-      "2026-03-14",
+      "2026-03-14  unsigned",
       "  08:12–09:40  location   sim-phone      3 points",
       "  21:30  note       manual         Regatta Sunday. … (+1 line)",
       "  22:00  location   sim-phone      1 point",
@@ -447,10 +447,10 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
     // With the other rows filtered away the four points are one unbroken run (SPEC §3.2).
     expect(run(["show", SHOW, "--since", "2026-03-14", "--profile", "location/v1"]).out).toBe(
       [
-        "2026-03-14",
+        "2026-03-14  unsigned",
         "  08:12–22:00  location   sim-phone      4 points",
         "",
-        "2026-04-01",
+        "2026-04-01  unsigned",
         "  00:30  location   sim-phone      1 point",
         "",
       ].join("\n"),
@@ -469,7 +469,7 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
   it("filters the hero line with the rows: only keepers that pass are heroes", () => {
     expect(run(["show", SAMPLE, "--day", "2026-03-01", "--profile", "keeper/v1"]).out).toBe(
       [
-        "2026-03-01",
+        "2026-03-01  signed 2026-03-08 20:30",
         "  hero  IMG_0001.jpg",
         "  10:12  keeper     keeper-inference hero photo (memory): IMG_0001.jpg",
         "",
@@ -477,7 +477,7 @@ describe("logbook-ts show --profile keeps only the lines of the given payload sc
     );
     expect(run(["show", SAMPLE, "--day", "2026-03-01", "--profile", "photo/v1"]).out).toBe(
       [
-        "2026-03-01",
+        "2026-03-01  signed 2026-03-08 20:30",
         "  10:12  photo      sim-camera     camera=SimPhone 3, file=IMG_0001.jpg, lat=59.913, lon=10.742",
         "",
       ].join("\n"),
@@ -611,7 +611,7 @@ describe("logbook-ts show --json prints each day as one JSON object", () => {
       run(["show", SHOW, "--since", "2026-03-17", "--until", "2026-03-20", "--json"]).out,
     ).toBe("");
     expect(run(["show", SHOW, "--day", "2026-03-20", "--json"]).out).toBe(
-      '{"day":"2026-03-20","timezone":"Europe/Oslo","hero":[],"rows":[]}\n',
+      '{"day":"2026-03-20","timezone":"Europe/Oslo","hero":[],"rows":[],"signed":null}\n',
     );
   });
 

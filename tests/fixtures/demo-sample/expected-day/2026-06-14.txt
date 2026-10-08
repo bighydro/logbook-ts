@@ -1,4 +1,4 @@
-2026-06-14  Sunday
+2026-06-14  Sunday · unsigned
   night before  Home · home
   night after   Home · home
   country       NO (place Home)
@@ -13,3 +13,4 @@
 
   health        sleep 6.2 h · 10,627 steps · resting 53 bpm
   sources       dawarich 286 lines, last 23:55 · apple-health 84 lines, last 23:40 · ais 24 lines, last 23:00 · safari 2 lines, last 21:20 · whatsapp 2 lines, last 13:30 · apple-books 1 line, last 22:10 · apple-podcasts 1 line, last 07:40 · google-takeout 1 line, last 22:15 · immich 1 line, last 11:25 · ios-calendar 1 line, last 10:30 · ios-calls 1 line, last 16:00
+  readiness     mail none · message present · meeting none · location present · photo present · calendar present

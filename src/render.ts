@@ -1,5 +1,6 @@
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
+import { signedDayRow } from "./signing.js";
 import type { JsonValue, Line, Payload } from "./types.js";
 
 /** What a row's summary needs besides the line itself. */
@@ -41,6 +42,8 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return crossing(p);
     case "keeper":
       return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}`;
+    case "signed-day":
+      return signedDayRow(p);
     default:
       return fallback(line.kind, p);
   }

@@ -1,4 +1,4 @@
-2026-03-05
+2026-03-05  unsigned
   07:00  flight     sim-flights    SIM SIM123  →
   11:00  event      sim-calendar   Board meeting · with j@example.org, k@example.org
   22:00  decision   manual         Say yes to the Copenhagen role.

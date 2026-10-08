@@ -22,6 +22,15 @@ import {
   underneath,
 } from "./render.js";
 import { buildResolver, type Resolver } from "./resolve.js";
+import {
+  isSignedDay,
+  SIGNED_DAY_KIND,
+  type SignedState,
+  signedState,
+  signedStateText,
+  sortPage,
+  standingSignatures,
+} from "./signing.js";
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
 import type { JsonValue, Line } from "./types.js";
 
@@ -78,6 +87,8 @@ export interface DayDetail {
   timezone: string;
   hero: ShownHero[];
   rows: ShownRow[];
+  /** The day's standing signature (RFC 0034 rule 6), or null when the day is unsigned. */
+  signed: SignedState | null;
   /** The text of `notes/<YYYY>/<day>.md`, when the file exists. */
   note?: string;
 }
@@ -133,7 +144,7 @@ export function showDay(root: string, options: ShowOptions): ShowResult {
     text: `${day}: nothing logged\n`,
     timezone: range.timezone,
     rows: 0,
-    detail: { day, timezone: range.timezone, hero: [], rows: [] },
+    detail: { day, timezone: range.timezone, hero: [], rows: [], signed: null },
   };
 }
 
@@ -166,7 +177,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
 
   const keep = profileFilter(options.profiles);
   const files = monthFiles(root);
-  const { resolver, supersededFlights, first, last } = readJudgements(files);
+  const { resolver, supersededFlights, first, last, signatures } = readJudgements(files);
   const since = options.since ?? (first === undefined ? undefined : local(first)?.day);
   const until = options.until ?? (last === undefined ? undefined : local(last)?.day);
   const ctx: RenderContext = {
@@ -175,11 +186,18 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     clock: (at) => local(at)?.clock,
     supersededFlights,
   };
+  // The standing signature per day (RFC 0034 rule 3): the owner's, not retracted.
+  const owner = typeof meta.owner_id === "string" ? meta.owner_id : undefined;
+  const standing = standingSignatures(
+    signatures,
+    { has: (id) => resolver.retractedBy(id) !== undefined },
+    owner,
+  );
   // A bound past the record's other end (or a record with no dated line) is an empty range, not an error.
   const days =
     since === undefined || until === undefined || since > until
       ? (function* () {})()
-      : streamDays(root, files, since, until, local, timezone, ctx, keep);
+      : streamDays(root, files, since, until, local, timezone, ctx, keep, standing);
   return { timezone, since, until, days };
 }
 
@@ -208,6 +226,7 @@ function* streamDays(
   timezone: string,
   ctx: RenderContext,
   keep: (line: Line) => boolean,
+  standing: Map<string, Line>,
 ): Generator<DayShown> {
   // A local day's lines sit in the month files of the UTC days around it (SPEC §2, §3.2).
   const firstMonth = monthKey(dayMs(since) - DAY_MS);
@@ -215,6 +234,9 @@ function* streamDays(
   /** The last month file that can hold a line of this local day. */
   const closes = (day: string): string => monthKey(dayMs(day) + DAY_MS);
   const open = new Map<string, Entry[]>();
+  // The page of each open day (RFC 0034): every line on it whatever `--profile` keeps, the
+  // signatures aside, so the digest is over the page as shown and not over the rows filtered.
+  const pages = new Map<string, Line[]>();
 
   const flush = function* (through: string | undefined): Generator<DayShown> {
     const ready = [...open.keys()]
@@ -223,7 +245,15 @@ function* streamDays(
     for (const day of ready) {
       const entries = open.get(day) as Entry[];
       open.delete(day);
-      yield renderDay(root, day, entries, local, timezone, ctx);
+      const page = sortPage(pages.get(day) ?? []);
+      pages.delete(day);
+      const signed = signedState(standing.get(day), timezone, page, day);
+      yield renderDay(root, day, entries, local, timezone, ctx, signed);
+    }
+    // A signed day with every line filtered out is not shown, as an empty day is not; its page
+    // is dropped with the days flushed.
+    for (const day of [...pages.keys()]) {
+      if (!open.has(day) && (through === undefined || closes(day) <= through)) pages.delete(day);
     }
   };
 
@@ -235,9 +265,11 @@ function* streamDays(
       if ("error" in parsed) continue; // verify reports it; show reads what it can
       const { line } = parsed;
       if (line.kind === "retraction") continue; // shown where the line it hides is (RFC 0003 rule 3)
-      if (typeof line.at !== "string" || !keep(line)) continue;
+      if (typeof line.at !== "string") continue;
       const at = local(line.at);
       if (at === undefined || at.day < since || at.day > until) continue;
+      if (line.kind !== SIGNED_DAY_KIND) pages.set(at.day, [...(pages.get(at.day) ?? []), line]);
+      if (!keep(line)) continue;
       const entries = open.get(at.day) ?? [];
       entries.push({ line, ms: Date.parse(line.at), local: at });
       open.set(at.day, entries);
@@ -254,18 +286,20 @@ function renderDay(
   local: Localize,
   timezone: string,
   ctx: RenderContext,
+  signed: SignedState | null,
 ): DayShown {
   entries.sort((a, b) => a.ms - b.ms || a.line.seq - b.line.seq);
   const hero = heroes(entries, ctx);
   const built = toRows(entries, local, ctx);
   const note = notesFile(root, day);
   const text = [
-    day,
+    // The header says whether the owner signed the day (RFC 0034 rule 6).
+    `${day}  ${signedStateText(signed)}`,
     ...heroLine(hero),
     ...built.flatMap(({ row, under }) => [rowText(row), ...under]),
     ...(note === undefined ? [] : ["  — note —", ...splitLines(note).map((r) => `  ${r}`)]),
   ];
-  const detail: DayDetail = { day, timezone, hero, rows: built.map((b) => b.row) };
+  const detail: DayDetail = { day, timezone, hero, rows: built.map((b) => b.row), signed };
   if (note !== undefined) detail.note = note;
   return { day, text: `${text.join("\n")}\n`, timezone, rows: built.length, detail };
 }
@@ -299,6 +333,8 @@ export interface Judgements {
   supersededFlights: Map<string, number>;
   /** Every id some line's payload names in `supersedes`, whatever the kind. */
   superseded: Set<string>;
+  /** Every `signed-day/v1` line (RFC 0034), standing or not, in file order; `standingSignatures` picks per day. */
+  signatures: Line[];
   /** The first and last instant a listed line has, as written. */
   first: string | undefined;
   last: string | undefined;
@@ -315,6 +351,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
   const judged: Line[] = [];
   const supersededFlights = new Map<string, number>();
   const superseded = new Set<string>();
+  const signatures: Line[] = [];
   let first: { at: string; ms: number } | undefined;
   let last: { at: string; ms: number } | undefined;
   let firstLocation: { at: string; ms: number } | undefined;
@@ -326,6 +363,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
       const { line } = parsed;
       if (line.kind === "resolution" || line.kind === "retraction") judged.push(line);
       if (line.kind === "retraction") continue;
+      if (isSignedDay(line)) signatures.push(line);
       const earlier = payloadOf(line).supersedes;
       if (typeof earlier === "string") {
         superseded.add(earlier);
@@ -349,6 +387,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
     resolver: buildResolver(judged),
     supersededFlights,
     superseded,
+    signatures,
     first: first?.at,
     last: last?.at,
     firstLocation: firstLocation?.at,

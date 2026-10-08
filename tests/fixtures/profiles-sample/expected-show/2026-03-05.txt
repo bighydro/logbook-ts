@@ -1,4 +1,4 @@
-2026-03-05
+2026-03-05  unsigned
   10:00  resolution ios-contacts   entity={'id': '019c0000-0000-7000-8000-000000000011', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=exact, ref={'kind': 'email', 'value': 'ola@example.org'}
   10:00  resolution ios-contacts   entity={'id': '019c0000-0000-7000-8000-000000000011', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=exact, ref={'kind': 'phone', 'value': '+4790000001'}
   10:00  resolution ios-contacts   entity={'id': '019c0000-0000-7000-8000-000000000012', 'registry': 'logbook', 'type': 'person'}, label=Ines Holm, method=exact, ref={'kind': 'email', 'value': 'ines@example.org'}

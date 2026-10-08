@@ -1,4 +1,4 @@
-2026-04-10  Friday
+2026-04-10  Friday · unsigned
   night before  in transit
   night after   Home · home
   country       NO (place Home)
@@ -9,3 +9,4 @@
 
   health        no lines
   sources       sim-phone 192 lines, last 23:55 · ais 2 lines, last 01:00 · manual 1 line, last 12:00
+  readiness     mail none · message none · meeting none · location present · photo none · calendar none

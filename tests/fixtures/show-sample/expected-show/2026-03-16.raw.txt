@@ -1,2 +1,2 @@
-2026-03-16
+2026-03-16  unsigned
   09:00  resolution manual         entity={'id': '019c0000-0000-7000-8000-000000000001', 'registry': 'logbook', 'type': 'person'}, label=Ines Holm-Berg, method=owner, ref={'kind': 'email', 'value': 'ines@example.org'}

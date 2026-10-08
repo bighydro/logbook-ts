@@ -35,10 +35,10 @@ function run(argv: string[]): { code: number; out: string; err: string } {
 /** The text with its `took …s` line, which varies, replaced by `took`. */
 const steady = (text: string): string => text.replace(/^took \d+\.\d{3}s$/m, "took");
 
-// What `logbook stats` of the reference printed on the conformance sample on 2026-10-02 (the tier
+// What `logbook stats` of the reference prints on the conformance sample (32 lines since RFC 0034; the tier
 // and month tables are this implementation's, SPEC-QUESTIONS 42; `took` varies).
-const SAMPLE_STATS = `logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
-31 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:00:00Z
+const SAMPLE_STATS = `logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
+32 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:30:00Z
 
   kind         lines   first       last
   event            3   2026-03-01  2026-03-07   1 source
@@ -57,6 +57,7 @@ const SAMPLE_STATS = `logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15
   listen           1   2026-03-08  2026-03-08   1 source
   mail             1   2026-03-08  2026-03-08   1 source
   message          1   2026-03-06  2026-03-06   1 source
+  signed-day       1   2026-03-08  2026-03-08   1 source
   sleep            1   2026-03-01  2026-03-01   1 source
   task             1   2026-03-08  2026-03-08   1 source
   trip             1   2026-03-08  2026-03-08   1 source
@@ -65,7 +66,7 @@ const SAMPLE_STATS = `logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15
   workout          1   2026-03-03  2026-03-03   1 source
 
   source            lines
-  manual                4
+  manual                5
   sim-calendar          3
   google-takeout        2
   sim-bank              2
@@ -87,15 +88,15 @@ const SAMPLE_STATS = `logbook/0.2  head 035a74e0027faa6872580c3c7b5f7a0efec92f15
   voice-memos           1
 
   year  lines
-  2026     31  ${BAR}
+  2026     32  ${BAR}
 
   tier  lines
-  1        14
+  1        15
   2        12
   3         5
 
   month    lines
-  2026-03     31  ${BAR}
+  2026-03     32  ${BAR}
 
 0 retractions hiding 0 lines
 0 resolution lines minting 0 entities
@@ -395,7 +396,7 @@ describe("logbook-ts stats", () => {
       "attachments",
       "took_seconds",
     ]);
-    expect(parsed.lines).toBe(31);
+    expect(parsed.lines).toBe(32);
     expect(parsed.attachments).toEqual({ referenced: 1, lines: 1, present: 0 });
     expect(out.endsWith("}\n")).toBe(true);
   });

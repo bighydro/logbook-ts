@@ -60,12 +60,15 @@ jobs:
           node dist/bin.js people tests/fixtures/demo-seed1 --year 2026 --json
 
   conformance:
-    # SPEC section 6, against the fixture as published at the spec's own tag.
+    # SPEC section 6, against the fixture as published at the spec's own revision: the 32-line
+    # samples of RFC 0034 (main at 3092b60, 2026-10-08; a tag will follow), Level 1 and, keyless,
+    # Level 2.
     runs-on: ubuntu-latest
     env:
-      SPEC_TAG: v0.5.0
-      EXPECTED_HEAD: 035a74e0027faa6872580c3c7b5f7a0efec92f15bb29cee400a6593814fd345c
-      EXPECTED_LINES: "31"
+      SPEC_REV: 3092b606955566bdf46b8b1f03af6f14168f20c8
+      EXPECTED_HEAD: 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
+      EXPECTED_LINES: "32"
+      EXPECTED_SEALED_HEAD: 0ab4c3e79bacc9a7c19d074094e81d1674fdf6967ceaf0d1711679e3c11481db
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -73,8 +76,10 @@ jobs:
         with: { node-version: "22", cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: clone the spec at the tag
-        run: git clone --depth 1 --branch "$SPEC_TAG" https://github.com/bighydro/logbook spec
+      - name: clone the spec at the revision
+        run: |
+          git clone --filter=blob:none https://github.com/bighydro/logbook spec
+          git -C spec checkout --quiet "$SPEC_REV"
       - name: verify prints the expected head
         run: |
           set -euo pipefail
@@ -83,6 +88,13 @@ jobs:
           test "$out" = "valid — ${EXPECTED_LINES} lines, head ${EXPECTED_HEAD}"
           test "$(jq -r .head spec/conformance/expected.json)" = "$EXPECTED_HEAD"
           test "$(jq -r .seq spec/conformance/expected.json)" = "$EXPECTED_LINES"
+      - name: verify prints the expected head of the sealed sample, keyless (Level 2, rule 4)
+        run: |
+          set -euo pipefail
+          out=$(node dist/bin.js verify spec/conformance/sample-logbook-sealed)
+          echo "$out"
+          test "$out" = "valid — ${EXPECTED_LINES} lines, head ${EXPECTED_SEALED_HEAD}"
+          test "$(jq -r .head spec/conformance/expected-sealed.json)" = "$EXPECTED_SEALED_HEAD"
       - name: appending one note to a copy still verifies
         run: |
           set -euo pipefail
@@ -121,8 +133,8 @@ jobs:
       - name: the vendored fixture is the one on main
         run: |
           set -euo pipefail
-          if ! diff -r --exclude='expected-*' spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json; then
-            echo "::error::conformance/ moved on bighydro/logbook main; copy sample-logbook and expected.json into tests/fixtures and update the conformance job's SPEC_TAG, EXPECTED_HEAD and EXPECTED_LINES"
+          if ! diff -r --exclude='expected-*' spec/conformance/sample-logbook tests/fixtures/sample-logbook || ! diff spec/conformance/expected.json tests/fixtures/expected.json || ! diff -r spec/conformance/sample-logbook-sealed tests/fixtures/sample-logbook-sealed || ! diff spec/conformance/expected-sealed.json tests/fixtures/expected-sealed.json; then
+            echo "::error::conformance/ moved on bighydro/logbook main; copy sample-logbook and expected.json into tests/fixtures and update the conformance job's SPEC_REV, EXPECTED_HEAD and EXPECTED_LINES"
             exit 1
           fi
 

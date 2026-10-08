@@ -22,6 +22,12 @@ export const EXPECTED = JSON.parse(readFileSync(join(FIXTURES, "expected.json"),
   head: string;
 };
 
+/** The Level 2 sample: the same week with its tiers 2–3 sealed (SPEC §4, RFC 0029), read keyless here. */
+export const SAMPLE_SEALED = join(FIXTURES, "sample-logbook-sealed");
+export const EXPECTED_SEALED = JSON.parse(
+  readFileSync(join(FIXTURES, "expected-sealed.json"), "utf-8"),
+) as { format: string; seq: number; head: string };
+
 const made: string[] = [];
 
 /** A fresh temp folder, removed by `cleanup()`. */
@@ -92,17 +98,44 @@ export function expectedShows(root: string): Array<{ day: string; raw: boolean; 
     }));
 }
 
-/** The `<day>.txt` and `<day>.json` files beside a fixture: `logbook day` of the reference on it. */
-export function expectedDays(root: string): Array<{ day: string; text: string; json: unknown }> {
+/**
+ * The reference's Day without its `readiness` block (RFC 0034, the per-class readiness of the
+ * day's sources), which this implementation does not read yet (SPEC-QUESTIONS 79): the text
+ * without the `readiness` row, the JSON without the key. What is left is compared whole.
+ */
+export function comparableDayText(text: string): string {
+  return text.replace(/^ {2}readiness {5}.*\n/m, "");
+}
+
+export function comparableDayJson(json: unknown): unknown {
+  if (json === null || typeof json !== "object" || Array.isArray(json)) return json;
+  const { readiness: _dropped, ...rest } = json as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * The `<day>.txt` and `<day>.json` files beside a fixture: `logbook day` of the reference on it, as
+ * captured (`raw`) and without the readiness block (`text`, `json`).
+ */
+export function expectedDays(
+  root: string,
+): Array<{ day: string; text: string; json: unknown; raw: { text: string; json: unknown } }> {
   const dir = join(root, "expected-day");
   return readdirSync(dir)
     .filter((name) => name.endsWith(".txt"))
     .sort()
-    .map((name) => ({
-      day: name.slice(0, 10),
-      text: readFileSync(join(dir, name), "utf-8"),
-      json: JSON.parse(readFileSync(join(dir, `${name.slice(0, 10)}.json`), "utf-8")) as unknown,
-    }));
+    .map((name) => {
+      const text = readFileSync(join(dir, name), "utf-8");
+      const json = JSON.parse(
+        readFileSync(join(dir, `${name.slice(0, 10)}.json`), "utf-8"),
+      ) as unknown;
+      return {
+        day: name.slice(0, 10),
+        text: comparableDayText(text),
+        json: comparableDayJson(json),
+        raw: { text, json },
+      };
+    });
 }
 
 /** The content of one line to write with `writeRecord`: the envelope minus what the chain fills in. */

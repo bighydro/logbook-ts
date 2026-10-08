@@ -270,7 +270,7 @@ describe("verifyLogbook — chain order across files", () => {
       root,
       lines.map((x) => JSON.stringify(x)),
     );
-    writeMeta(root, { ...readMetaFile(root), head: (lines[30] as Line).hash });
+    writeMeta(root, { ...readMetaFile(root), head: (lines[31] as Line).hash });
     const result = verifyLogbook(root);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toMatch(/seq 1/);
@@ -285,7 +285,7 @@ describe("addNote", () => {
     const line = addNote(root, "Wrote a second implementation.", { now });
 
     expect(line).toMatchObject({
-      seq: 32,
+      seq: 33,
       at: "2026-03-09T08:15:30Z",
       end: null,
       tz: "Europe/Oslo",
@@ -315,11 +315,11 @@ describe("addNote", () => {
 
     const result = verifyLogbook(root);
     expect(result.errors).toEqual([]);
-    expect(result.lines).toBe(32);
+    expect(result.lines).toBe(33);
     expect(result.head).toBe(line.hash);
 
     const meta = readMetaFile(root);
-    expect(meta.seq).toBe(32);
+    expect(meta.seq).toBe(33);
     expect(meta.head).toBe(line.hash);
     expect(meta.timezone).toBe("Europe/Oslo");
     expect(meta.owner_id).toBe("00000000-0000-4000-8000-000000000001");
@@ -331,7 +331,7 @@ describe("addNote", () => {
     addNote(root, "already April in UTC", { now: new Date("2026-03-31T23:00:00-02:00") });
     const march = readFileSync(join(root, "logbook", "2026", "03.jsonl"), "utf-8");
     const april = readFileSync(join(root, "logbook", "2026", "04.jsonl"), "utf-8");
-    expect(march.split("\n").filter(Boolean)).toHaveLength(32);
+    expect(march.split("\n").filter(Boolean)).toHaveLength(33);
     expect(march.endsWith("\n")).toBe(true);
     expect(march.includes("\r")).toBe(false);
     expect(april.split("\n").filter(Boolean)).toHaveLength(1);
@@ -377,8 +377,8 @@ describe("addNote", () => {
     const root = copySample();
     writeMeta(root, { ...readMetaFile(root), format: "logbook/0.3", recipients: [] });
     const line = addNote(root, "plain, as a 0.2 record is");
-    expect(line.seq).toBe(32);
-    expect(readMetaFile(root)).toMatchObject({ format: "logbook/0.3", recipients: [], seq: 32 });
+    expect(line.seq).toBe(33);
+    expect(readMetaFile(root)).toMatchObject({ format: "logbook/0.3", recipients: [], seq: 33 });
     expect(verifyLogbook(root).valid).toBe(true);
   });
 
@@ -390,16 +390,16 @@ describe("addNote", () => {
       recipients: ["age1x5ut7lplvtgkzcnvtjux674z32mu5q72r6ffaxemxtg9g08p7g5qa8ytxl", "age1…"],
     });
     expect(() => addNote(root, "no")).toThrow(/recipients/);
-    expect(readLines(root)).toHaveLength(31);
-    expect(readMetaFile(root).seq).toBe(31);
+    expect(readLines(root)).toHaveLength(32);
+    expect(readMetaFile(root).seq).toBe(32);
   });
 
   it("refuses a logbook/0.1 record and writes nothing", () => {
     const root = copySample();
     writeMeta(root, { ...readMetaFile(root), format: "logbook/0.1" });
     expect(() => addNote(root, "no")).toThrow(LogbookError);
-    expect(readLines(root)).toHaveLength(31);
-    expect(readMetaFile(root).seq).toBe(31);
+    expect(readLines(root)).toHaveLength(32);
+    expect(readMetaFile(root).seq).toBe(32);
   });
 
   it("refuses when logbook.json is missing and refuses empty text", () => {
@@ -421,6 +421,6 @@ describe("addNote", () => {
     const root = copySample();
     writeMeta(root, { ...readMetaFile(root), head: "b".repeat(64) });
     expect(() => addNote(root, "onto a broken head")).toThrow(LogbookError);
-    expect(readLines(root)).toHaveLength(31);
+    expect(readLines(root)).toHaveLength(32);
   });
 });

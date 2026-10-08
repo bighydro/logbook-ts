@@ -784,5 +784,95 @@
       "newest": "2026-04-06T11:30:00Z"
     }
   ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-03-10",
+      "until": "2026-04-06",
+      "logged_days": 3
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": true,
+        "lines": 3,
+        "sources": [
+          "mail"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": true,
+        "lines": 2,
+        "sources": [
+          "whatsapp"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": true,
+        "lines": 2,
+        "sources": [
+          "granola"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": true,
+        "lines": 241,
+        "sources": [
+          "sim-phone"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": true,
+        "lines": 2,
+        "sources": [
+          "immich"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": true,
+        "lines": 3,
+        "sources": [
+          "sim-calendar"
+        ],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
   "received": []
 }

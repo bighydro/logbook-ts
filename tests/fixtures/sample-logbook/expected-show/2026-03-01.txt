@@ -1,4 +1,4 @@
-2026-03-01
+2026-03-01  signed 2026-03-08 20:30
   hero  IMG_0001.jpg
   08:30–09:40  location   sim-phone      2 points
   10:00  event      sim-calendar   Coffee with Ines · with ines@example.org
