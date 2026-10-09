@@ -19,7 +19,8 @@ export interface Io {
 }
 
 export const USAGE = `usage:
-  logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>"
+  logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>", or the
+                                      errors after "invalid — N errors; M lines read, head <hex>"
   logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
   logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]
                                       print the day as the reference does: local time, kind, source,
@@ -102,8 +103,10 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
           io.stdout(`valid — ${result.lines} lines, head ${result.head}\n`);
           return 0;
         }
+        // SPEC §3: an invalid record still reports the seq and head of the lines read, so the
+        // owner of a torn record learns which prefix of the chain is intact.
         io.stderr(
-          `invalid — ${result.errors.length} error${result.errors.length === 1 ? "" : "s"}\n`,
+          `invalid — ${result.errors.length} error${result.errors.length === 1 ? "" : "s"}; ${result.lines} lines read, head ${result.head}\n`,
         );
         for (const error of result.errors) io.stderr(`  ${error}\n`);
         return 1;

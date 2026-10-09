@@ -51,6 +51,8 @@ export interface Row {
   raw: string;
   /** 1-based, counting blank rows too. */
   row: number;
+  /** Whether the row ended with `\n`. False only for the last row of a file that ends inside it. */
+  newline: boolean;
 }
 
 /**
@@ -70,10 +72,13 @@ export function* eachLine(file: string, chunkSize = 64 * 1024): Generator<Row> {
       pending += text;
       const parts = pending.split("\n");
       pending = read === 0 ? "" : (parts.pop() as string);
-      for (const part of parts) {
+      const last = parts.length - 1;
+      for (const [index, part] of parts.entries()) {
         row += 1;
         const raw = part.replace(/\r$/, "");
-        if (raw.trim() !== "") yield { raw, row };
+        // At the end of the file the text after its last `\n` is a row too, one with no newline.
+        const newline = !(read === 0 && index === last);
+        if (raw.trim() !== "") yield { raw, row, newline };
       }
       if (read === 0) return;
     }
@@ -82,16 +87,19 @@ export function* eachLine(file: string, chunkSize = 64 * 1024): Generator<Row> {
   }
 }
 
+/** Why a row is not a Line: not JSON at all, or JSON that is not an object. */
+export type NotALine = { error: string; reason: "not-json" | "not-object" };
+
 /** One row as a Line, or why it is not one. `where` names the file and row for the message. */
-export function parseLine(raw: string, where: string): { line: Line } | { error: string } {
+export function parseLine(raw: string, where: string): { line: Line } | NotALine {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    return { error: `${where}: not JSON (${(err as Error).message})` };
+    return { error: `${where}: not JSON (${(err as Error).message})`, reason: "not-json" };
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: `${where}: not a JSON object` };
+    return { error: `${where}: not a JSON object`, reason: "not-object" };
   }
   return { line: parsed as Line };
 }

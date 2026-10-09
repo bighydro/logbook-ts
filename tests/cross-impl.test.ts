@@ -1,7 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
@@ -13,11 +21,13 @@ import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
 import { collectStats, statsText } from "../src/stats.js";
+import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
 import {
   cleanup,
   comparableDayJson,
   comparableDayText,
+  cutInsideLastLine,
   expectedDays,
   expectedDaysWindows,
   expectedShows,
@@ -123,6 +133,103 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts read the sa
     }
   }, 120_000);
 });
+
+/**
+ * The reference's `logbook verify` on a copy of a record, read as what SPEC §3 says a verifier
+ * reports: the seq and head of the lines read, and each problem by file and line number. The
+ * valid line is `valid — N lines, head <hex>`; the invalid one `INVALID — N problem(s); M lines
+ * read, head <hex>:` with the problems indented under it (read from its output, never its source).
+ */
+function referenceVerify(copy: string): {
+  status: number;
+  lines: number;
+  head: string;
+  errors: string[];
+} {
+  const { status, stdout } = referenceRun(copy, ["verify"]);
+  const [first = "", ...rest] = stdout.split("\n");
+  const valid = /^valid — (\d+) lines, head ([0-9a-f]{64})$/.exec(first);
+  if (valid) return { status, lines: Number(valid[1]), head: valid[2] as string, errors: [] };
+  const invalid = /^INVALID — (\d+) problem\(s\); (\d+) lines read, head ([0-9a-f]{64}):$/.exec(
+    first,
+  );
+  if (invalid === null) throw new Error(`not a verify line: ${JSON.stringify(stdout)}`);
+  const errors = rest.filter((line) => line !== "").map((line) => line.replace(/^ {2}/, ""));
+  if (errors.length !== Number(invalid[1])) throw new Error(`problems miscounted: ${stdout}`);
+  return { status, lines: Number(invalid[2]), head: invalid[3] as string, errors };
+}
+
+describe.skipIf(!ready)(
+  "the reference implementation and logbook-ts verify the same record",
+  () => {
+    // SPEC §6: cutting the sample's month file inside any line makes verify report invalid with the
+    // seq and head of the last whole line (§3, truncation). The conformance sample and the seed-1 demo,
+    // whole and then cut halfway into the last line of their last month file, with logbook.json as a
+    // crash leaves it: the two must agree on the seq, the head and the sentence naming the cut line.
+    // The reference names the file with `/`; ours names it as node:path joins it, so each is held to
+    // the sentence built from the same parts, never one string against the other.
+    const cutShort = (parts: readonly string[], row: number): { theirs: string; ours: string } => ({
+      theirs: `${posix.join(...parts)} line ${row}: the file ends inside this line (cut short)`,
+      ours: `${join(...parts)} line ${row}: the file ends inside this line (cut short)`,
+    });
+    for (const [fixture, parts] of [
+      ["sample-logbook", ["logbook", "2026", "03.jsonl"]],
+      ["demo-seed1", ["logbook", "2026", "06.jsonl"]],
+    ] as const) {
+      it(`${fixture}: whole, then cut inside its last line`, () => {
+        const copy = copyOf(fixture);
+        const whole = referenceVerify(copy);
+        const ours = verifyLogbook(copy);
+        expect(whole.status).toBe(0);
+        expect([ours.lines, ours.head, ours.errors]).toEqual([whole.lines, whole.head, []]);
+
+        const { row, seq, head } = cutInsideLastLine(copy, join(...parts));
+        const torn = referenceVerify(copy);
+        const tornOurs = verifyLogbook(copy);
+        const sentence = cutShort(parts, row);
+        expect(torn.status).toBe(1);
+        expect([torn.lines, torn.head, torn.errors]).toEqual([seq, head, [sentence.theirs]]);
+        expect(tornOurs.valid).toBe(false);
+        expect([tornOurs.lines, tornOurs.head, tornOurs.errors]).toEqual([
+          torn.lines,
+          torn.head,
+          [sentence.ours],
+        ]);
+      }, 120_000);
+    }
+
+    it("sample-logbook cut inside its first line: no whole line remains, and both say 0 and GENESIS", () => {
+      const copy = copyOf("sample-logbook");
+      const parts = ["logbook", "2026", "03.jsonl"] as const;
+      const file = join(copy, ...parts);
+      const first = readFileSync(file, "utf-8").split("\n")[0] as string;
+      writeFileSync(file, first.slice(0, Math.floor(first.length / 2)), "utf-8");
+      const meta = JSON.parse(readFileSync(join(copy, "logbook.json"), "utf-8")) as Record<
+        string,
+        unknown
+      >;
+      writeFileSync(
+        join(copy, "logbook.json"),
+        JSON.stringify({ ...meta, seq: 0, head: "0".repeat(64) }),
+        "utf-8",
+      );
+      const theirs = referenceVerify(copy);
+      const ours = verifyLogbook(copy);
+      const sentence = cutShort(parts, 1);
+      expect(theirs.status).toBe(1);
+      expect([theirs.lines, theirs.head, theirs.errors]).toEqual([
+        0,
+        "0".repeat(64),
+        [sentence.theirs],
+      ]);
+      expect([ours.lines, ours.head, ours.errors]).toEqual([
+        theirs.lines,
+        theirs.head,
+        [sentence.ours],
+      ]);
+    });
+  },
+);
 
 /** `logbook <command…>` of the reference on a copy of a record, whatever its exit status; `LOGBOOK_HOME` names the copy. */
 function referenceRun(copy: string, args: string[]): { status: number; stdout: string } {

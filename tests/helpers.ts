@@ -78,6 +78,41 @@ export function writeLines(root: string, lines: string[], rel = SAMPLE_MONTH): v
   writeFileSync(join(root, rel), `${lines.join("\n")}\n`, "utf-8");
 }
 
+/** A writable copy of a fixture's record: `logbook.json`, the month files and what else it holds, without the expected output beside it. */
+export function copyFixture(name: string): string {
+  const dir = join(tempDir(), name);
+  cpSync(join(FIXTURES, name), dir, {
+    recursive: true,
+    filter: (src) => !src.includes("expected-"),
+  });
+  return dir;
+}
+
+/**
+ * The torn record a crash leaves (SPEC §3, truncation): the month file `rel` cut halfway into its
+ * last row, and `logbook.json` behind the files, never ahead (SPEC §3, write order), naming the line
+ * before the cut. Returns the number of the cut row in its file, and the `seq` and `hash` of the last
+ * whole line (0 and sixty-four zeros when the file held one line and it is cut).
+ */
+export function cutInsideLastLine(
+  root: string,
+  rel: string,
+): { row: number; seq: number; head: string } {
+  const file = join(root, rel);
+  const bytes = readFileSync(file);
+  const text = bytes.toString("utf-8");
+  const rows = text.endsWith("\n") ? text.slice(0, -1).split("\n") : text.split("\n");
+  const last = Buffer.from(rows[rows.length - 1] as string, "utf-8");
+  const kept = bytes.subarray(0, bytes.length - last.length - (text.endsWith("\n") ? 1 : 0));
+  writeFileSync(file, Buffer.concat([kept, last.subarray(0, Math.floor(last.length / 2))]));
+  const before =
+    rows.length > 1 ? (JSON.parse(rows[rows.length - 2] as string) as Line) : undefined;
+  const seq = before ? before.seq : 0;
+  const head = before ? String(before.hash) : "0".repeat(64);
+  writeMeta(root, { ...readMetaFile(root), seq, head });
+  return { row: rows.length, seq, head };
+}
+
 export function cleanup(): void {
   while (made.length) {
     const dir = made.pop();
@@ -148,12 +183,11 @@ export interface Draft {
   payload: Record<string, unknown>;
 }
 
-/**
- * A synthetic record under a fresh temp folder: the drafts chained in order (SPEC §3), each in the
- * month file of its `at`, and a logbook.json that names the head. Nothing in it is real.
- */
-export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
-  const root = freshLogbook(timezone);
+/** The drafts chained in order (SPEC §3): the text of each month file by its relative path, the seq and the head. */
+function chainDrafts(
+  drafts: Draft[],
+  timezone: string,
+): { files: Map<string, string>; seq: number; head: string } {
   const files = new Map<string, string>();
   let prev = "0".repeat(64);
   let seq = 0;
@@ -178,11 +212,46 @@ export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
     const rel = join("logbook", draft.at.slice(0, 4), `${draft.at.slice(5, 7)}.jsonl`);
     files.set(rel, `${files.get(rel) ?? ""}${canonicalize(line)}\n`);
   }
+  return { files, seq, head: prev };
+}
+
+function writeMonthFiles(root: string, files: Map<string, string>): void {
   for (const [rel, text] of files) {
     mkdirSync(join(root, rel, ".."), { recursive: true });
     writeFileSync(join(root, rel), text, "utf-8");
   }
-  writeMeta(root, { ...readMetaFile(root), seq, head: prev });
+}
+
+/**
+ * A synthetic record under a fresh temp folder: the drafts chained in order (SPEC §3), each in the
+ * month file of its `at`, and a logbook.json that names the head, beside the sample's places and
+ * settings. Nothing in it is real.
+ */
+export function writeRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
+  const root = freshLogbook(timezone);
+  const { files, seq, head } = chainDrafts(drafts, timezone);
+  writeMonthFiles(root, files);
+  writeMeta(root, { ...readMetaFile(root), seq, head });
+  return root;
+}
+
+/**
+ * The same record with nothing beside it: logbook.json and the month files only, no copy of the
+ * sample's folders, so a test that writes hundreds of records (a property) costs a few files each.
+ */
+export function writeBareRecord(drafts: Draft[], timezone = "Europe/Oslo"): string {
+  const root = join(tempDir(), "bare");
+  mkdirSync(root);
+  const { files, seq, head } = chainDrafts(drafts, timezone);
+  writeMonthFiles(root, files);
+  writeMeta(root, {
+    format: "logbook/0.2",
+    owner_id: "00000000-0000-4000-8000-000000000002",
+    created_at: "2026-01-01T00:00:00Z",
+    timezone,
+    seq,
+    head,
+  });
   return root;
 }
 

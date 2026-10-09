@@ -11,10 +11,25 @@ describe("eachLine", () => {
     const file = join(tempDir(), "a.jsonl");
     writeFileSync(file, '{"a":1}\r\n\n  \n{"b":2}\n{"c":3}', "utf-8");
     expect([...eachLine(file)]).toEqual([
-      { raw: '{"a":1}', row: 1 },
-      { raw: '{"b":2}', row: 4 },
-      { raw: '{"c":3}', row: 5 },
+      { raw: '{"a":1}', row: 1, newline: true },
+      { raw: '{"b":2}', row: 4, newline: true },
+      { raw: '{"c":3}', row: 5, newline: false },
     ]);
+  });
+
+  it("says whether a row ended with a newline: false only for the last row of a file cut inside it", () => {
+    const file = join(tempDir(), "d.jsonl");
+    writeFileSync(file, '{"a":1}\n{"b":2}\n', "utf-8");
+    expect([...eachLine(file)].map((r) => r.newline)).toEqual([true, true]);
+    writeFileSync(file, '{"a":1}\n{"b":2}\r', "utf-8");
+    expect([...eachLine(file)].map((r) => r.newline)).toEqual([true, false]);
+    writeFileSync(file, '{"a":1}\n{"b":', "utf-8");
+    expect([...eachLine(file, 3)]).toEqual([
+      { raw: '{"a":1}', row: 1, newline: true },
+      { raw: '{"b":', row: 2, newline: false },
+    ]);
+    writeFileSync(file, '{"a":1}\n   ', "utf-8");
+    expect([...eachLine(file)]).toEqual([{ raw: '{"a":1}', row: 1, newline: true }]);
   });
 
   it("streams in chunks without splitting a multi-byte character", () => {
@@ -72,8 +87,15 @@ describe("parseLine", () => {
   it("reports non-JSON and non-object rows with their location", () => {
     expect(parseLine("nope", "x line 1")).toEqual({
       error: expect.stringMatching(/^x line 1: not JSON/),
+      reason: "not-json",
     });
-    expect(parseLine("[1]", "x line 2")).toEqual({ error: "x line 2: not a JSON object" });
-    expect(parseLine("null", "x line 3")).toEqual({ error: "x line 3: not a JSON object" });
+    expect(parseLine("[1]", "x line 2")).toEqual({
+      error: "x line 2: not a JSON object",
+      reason: "not-object",
+    });
+    expect(parseLine("null", "x line 3")).toEqual({
+      error: "x line 3: not a JSON object",
+      reason: "not-object",
+    });
   });
 });
