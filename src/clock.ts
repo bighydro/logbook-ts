@@ -22,7 +22,18 @@ export function isDay(day: string): boolean {
 /** Midnight UTC of a `YYYY-MM-DD`, in ms. */
 export function dayMs(day: string): number {
   const m = DAY.exec(day) as RegExpExecArray;
-  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return utcMs(Number(m[1]), Number(m[2]), Number(m[3]));
+}
+
+/**
+ * The instant a UTC calendar date and clock denote, in ms; `month` 1 to 12. Unlike `Date.UTC`,
+ * which reads a year from 0 to 99 as 1900 plus it, the year is the one given: 99 is 0099.
+ */
+function utcMs(year: number, month: number, day: number, hour = 0, minute = 0, second = 0): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
 }
 
 /** The `YYYY-MM-DD` `n` days after `day` (negative for before). */
@@ -74,9 +85,15 @@ function formatter(timezone: string): Intl.DateTimeFormat {
 export function wallClock(ms: number, timezone: string): Wall {
   const parts = formatter(timezone).formatToParts(new Date(ms));
   const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  // Intl numbers the year by era (the year 0 is 1, before Christ), so the year is UTC's, moved
+  // across New Year when the zone's clock is there and UTC's is not: an offset is under a day.
+  const utc = new Date(ms);
+  const month = get("month");
+  const turn =
+    month === 1 && utc.getUTCMonth() === 11 ? 1 : month === 12 && utc.getUTCMonth() === 0 ? -1 : 0;
   return {
-    year: get("year"),
-    month: get("month"),
+    year: utc.getUTCFullYear() + turn,
+    month,
     day: get("day"),
     hour: get("hour") % 24,
     minute: get("minute"),
@@ -85,6 +102,7 @@ export function wallClock(ms: number, timezone: string): Wall {
 }
 
 const two = (n: number): string => String(n).padStart(2, "0");
+const four = (n: number): string => String(n).padStart(4, "0");
 
 export function localizer(timezone: string): Localize {
   return (at) => {
@@ -98,7 +116,7 @@ export function localizer(timezone: string): Localize {
 export function localOf(ms: number, timezone: string): Local {
   const w = wallClock(ms, timezone);
   return {
-    day: `${w.year}-${two(w.month)}-${two(w.day)}`,
+    day: `${four(w.year)}-${two(w.month)}-${two(w.day)}`,
     clock: `${two(w.hour)}:${two(w.minute)}`,
   };
 }
@@ -106,7 +124,7 @@ export function localOf(ms: number, timezone: string): Local {
 /** The zone's offset from UTC at an instant, in ms (positive east). */
 export function zoneOffsetMs(ms: number, timezone: string): number {
   const w = wallClock(ms, timezone);
-  const asUtc = Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second);
+  const asUtc = utcMs(w.year, w.month, w.day, w.hour, w.minute, w.second);
   // Rounded to the minute: the instant may carry milliseconds the wall clock does not show.
   return asUtc - Math.floor(ms / 1000) * 1000;
 }
@@ -139,7 +157,7 @@ export function offsetString(ms: number, timezone: string): string {
 /** `YYYY-MM-DDTHH:MM:SS±HH:MM`: the instant on the zone's clock, as Python's isoformat spells it. */
 export function localIso(ms: number, timezone: string): string {
   const w = wallClock(ms, timezone);
-  return `${w.year}-${two(w.month)}-${two(w.day)}T${two(w.hour)}:${two(w.minute)}:${two(w.second)}${offsetString(ms, timezone)}`;
+  return `${four(w.year)}-${two(w.month)}-${two(w.day)}T${two(w.hour)}:${two(w.minute)}:${two(w.second)}${offsetString(ms, timezone)}`;
 }
 
 /** RFC 3339 UTC with second precision of an instant in ms. */
