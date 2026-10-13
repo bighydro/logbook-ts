@@ -6,17 +6,22 @@ import { readDay } from "../src/day.js";
 import { renderDay } from "../src/dayText.js";
 import { showDay } from "../src/show.js";
 import {
+  countsText,
+  DISPOSITIONS,
+  dispositionsOf,
+  mark,
   pageDigest,
   pageOf,
   SIGNED_DAY_KIND,
   SIGNED_DAY_SCHEMA,
   signedDayProblems,
+  signedDayRow,
   signedState,
   signedStateText,
   standingSignatures,
 } from "../src/signing.js";
 import { verifyLogbook } from "../src/store.js";
-import type { Line } from "../src/types.js";
+import type { JsonValue, Line } from "../src/types.js";
 import {
   cleanup,
   copySample,
@@ -289,6 +294,7 @@ describe("the standing signature of a day (RFC 0034 rule 3)", () => {
       page_matches: true,
       note: "A quiet Sunday. Ines came for coffee.",
       supersedes: null,
+      dispositions: {},
     });
     expect(signedStateText(state)).toBe("signed 2026-03-08 20:30");
     const grown = signedState(signature(), "Europe/Oslo", page.slice(1), "2026-03-01");
@@ -391,5 +397,150 @@ describe("the vendored sealed sample", () => {
     };
     expect(meta.format).toBe("logbook/0.3");
     expect(meta.recipients).toHaveLength(2);
+  });
+});
+
+describe("dispositions (RFC 0034 amendment 1): what became of the commitment on a confirmed line", () => {
+  const A = "00000000-0000-4000-8000-000000000001";
+  const B = "00000000-0000-4000-8000-000000000002";
+  const withDispositions = (
+    confirmed: string[],
+    dispositions: unknown,
+    extra: Record<string, unknown> = {},
+  ): Line =>
+    line({}, { confirmed, page: { sha256: "ab".repeat(32), lines: 2 }, dispositions, ...extra });
+
+  it("is optional, may be empty, and takes exactly four words on ids in `confirmed`", () => {
+    expect(signedDayProblems(withDispositions([A], undefined), OWNER)).toEqual([]);
+    expect(signedDayProblems(withDispositions([A], {}), OWNER)).toEqual([]);
+    expect(
+      signedDayProblems(withDispositions([A, B], { [A]: "kept", [B]: "carried" }), OWNER),
+    ).toEqual([]);
+    for (const word of DISPOSITIONS) {
+      expect(signedDayProblems(withDispositions([A], { [A]: word }), OWNER)).toEqual([]);
+    }
+    expect(DISPOSITIONS).toEqual(["kept", "missed", "dropped", "carried"]);
+  });
+
+  it("names each rule broken as the reference does: a fifth word, an id not confirmed, not an object, not a string", () => {
+    expect(signedDayProblems(withDispositions([A], { [A]: "done" }), OWNER)).toEqual([
+      `the disposition of ${A} is 'done'; a line is kept, missed, dropped or carried`,
+    ]);
+    expect(signedDayProblems(withDispositions([A], { [B]: "kept" }), OWNER)).toEqual([
+      `dispositions names ${B}, which is not in confirmed`,
+    ]);
+    expect(signedDayProblems(withDispositions([A], [A]), OWNER)).toEqual([
+      "dispositions must be an object mapping a confirmed line's id to its disposition",
+    ]);
+    expect(signedDayProblems(withDispositions([A], { [A]: 1 }), OWNER)).toEqual([
+      `the disposition of ${A} is 1; a line is kept, missed, dropped or carried`,
+    ]);
+    expect(
+      signedDayProblems(withDispositions([A], { [A]: "done", [B]: "kept" }), OWNER),
+    ).toHaveLength(2);
+  });
+
+  it("page.lines may not be smaller than the number of lines confirmed (the reference's rule)", () => {
+    const fewer = line({}, { confirmed: [A, B], page: { sha256: "ab".repeat(32), lines: 1 } });
+    expect(signedDayProblems(fewer, OWNER)).toEqual([
+      "page.lines is smaller than the number of lines confirmed",
+    ]);
+  });
+
+  it("dispositionsOf keeps the valid entries and never fails on the rest (SPEC §5)", () => {
+    const payload = (extra: Record<string, unknown> = {}) =>
+      line({}, extra).payload as Record<string, JsonValue>;
+    expect(dispositionsOf(payload())).toEqual({});
+    expect(dispositionsOf(payload({ dispositions: [A] }))).toEqual({});
+    expect(dispositionsOf(payload({ confirmed: "x", dispositions: { [A]: "kept" } }))).toEqual({});
+    expect(
+      dispositionsOf(
+        payload({
+          confirmed: [A, B],
+          dispositions: {
+            [A]: "kept",
+            [B]: "done",
+            "00000000-0000-4000-8000-000000000003": "missed",
+          },
+        }),
+      ),
+    ).toEqual({ [A]: "kept" });
+  });
+
+  it("counts read `kept 2, missed 1` in the four words' order, nothing for none; the show row carries them before the note", () => {
+    const payload = (extra: Record<string, unknown> = {}) =>
+      line({}, extra).payload as Record<string, JsonValue>;
+    expect(countsText({})).toBe("");
+    expect(countsText({ a: "carried", b: "kept", c: "missed", d: "kept" })).toBe(
+      "kept 2, missed 1, carried 1",
+    );
+    const p = payload({
+      confirmed: [A, B],
+      page: { sha256: "ab".repeat(32), lines: 2 },
+      dispositions: { [A]: "kept", [B]: "missed" },
+      note: "Sent the photos.",
+    });
+    expect(signedDayRow(p)).toBe(
+      "signed 2026-03-01: 2 lines confirmed of 2 · kept 1, missed 1 · Sent the photos.",
+    );
+    expect(signedDayRow(payload())).toBe("signed 2026-03-01: 1 line confirmed of 1");
+  });
+
+  it("marks a row with the symbol of the first named line's disposition, and nothing otherwise", () => {
+    const marks = { [A]: "kept", [B]: "missed" };
+    expect(mark(marks, A)).toBe("✓ ");
+    expect(mark(marks, B)).toBe("✗ ");
+    expect(mark({ [A]: "dropped" }, A)).toBe("– ");
+    expect(mark({ [A]: "carried" }, A)).toBe("→ ");
+    expect(mark(marks, "x", B)).toBe("✗ ");
+    expect(mark(marks, null, "x")).toBe("");
+    expect(mark({}, A)).toBe("");
+    expect(mark(undefined, A)).toBe("");
+  });
+
+  it("the Day carries the map under signed.dispositions and prints the symbol before each disposed line", () => {
+    const note = "00000000-0000-4000-8000-000000000001";
+    const event = "00000000-0000-4000-8000-000000000002";
+    const root = writeRecord([
+      {
+        at: "2026-05-01T08:00:00Z",
+        source: "manual",
+        kind: "note",
+        tier: 2,
+        payload: { schema: "note/v1", text: "Send the mooring photos by Friday." },
+      },
+      {
+        at: "2026-05-01T00:00:00Z",
+        end: "2026-05-02T00:00:00Z",
+        source: "sim-calendar",
+        kind: "event",
+        tier: 1,
+        payload: { schema: "event/v1", title: "Boat week", all_day: true },
+      },
+      {
+        at: "2026-05-01T18:00:00Z",
+        source: "manual",
+        kind: "signed-day",
+        tier: 1,
+        payload: payload({
+          day: "2026-05-01",
+          subject: "00000000-0000-4000-8000-000000000002",
+          confirmed: [event, note],
+          page: { sha256: "ab".repeat(32), lines: 2 },
+          dispositions: { [note]: "kept", [event]: "carried" },
+        }),
+      },
+    ]);
+    const day = readDay(root, { day: "2026-05-01" });
+    expect(day.signed?.dispositions).toEqual({ [note]: "kept", [event]: "carried" });
+    const text = renderDay(day);
+    expect(text).toContain("  all day       → Boat week\n");
+    expect(text).toContain("  unplaced      10:00  note   ✓ Send the mooring photos by Friday.\n");
+    // The show row of the signature lists the counts.
+    expect(showDay(root, { day: "2026-05-01" }).text).toContain(
+      "signed 2026-05-01: 2 lines confirmed of 2 · kept 1, carried 1\n",
+    );
+    // The sample's signature gives none: the map is empty, and the rows print as before.
+    expect(readDay(SAMPLE, { day: "2026-03-01" }).signed?.dispositions).toEqual({});
   });
 });

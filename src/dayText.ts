@@ -12,7 +12,7 @@ import {
   type TimelineEntry,
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
-import { signedStateText } from "./signing.js";
+import { mark, signedStateText } from "./signing.js";
 
 const DASH = "–";
 const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - [...s].length));
@@ -73,13 +73,22 @@ export function renderDay(day: Day): string {
   const span = (start: string, end: string | null): string =>
     end === null ? clock(start) : `${clock(start)}${DASH}${clock(end)}`;
 
-  // The header says whether the owner signed the day (RFC 0034 rule 6), after the weekday.
+  // The header says whether the owner signed the day (RFC 0034 rule 6), after the weekday. On a
+  // signed day, the disposition's symbol prints before each line the signature gave one
+  // (amendment 1): `marks` is the standing signature's map, line id → word.
   const lines: string[] = [`${day.day}  ${day.weekday} · ${signedStateText(day.signed)}`];
+  const marks = day.signed?.dispositions;
   lines.push(header("night before", nightText(day.nights.before)));
   lines.push(header("night after", nightText(day.nights.after)));
   lines.push(header("country", countryText(day)));
-  if (day.all_day.length)
-    lines.push(header("all day", day.all_day.map((e) => e.title).join(" · ")));
+  if (day.all_day.length) {
+    lines.push(
+      header(
+        "all day",
+        day.all_day.map((a) => `${mark(marks, a.line)}${a.title}${sourcesText(a)}`).join(", "),
+      ),
+    );
+  }
   lines.push("");
 
   const under = (indent: string, label: string, value: string): string =>
@@ -88,15 +97,21 @@ export function renderDay(day: Day): string {
     for (const e of a.events) {
       const when =
         e.end === null ? clock(e.start) : `${clock(e.start)}${DASH}${clockAcross(e.end)}`;
-      lines.push(under(indent, "event", `${e.title} ${when}`));
+      lines.push(
+        under(indent, "event", `${mark(marks, e.line)}${e.title} ${when}${sourcesText(e)}`),
+      );
     }
-    for (const t of a.transcripts) lines.push(under(indent, "transcript", t.title));
-    for (const n of a.notes) lines.push(under(indent, "note", n.text));
-    for (const m of a.mail)
-      lines.push(under(indent, "mail", `${m.subject} (${plural(m.messages, "message")})`));
-    for (const c of a.calls) lines.push(under(indent, "call", callText(c)));
+    for (const t of a.transcripts)
+      lines.push(under(indent, "transcript", `${mark(marks, t.line)}${t.title}`));
+    for (const n of a.notes) lines.push(under(indent, "note", `${mark(marks, n.line)}${n.text}`));
+    for (const m of a.mail) {
+      const text = `${m.subject} (${plural(m.messages, "message")})`;
+      lines.push(under(indent, "mail", `${mark(marks, ...m.lines)}${text}`));
+    }
+    for (const c of a.calls)
+      lines.push(under(indent, "call", `${mark(marks, c.line)}${callText(c)}`));
     for (const k of a.keepers)
-      lines.push(under(indent, "keeper", `${k.name} (${k.lane ?? "None"})`));
+      lines.push(under(indent, "keeper", `${mark(marks, k.line)}${k.name} (${k.lane ?? "None"})`));
     if (w !== undefined && (w.confirmed.length || w.proposed.length)) {
       const person = (p: { name: string; sources: string[] }) =>
         `${p.name} (${p.sources.join(", ")})`;
@@ -109,9 +124,8 @@ export function renderDay(day: Day): string {
 
   const row = (indent: string, entry: TimelineEntry, inside = false): void => {
     if (entry.kind === "flight") {
-      lines.push(
-        `${indent}${span(entry.start, entry.end)}  ${pad("flight", 6)} ${flightText(entry)}`,
-      );
+      const text = `${mark(marks, entry.line)}${flightText(entry)}`;
+      lines.push(`${indent}${span(entry.start, entry.end)}  ${pad("flight", 6)} ${text}`);
       return;
     }
     const when = `${clock(entry.within_day.start)}${DASH}${clock(entry.within_day.end)}`;
@@ -128,7 +142,8 @@ export function renderDay(day: Day): string {
   if (day.unplaced.length) {
     lines.push("");
     for (const u of day.unplaced) {
-      lines.push(header("unplaced", `${span(u.at, u.end)}  ${pad(u.kind, 6)} ${u.title}`));
+      const text = `${mark(marks, u.line)}${u.title}${sourcesText(u)}`;
+      lines.push(header("unplaced", `${span(u.at, u.end)}  ${pad(u.kind, 6)} ${text}`));
     }
   }
 
@@ -149,6 +164,12 @@ export function renderDay(day: Day): string {
     ),
   );
   return `${lines.join("\n")}\n`;
+}
+
+/** ` · ×N sources` for a calendar entry several sources carry; nothing for one source. */
+function sourcesText(item: { sources?: string[] }): string {
+  const n = item.sources?.length ?? 0;
+  return n > 1 ? ` · ×${n} sources` : "";
 }
 
 /** `Home · home`, `aboard Solvind · 60.3000,5.2000 · away`, `in transit`. */

@@ -12,6 +12,17 @@
  * by instant then `seq`), and the digest is the SHA-256 of `canonical_json({"day", "tz", "lines":
  * [the hashes]})`, so any implementation recomputes it from the record alone and the owner's words
  * are never held to a wording.
+ *
+ * Amendment 1, dispositions: beside confirming a line, the owner may say what became of the
+ * commitment on it. The payload's optional `dispositions` maps a confirmed line's id to one of four
+ * words: `kept`, `missed`, `dropped` (let go on purpose) or `carried` (still open, taken to a later
+ * day). An id not in `confirmed`, or a fifth word, is invalid (`signedDayProblems`), and a reader
+ * keeps the valid entries and never fails on the rest (`dispositionsOf`). The field is optional, so a
+ * signature without it is what it was and its hash does not move; the page digest does not change.
+ * `day` prints a symbol next to each disposed line (`mark`) and `show` lists the counts on the
+ * signature's row (`countsText`). Amendment 2 (an empty `confirmed`, the owner's clock) and amendment
+ * 3 (signing through the MCP door) change what the reference's writer accepts, not the line: a
+ * signature with `confirmed: []` is read as any signature is, and nothing here writes one.
  */
 
 import { sha256Hex } from "./chain.js";
@@ -26,6 +37,22 @@ const SIGNED_DAY_SOURCE = "manual";
 /** The line names a day, ids, a digest and a count, never what a line said. */
 const SIGNED_DAY_TIER = 1;
 const HEX64 = /^[0-9a-f]{64}$/;
+/** The four dispositions (amendment 1): what became of the commitment on a confirmed line. */
+export const DISPOSITIONS = ["kept", "missed", "dropped", "carried"] as const;
+export type Disposition = (typeof DISPOSITIONS)[number];
+/** A tick for kept, a cross for missed, a dash for dropped, an arrow for carried. */
+const SYMBOLS: Record<Disposition, string> = {
+  kept: "\u2713",
+  missed: "\u2717",
+  dropped: "\u2013",
+  carried: "\u2192",
+};
+const DISPOSITION_WORDS = "kept, missed, dropped or carried";
+const isDisposition = (v: unknown): v is Disposition =>
+  typeof v === "string" && (DISPOSITIONS as readonly string[]).includes(v);
+/** A value as Python's `repr` spells it in the reference's messages: a string quoted, the rest as is. */
+const repr = (v: unknown): string =>
+  typeof v === "string" ? `'${v}'` : v === null ? "None" : JSON.stringify(v);
 
 /** The Day's `signed` block (RFC 0034 rule 6), and what `show --json` carries under `signed`. */
 export interface SignedState {
@@ -45,6 +72,8 @@ export interface SignedState {
   page_matches: boolean | null;
   note: string | null;
   supersedes: string | null;
+  /** The dispositions the signature gives, line id → word, the valid entries only (amendment 1). */
+  dispositions: Record<string, Disposition>;
 }
 
 type Fields = Record<string, JsonValue | undefined>;
@@ -145,8 +174,13 @@ export function signedDayProblems(line: Line, owner: string | undefined, page?: 
     }
     if (!Number.isInteger(pageInfo.lines) || (pageInfo.lines as number) < 0) {
       problems.push("page.lines must be an integer ≥ 0");
-    } else if (page !== undefined && pageInfo.lines !== page.length) {
-      problems.push(`page.lines is ${pageInfo.lines} but the page has ${page.length} lines`);
+    } else {
+      if (Array.isArray(confirmed) && (pageInfo.lines as number) < confirmed.length) {
+        problems.push("page.lines is smaller than the number of lines confirmed");
+      }
+      if (page !== undefined && pageInfo.lines !== page.length) {
+        problems.push(`page.lines is ${pageInfo.lines} but the page has ${page.length} lines`);
+      }
     }
   }
   if (p.note !== undefined && (typeof p.note !== "string" || /[\r\n]/.test(p.note))) {
@@ -155,7 +189,72 @@ export function signedDayProblems(line: Line, owner: string | undefined, page?: 
   if (p.supersedes !== undefined && typeof p.supersedes !== "string") {
     problems.push("supersedes must be a line id");
   }
+  // Amendment 1: an object whose keys are ids in `confirmed` and whose values are one of the four
+  // words; the messages are the reference's (`signing.validate`).
+  if (p.dispositions !== undefined) {
+    const found = p.dispositions;
+    if (!isObject(found)) {
+      problems.push(
+        "dispositions must be an object mapping a confirmed line's id to its disposition",
+      );
+    } else {
+      const ids = new Set(Array.isArray(confirmed) ? (confirmed as unknown[]) : []);
+      for (const [id, value] of Object.entries(found)) {
+        if (!ids.has(id)) problems.push(`dispositions names ${id}, which is not in confirmed`);
+        if (!isDisposition(value)) {
+          problems.push(
+            `the disposition of ${id} is ${repr(value)}; a line is ${DISPOSITION_WORDS}`,
+          );
+        }
+      }
+    }
+  }
   return problems;
+}
+
+/**
+ * The dispositions a signature gives, id → word, the valid entries only: an id that is not in
+ * `confirmed`, a word that is not one of the four, or a field that is not an object are left out and
+ * never fail a reader (SPEC §5). Empty when the field is absent.
+ */
+export function dispositionsOf(p: Fields): Record<string, Disposition> {
+  const found = p.dispositions;
+  const confirmed = p.confirmed;
+  const out: Record<string, Disposition> = {};
+  if (!isObject(found) || !Array.isArray(confirmed)) return out;
+  const ids = new Set(confirmed as unknown[]);
+  for (const [id, value] of Object.entries(found)) {
+    if (ids.has(id) && isDisposition(value)) out[id] = value;
+  }
+  return out;
+}
+
+/** `kept 2, missed 1`: how many lines got each word, in the four words' order; empty for none. */
+export function countsText(dispositions: Record<string, string>): string {
+  const values = Object.values(dispositions);
+  return DISPOSITIONS.map((word) => [word, values.filter((v) => v === word).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([word, n]) => `${word} ${n}`)
+    .join(", ");
+}
+
+/**
+ * For a reader's row: the symbol of the disposition the first of `lineIds` has (a tick for kept, a
+ * cross for missed, a dash for dropped, an arrow for carried), with a space after it, or nothing: a
+ * row on an unsigned day, or a line given none, prints as it did.
+ */
+export function mark(
+  dispositions: Record<string, string> | undefined | null,
+  ...lineIds: Array<string | null | undefined>
+): string {
+  if (!dispositions) return "";
+  for (const id of lineIds) {
+    if (id !== null && id !== undefined && id in dispositions) {
+      const word = dispositions[id];
+      if (isDisposition(word)) return `${SYMBOLS[word]} `;
+    }
+  }
+  return "";
 }
 
 /**
@@ -221,6 +320,7 @@ export function signedState(
     page_matches: matches,
     note: typeof p.note === "string" ? p.note : null,
     supersedes: typeof p.supersedes === "string" ? p.supersedes : null,
+    dispositions: dispositionsOf(p),
   };
 }
 
@@ -235,11 +335,16 @@ export function signedStateText(state: SignedState | null): string {
   return state.page_matches === false ? `${text}, the page has changed since` : text;
 }
 
-/** A signature's row in `show`: `signed 2026-03-01: 4 lines confirmed of 4 · <note>`. */
+/**
+ * A signature's row in `show`: `signed 2026-03-01: 4 lines confirmed of 4 · kept 1, missed 1 ·
+ * <note>`, the counts only when the signature gives dispositions.
+ */
 export function signedDayRow(p: Fields): string {
   const pageInfo = isObject(p.page) ? p.page : {};
   const n = Array.isArray(p.confirmed) ? p.confirmed.length : 0;
   const onPage = pageInfo.lines === undefined ? "?" : String(pageInfo.lines);
-  const text = `signed ${String(p.day)}: ${n} line${n === 1 ? "" : "s"} confirmed of ${onPage}`;
+  let text = `signed ${String(p.day)}: ${n} line${n === 1 ? "" : "s"} confirmed of ${onPage}`;
+  const counts = countsText(dispositionsOf(p));
+  if (counts !== "") text = `${text} · ${counts}`;
   return typeof p.note === "string" && p.note !== "" ? `${text} · ${p.note}` : text;
 }

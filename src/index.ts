@@ -121,7 +121,12 @@ export {
   showRange,
 } from "./show.js";
 export {
+  countsText,
+  DISPOSITIONS,
+  type Disposition,
+  dispositionsOf,
   isSignedDay,
+  mark,
   pageDigest,
   pageOf,
   SIGNED_DAY_KIND,
