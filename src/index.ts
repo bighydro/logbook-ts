@@ -216,3 +216,4 @@ export {
   type VerifyResult,
 } from "./types.js";
 export { uuidV7 } from "./uuid.js";
+export type { VerifyStats } from "./verify.js";

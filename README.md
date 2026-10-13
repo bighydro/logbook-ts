@@ -93,7 +93,7 @@ SPEC §6, the conformance rule, and the readers.
 
 | Command | Does |
 |---|---|
-| `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or `invalid — N errors; M lines read, head <hex>` and the errors on stderr and exits 1: the seq and head of the lines read, so a record whose month file a crash cut inside a line (SPEC §3, truncation) reports the last whole line and its hash, never 0 and GENESIS while the first line is whole, and names the cut line `<file> line N: the file ends inside this line (cut short)`. A line that is not one is reported by file and line number and its file is read no further; a last line whole but for its newline is a line. A line whose JSON text gives a member name twice in one object, at any depth, is not one (SPEC §2), however the name is spelled: `<file> line N: duplicate key 'kind'`, as the reference names it. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. |
+| `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or `invalid — N errors; M lines read, head <hex>` and the errors on stderr and exits 1: the seq and head of the lines read, so a record whose month file a crash cut inside a line (SPEC §3, truncation) reports the last whole line and its hash, never 0 and GENESIS while the first line is whole, and names the cut line `<file> line N: the file ends inside this line (cut short)`. A line that is not one is reported by file and line number and its file is read no further; a last line whole but for its newline is a line. A line whose JSON text gives a member name twice in one object, at any depth, is not one (SPEC §2), however the name is spelled: `<file> line N: duplicate key 'kind'`, as the reference names it. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. The month files are merged in `seq` order as the reference merges them, one line held from each and no file left open between reads, so memory is one line per month file whatever the length of the record, and so is `add`'s, which verifies first; a month file out of `seq` order, which SPEC §3 allows, is read again sorted, keeping only where each line lies. |
 | `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
@@ -612,6 +612,8 @@ canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
 ceilings("/path/to/root"); // policy/crossing.json: [{ destination, max_tier, until, expired, write, window_days, writes }, …]
 mcpDoor("/path/to/root")?.writes; // the write tools the mcp entry allows today, e.g. ["sign_day", "note_day"]
 signedDayProblems(line, meta.owner_id); // [] for a signed-day/v1 line as RFC 0034 and its amendments shape it
+const held = { peakHeld: 0 };
+verifyLogbook("/path/to/root", held); // held.peakHeld: lines held at once, one per month file at most; held.unsorted when one was out of order
 ```
 
 ## Developing
@@ -641,6 +643,10 @@ LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
 `tests/fixtures/demo-seed1` is `logbook demo --seed 1 --out` as the reference wrote it, without its
 `index.sqlite`, and its `make.mjs` rebuilds it; `scripts/make-tables.mjs` regenerates `src/tables.ts`
 from its data tables. All take `LOGBOOK_REF`.
+
+`tests/verify-memory.test.ts` is the memory control: it bundles `src/` with tsup into a temp folder, writes
+25,000 synthetic notes of about 2 KiB there (some 57 MiB), and has a `node` child of its own verify the record
+and append to it with V8's old space capped at half the record's size, then prints what the child measured.
 
 CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
 tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture
