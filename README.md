@@ -9,7 +9,11 @@ place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUEST
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
 the reference implementation (openlogbook, main at 3092b60, 2026-10-08) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
-its source, and checked by a cross-implementation test.
+its source, and checked by a cross-implementation test. One exception, made on the owner's instruction
+for the catch-up of 2026-10-13: the validation sentences of the settings and policy files and of
+`signed-day/v1`'s dispositions were matched to the reference's source (openlogbook 0.6.1, and PR 252),
+so a record one implementation refuses the other refuses in the same words; the [Parity](#parity)
+table says what that covers.
 
 Zero runtime dependencies. RFC 8785 canonical JSON, SHA-256 chaining and UUIDv7 are implemented by hand on
 Node's built-ins.
@@ -114,6 +118,54 @@ hash    = sha256( prev + "|" + seq + "|" + sha256(content) + "|" + recorded_at )
 number layout, NaN, Infinity and lone surrogates rejected. It is tested against the RFC's §3.2.3 example and
 Appendix B vectors, and with property tests that any JSON value round-trips through it to identical bytes.
 
+## Parity
+
+What this implementation reads, verifies and writes, profile by profile, against the reference it
+matches: **openlogbook 0.6.1** (bighydro/logbook, tag v0.6.1), plus RFC 0034's signed-day amendments
+1–3 and the `write` keys of its PR 252 (branch `feat/mcp-write-tools`), as of 2026-10-13. *Read* means
+the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
+as the reference does; *verify* means the chain (SPEC §3, every profile hashes alike) and, where the
+reference validates a shape, the same validation in the same words; *write* means a command here
+appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
+by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+| Profile | Read | Verify | Write | Notes |
+|---|---|---|---|---|
+| the envelope (SPEC §2–3), `logbook/0.2` and `logbook/0.3` | yes | chain, seq, prev, hash, head; a torn file; a sealed line kept closed | `note/v1` only | Level 1 and keyless Level 2 of SPEC §6 on the 32-line samples |
+| `location/v1` (0001) | yes | chain | — | a `subject` is an asset's run |
+| `photo/v1` (0002) | yes | chain | — | |
+| `retraction/v1` (0003) | yes | chain | — | hides what it names in every reader |
+| `transcript/v1` (0004) | yes | chain | — | |
+| `resolution/v1` (0006) | yes | chain | — | names, aliases, the owner |
+| `message/v1` (0008) | yes | chain | — | |
+| `event/v1` (0009) | yes | chain | — | folded across sources, `all_day` |
+| `note/v1` (0010) | yes | chain | `add` writes `{schema, text}` as `logbook add` does | `labels` (RFC 0010, 2026-10-01; what PR 252's `note_day` writes as `[kind]`), `title`, `folder`, `supersedes` are read and preserved; no reader of the reference prints the label, so none here does |
+| `crossing/v1` (0011) | yes | chain | — | `policy.signed_only` read as a field like any other |
+| `call/v1` (0012) | yes | chain | — | |
+| `flight/v1` (0013) | yes | chain | — | a tracked line supersedes a declared one |
+| `health-sample/v1` (0014) | yes | chain | — | |
+| `mail/v1` (0015) | yes | chain | — | |
+| `task/v1` (0016) | yes | chain | — | |
+| `browse/v1`, `watch/v1`, `listen/v1` (0017–0019) | yes | chain | — | the generic row |
+| `trip/v1` (0020) | yes | chain | — | |
+| `transaction/v1` (0021) | yes | chain | — | the Day's `spend` |
+| `highlight/v1` (0022), `voice-memo/v1` (0023) | yes | chain | — | |
+| `keeper/v1` (0024) | yes | chain | — | the hero line |
+| `weather/v1` (0026) | `null` only | chain | — | SPEC-QUESTIONS 69d |
+| `story/v1` (0028), `received/v1` (0025) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
+| `signed-day/v1` (0034, amendments 1–3) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2 and 3 are the writer's (`--confirm none`, `--at`, the MCP door) and leave the line as it is |
+
+| Settings and policy file | Read | Validated as the reference validates it | Written |
+|---|---|---|---|
+| `logbook.json` | yes | format, and the fields a reader needs | `add` rewrites `seq` and `head` atomically |
+| `policy/stays.json` | yes, `aboard_min_s` included | yes (`SettingsError`) | — |
+| `places.json` | yes, the settings' `radius_m` as the default reach | yes | — |
+| `assets.json` | yes, `mmsi`, `icao24`, `registration` included | yes | — |
+| `policy/owner.json` | yes | yes | — (the reference writes the empty file; this reads it as empty) |
+| `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory) |
+| `policy/import.json` | yes (`readDisabledSources`) | yes | — (as above); the Day's `readiness` that consumes it is not read yet, SPEC-QUESTIONS 79 |
+| `policy/circle.json` | — | — | — (`receive` is not ported) |
+
 ## Reading a day
 
 `show` prints the lines whose `at` falls on the given calendar day in a timezone: `--tz` if given, else
@@ -143,7 +195,7 @@ The summary depends on the kind; names come from the record's own `resolution/v1
 | `highlight` | `“quote” — title · note`; a bookmark is `bookmark — title @ location`. |
 | `trip` | `from → to, mode, provider, 58.00 CHF, cancelled, 1 change, ticket`. |
 | `crossing` | `crossed to hermes: 6 lines (tier 1: 2, tier 2: 4)`. |
-| `signed-day` | `signed 2026-03-01: 7 lines confirmed of 7 · A quiet Sunday.`, listed on the day the owner signed, not the day signed. |
+| `signed-day` | `signed 2026-03-01: 7 lines confirmed of 7 · kept 2, missed 1 · A quiet Sunday.`, listed on the day the owner signed, not the day signed; the counts only when the signature gives dispositions (RFC 0034 amendment 1). |
 | `task`, `browse`, `watch`, `listen`, `commitment` and any other kind | `text`, else `title` (a page's `url`), else every payload field but `schema` as `key=value`, spelled as Python's `str()` spells it, which is what the reference prints for `photo`, `health`, `transaction`, `resolution` and `commitment-close` lines. |
 
 A line hidden by a `retraction/v1` line (RFC 0003) stays in its place as `  22:30  retracted #11: typo`;
@@ -557,6 +609,9 @@ rollupCountries("/path/to/root", {}).years[0]?.countries; // [{ country: "NO", d
 rollupNights("/path/to/root", { year: "2026" }).years[0]; // { year, home, away, in_transit, aboard, lines, longest_trip }
 buildResolver(lines).name({ kind: "email", value: "ines@example.org" }); // "Ines Holm-Berg" or undefined
 canonicalize({ b: 1, a: [1e21, 0.000001] }); // '{"a":[1e+21,0.000001],"b":1}'
+ceilings("/path/to/root"); // policy/crossing.json: [{ destination, max_tier, until, expired, write, window_days, writes }, …]
+mcpDoor("/path/to/root")?.writes; // the write tools the mcp entry allows today, e.g. ["sign_day", "note_day"]
+signedDayProblems(line, meta.owner_id); // [] for a signed-day/v1 line as RFC 0034 and its amendments shape it
 ```
 
 ## Developing

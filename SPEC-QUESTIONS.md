@@ -607,3 +607,50 @@ the RFC's words is written here. The RFC's example is synthetic and the fixtures
     what is reported, not the text; the per-problem sentence for the cut line is matched byte for byte,
     and `tests/cross-impl.test.ts` holds the reference and this implementation to the same `seq`, `head`
     and sentences on the conformance sample and the seed-1 demo, whole and cut.
+
+82. **The dispositions, read without the reference running.** RFC 0034 amendment 1 (2026-10-08) adds
+    `dispositions` to `signed-day/v1` and says what a reader does with an entry it does not expect
+    ("keeps the valid entries and never fails on the rest"), how `day` marks a disposed line (a tick,
+    a cross, a dash, an arrow "on the row of the line") and how `show` counts them. The validation
+    messages are not in the RFC; they are the reference's `signing.validate`, and this implementation
+    reproduces them word for word (`tests/signing.test.ts`) so that a line one refuses the other
+    refuses in the same sentence, the rule the catch-up of 2026-10-13 was held to. No conformance
+    fixture carries a disposition (the RFC says so: the heads recorded before amendment 1 stand),
+    and the reference's own environment could not be installed where this port was made (its
+    `uv run` needs PyPI, which the work was not allowed to reach), so the text form of a disposed
+    day — `  all day       → Boat week`, `  unplaced      10:00  note   ✓ Send the mooring photos by
+    Friday.`, the symbol before the title on the event, transcript, note, mail (any of the thread's
+    lines), call, keeper, flight and unplaced rows and nowhere else — is matched to the reference's
+    `day.rows` and `_entry_rows` as read, not as run. The RFC should give one example row per kind,
+    or a fixture under `conformance/` with a signature that disposes of a line, so a second
+    implementation is held to output and not to source. The same reading found two rows this
+    implementation printed differently and now prints as the reference does: several all-day
+    entries are joined with `, `, and an all-day, event or unplaced row that several sources carry
+    ends in ` · ×N sources`.
+83. **The settings files are validated in the reference's words, and where Python is looser.** SPEC §1
+    names `places.json`, `assets.json` and `policy/` and says nothing about what a reader does with a
+    malformed one. The reference refuses the record naming the file (`stays.SettingsError`,
+    `PlaceError`, `AssetError`, `policy.PolicyError`), and `day`, `days`, `trips`, the rollups and
+    `people` stop there; this implementation read a malformed file as its defaults, so the two
+    printed different days of the same record. It now refuses the same files with the same sentences
+    (`tests/settings.test.ts`, `tests/policy.test.ts`). Three places Python's dynamic checks are
+    looser than the spec's wording, not copied here on purpose: `max_tier: true` passes `in (1, 2, 3)`
+    in Python (a bool is an int) and reads as tier 1, refused here; `float("59.9")` makes a string
+    coordinate numeric, which is kept (a numeric string is accepted) but `float(True)` is not; and
+    `date.fromisoformat` and `time.fromisoformat` accept more spellings than `YYYY-MM-DD` and `HH:MM`
+    (`20261231`, `22`), refused here. The reference also writes the default `policy/owner.json`,
+    `policy/import.json` and `policy/crossing.json` into the record the first time a reader needs
+    one; a reader here writes nothing and reads the same default in memory. The spec should say
+    that a reader MUST refuse a malformed settings file, and what a reader MAY write.
+84. **The policy's write keys, read by a reader that cannot use them.** ADR 0022 and RFC 0034 amendment
+    3 (PR 252, `feat/mcp-write-tools`, not merged at 2026-10-13) put two keys on the `mcp` entry of
+    `policy/crossing.json`: `write`, the tools the owner allows through the MCP door by name
+    (`sign_day`, `note_day`), and `write_window_days`, how far back they may write (60). They are
+    read and validated here as the reference's `policy.mcp_door` reads them, with its sentences, so
+    that a policy file one implementation refuses the other refuses; nothing here serves MCP, signs
+    or writes a note through a door, so `mcpDoor` is a library reader and a test, never a gate on
+    anything. The keys are the reference's, documented in docs/mcp.md and ADR 0016's amendment and
+    not in SPEC.md; a `note_day` line is a `note/v1` line with `source: mcp` and `labels: [kind]`
+    (`note`, `proposal` or `reflection`), which every reader here reads as any note (RFC 0010 added
+    `labels` on 2026-10-01). Whether the policy's keys belong in the spec's §1, or stay the
+    reference's own, is for the spec to say; until then this implementation follows the reference.
