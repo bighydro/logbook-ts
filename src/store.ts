@@ -7,7 +7,7 @@ import { FORMAT, type Line, type Meta, SEALED_FORMAT, type VerifyResult } from "
 import { uuidV7 } from "./uuid.js";
 
 export class LogbookError extends Error {
-  override readonly name = "LogbookError";
+  override readonly name: string = "LogbookError";
 }
 
 const META_FILE = "logbook.json";
