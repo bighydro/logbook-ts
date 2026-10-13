@@ -113,6 +113,62 @@ export function cutInsideLastLine(
   return { row: rows.length, seq, head };
 }
 
+/**
+ * A row of the conformance sample rewritten by hand so its JSON text gives a member name twice in one
+ * object (SPEC §2: such a line is invalid). The value written last is the line's own, so a parser
+ * that keeps the last of two (`JSON.parse`) reads the line as it was and its hash recomputes: only
+ * the duplicate is wrong. `row` is 1-based; `key` is the decoded name a verifier names.
+ */
+export interface DuplicateKey {
+  name: string;
+  row: number;
+  key: string;
+  from: string;
+  to: string;
+}
+
+export const DUPLICATE_KEYS: readonly DuplicateKey[] = [
+  {
+    name: "an envelope member",
+    row: 5,
+    key: "kind",
+    from: '"kind": "note"',
+    to: '"kind": "event", "kind": "note"',
+  },
+  {
+    name: "a payload member",
+    row: 5,
+    key: "text",
+    from: '"text": "Ines',
+    to: '"text": "Ola was here.", "text": "Ines',
+  },
+  {
+    name: "a name spelled with an escape and without",
+    row: 5,
+    key: "kind",
+    from: '"kind": "note"',
+    to: '"k\\u0069nd": "event", "kind": "note"',
+  },
+  {
+    name: "a member of an object in a list in the payload",
+    row: 23,
+    key: "bytes",
+    from: '"attachments": [{"bytes": 41002',
+    to: '"attachments": [{"bytes": 0, "bytes": 41002',
+  },
+];
+
+/** Rewrite the variant's row of the sample month file under `root`; returns the row as written. */
+export function writeDuplicateKey(root: string, variant: DuplicateKey): string {
+  const lines = readLines(root);
+  const before = lines[variant.row - 1] as string;
+  if (!before.includes(variant.from)) throw new Error(`row ${variant.row} has no ${variant.from}`);
+  const after = before.replace(variant.from, variant.to);
+  lines[variant.row - 1] = after;
+  writeLines(root, lines);
+  return after;
+}
+
 export function cleanup(): void {
   while (made.length) {
     const dir = made.pop();

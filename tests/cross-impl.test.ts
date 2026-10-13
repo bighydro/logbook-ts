@@ -28,13 +28,16 @@ import {
   comparableDayJson,
   comparableDayText,
   cutInsideLastLine,
+  DUPLICATE_KEYS,
   expectedDays,
   expectedDaysWindows,
   expectedShows,
   expectedWindows,
   FIXTURES,
+  SAMPLE_MONTH,
   tempDir,
   windowOptions,
+  writeDuplicateKey,
 } from "./helpers.js";
 
 /**
@@ -195,6 +198,29 @@ describe.skipIf(!ready)(
           torn.head,
           [sentence.ours],
         ]);
+      }, 120_000);
+    }
+
+    // SPEC §2: a line that gives a member name twice in one object, at any depth, is invalid. Each
+    // variant writes the line's own value last, so only the duplicate is wrong; the two must agree on
+    // the seq and head of the lines before it and on the sentence naming it. Each also says
+    // logbook.json is ahead of those lines, in its own words (SPEC-QUESTIONS 81), so that is left out.
+    for (const variant of DUPLICATE_KEYS) {
+      it(`sample-logbook with ${variant.name} given twice in line ${variant.row}`, () => {
+        const copy = copyOf("sample-logbook");
+        writeDuplicateKey(copy, variant);
+        const theirs = referenceVerify(copy);
+        const ours = verifyLogbook(copy);
+        const sentence = (file: string) =>
+          `${file} line ${variant.row}: duplicate key '${variant.key}'`;
+        expect(theirs.status).toBe(1);
+        expect([theirs.lines, theirs.head, theirs.errors[0]]).toEqual([
+          variant.row - 1,
+          ours.head,
+          sentence(posix.join("logbook", "2026", "03.jsonl")),
+        ]);
+        expect(ours.valid).toBe(false);
+        expect([ours.lines, ours.errors[0]]).toEqual([theirs.lines, sentence(SAMPLE_MONTH)]);
       }, 120_000);
     }
 
