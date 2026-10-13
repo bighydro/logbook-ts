@@ -1,6 +1,7 @@
 import { closeSync, openSync, readdirSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
+import { pyRepr } from "./pyrepr.js";
 import type { Line } from "./types.js";
 
 const LOG_DIR = "logbook";
@@ -87,10 +88,14 @@ export function* eachLine(file: string, chunkSize = 64 * 1024): Generator<Row> {
   }
 }
 
-/** Why a row is not a Line: not JSON at all, or JSON that is not an object. */
-export type NotALine = { error: string; reason: "not-json" | "not-object" };
+/** Why a row is not a Line: not JSON at all, JSON that gives a member name twice, or JSON that is not an object. */
+export type NotALine = { error: string; reason: "not-json" | "duplicate-key" | "not-object" };
 
-/** One row as a Line, or why it is not one. `where` names the file and row for the message. */
+/**
+ * One row as a Line, or why it is not one. `where` names the file and row for the message. A row that
+ * gives a member name twice in one object, at any depth, is no line (SPEC §2), however the name is
+ * spelled: it is named as the reference names it, `<where>: duplicate key 'kind'`.
+ */
 export function parseLine(raw: string, where: string): { line: Line } | NotALine {
   let parsed: unknown;
   try {
@@ -98,8 +103,78 @@ export function parseLine(raw: string, where: string): { line: Line } | NotALine
   } catch (err) {
     return { error: `${where}: not JSON (${(err as Error).message})`, reason: "not-json" };
   }
+  const twice = duplicateKey(raw);
+  if (twice !== undefined) {
+    return { error: `${where}: duplicate key ${pyRepr(twice)}`, reason: "duplicate-key" };
+  }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return { error: `${where}: not a JSON object`, reason: "not-object" };
   }
   return { line: parsed as Line };
+}
+
+const QUOTE = 0x22;
+const BACKSLASH = 0x5c;
+const COMMA = 0x2c;
+const OPEN_ARRAY = 0x5b;
+const CLOSE_ARRAY = 0x5d;
+const OPEN_OBJECT = 0x7b;
+const CLOSE_OBJECT = 0x7d;
+
+/** An open object's member names so far, and the first of them given again. */
+interface OpenObject {
+  names: Set<string>;
+  twice?: string;
+}
+
+/**
+ * The first member name `text` gives twice in one object, decoded (`"k\u0069nd"` is `kind`), or
+ * undefined when it gives none. `text` is JSON that `JSON.parse` took, which keeps the last of two
+ * and so cannot tell. Each object is judged as it closes, innermost first, by the first of its names
+ * seen before: the name the reference reports (`{"x":1,"x":{"b":1,"b":2}}` names `b`).
+ */
+function duplicateKey(text: string): string | undefined {
+  const open: Array<OpenObject | null> = []; // null for an open array
+  let nameNext = false; // the next string is a member name
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c === QUOTE) {
+      const end = stringEnd(text, i);
+      const top = open[open.length - 1];
+      if (nameNext && top) {
+        const spelled = text.slice(i + 1, end);
+        const name = spelled.includes("\\")
+          ? (JSON.parse(text.slice(i, end + 1)) as string)
+          : spelled;
+        if (top.names.has(name)) top.twice ??= name;
+        else top.names.add(name);
+        nameNext = false;
+      }
+      i = end;
+    } else if (c === OPEN_OBJECT) {
+      open.push({ names: new Set() });
+      nameNext = true;
+    } else if (c === OPEN_ARRAY) {
+      open.push(null);
+    } else if (c === CLOSE_OBJECT) {
+      const closed = open.pop();
+      if (closed?.twice !== undefined) return closed.twice;
+    } else if (c === CLOSE_ARRAY) {
+      open.pop();
+    } else if (c === COMMA) {
+      nameNext = open[open.length - 1] != null;
+    }
+  }
+  return undefined;
+}
+
+/** The index of the quote that closes the string opening at `start`: the first one not escaped. */
+function stringEnd(text: string, start: number): number {
+  let end = text.indexOf('"', start + 1);
+  for (;;) {
+    let slashes = 0;
+    while (text.charCodeAt(end - 1 - slashes) === BACKSLASH) slashes += 1;
+    if (slashes % 2 === 0) return end;
+    end = text.indexOf('"', end + 1);
+  }
 }

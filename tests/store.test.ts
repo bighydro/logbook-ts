@@ -11,6 +11,8 @@ import {
   copySample,
   cutInsideLastLine,
   type Draft,
+  DUPLICATE_KEYS,
+  type DuplicateKey,
   EXPECTED,
   freshLogbook,
   readLines,
@@ -18,6 +20,7 @@ import {
   SAMPLE,
   SAMPLE_MONTH,
   writeBareRecord,
+  writeDuplicateKey,
   writeLines,
   writeMeta,
   writeRecord,
@@ -598,5 +601,34 @@ describe("verifyLogbook — a month file cut inside a line (SPEC §3, truncation
     expect(result.errors.some((e) => /seq 4 — expected seq 2/.test(e))).toBe(true);
     expect(result.errors.some((e) => /seq 3/.test(e))).toBe(false);
     expect(result.errors.some((e) => e.includes(`prev ${third.hash}`))).toBe(true); // seq 4's prev is unmet
+  });
+});
+
+describe("verifyLogbook — a member name given twice in one object (SPEC §2)", () => {
+  // SPEC §2: a line whose JSON text gives the same key twice in one object, at any depth, is invalid.
+  // Each variant writes the line's own value last, so JSON.parse alone reads the line as it was and
+  // its hash recomputes; only the duplicate is wrong, and verify must say so as the reference does.
+  for (const variant of DUPLICATE_KEYS) {
+    it(`${variant.name}: named by file and line, the decoded name quoted, the file read no further`, () => {
+      const root = copySample();
+      const row = writeDuplicateKey(root, variant);
+      const kept = JSON.parse(row) as Line;
+      expect(hashLine(kept)).toBe(kept.hash); // keep-the-last reads a line that verifies
+
+      const result = verifyLogbook(root);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toBe(
+        `${SAMPLE_MONTH} line ${variant.row}: duplicate key '${variant.key}'`,
+      );
+      const before = JSON.parse(readLines(root)[variant.row - 2] as string) as Line;
+      expect([result.lines, result.head]).toEqual([variant.row - 1, before.hash]);
+    });
+  }
+
+  it("addNote refuses such a record and writes nothing", () => {
+    const root = copySample();
+    writeDuplicateKey(root, DUPLICATE_KEYS[0] as DuplicateKey);
+    expect(() => addNote(root, "onto a line with a key twice")).toThrow(/duplicate key 'kind'/);
+    expect(readLines(root)).toHaveLength(32);
   });
 });

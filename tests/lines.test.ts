@@ -1,7 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
 import { eachLine, monthFiles, parseLine } from "../src/lines.js";
+import { pyRepr } from "../src/pyrepr.js";
 import { cleanup, SAMPLE, tempDir } from "./helpers.js";
 
 afterEach(cleanup);
@@ -97,5 +99,74 @@ describe("parseLine", () => {
       error: "x line 3: not a JSON object",
       reason: "not-object",
     });
+  });
+});
+
+describe("parseLine — a member name given twice in one object (SPEC §2)", () => {
+  const twice = (raw: string, key: string) =>
+    expect(parseLine(raw, "x line 7")).toEqual({
+      error: `x line 7: duplicate key ${key}`,
+      reason: "duplicate-key",
+    });
+
+  it("refuses the object at any depth, naming the decoded name as the reference quotes it", () => {
+    twice('{"kind":"event","kind":"note"}', "'kind'");
+    twice('{"payload":{"schema":"note/v1","text":"a","text":"b"}}', "'text'");
+    twice('{"k\\u0069nd":"event","kind":"note"}', "'kind'");
+    twice('{"kind":"event","k\\u0069nd":"note"}', "'kind'");
+    twice('{"payload":{"attachments":[{"bytes":0,"bytes":41002}]}}', "'bytes'");
+    twice('[{"a":1},{"a":1,"a":2}]', "'a'"); // found before the row is known not to be an object
+    twice('{ "kind" : 1 ,\t"kind" : 2 }', "'kind'");
+  });
+
+  it("names what the reference names: the object that closes first, then its first name repeated", () => {
+    // Run against the reference (`logbook verify`, a line of the sample so rewritten), never its source.
+    twice('{"x":1,"x":{"b":1,"b":2}}', "'b'");
+    twice('{"x":1,"x":2,"y":{"b":1,"b":2}}', "'b'");
+    twice('{"p":1,"q":1,"q":2,"p":2}', "'q'");
+    twice(`{"it's":1,"it's":2}`, `"it's"`);
+    twice('{"Tromsø":1,"Troms\\u00f8":2}', "'Tromsø'");
+    twice('{"a\\u0007":1,"a\\u0007":2}', "'a\\x07'");
+    twice('{"😀":1,"\\ud83d\\ude00":2}', "'😀'");
+  });
+
+  it("takes a name repeated in sibling objects, in a list, or inside a string", () => {
+    const raw =
+      '{"m":{"k":1},"n":{"k":1},"l":[{"k":1},{"k":2}],"s":"\\"k\\":1,\\"k\\":2}","t":"\\\\","k":{}}';
+    expect(parseLine(raw, "x line 1")).toEqual({ line: JSON.parse(raw) });
+    expect(parseLine('{"kind":"note","Kind":"note","kind ":1}', "x line 2")).toEqual({
+      line: { kind: "note", Kind: "note", "kind ": 1 },
+    });
+  });
+
+  it("a row that is not JSON is said so, whatever names it repeats", () => {
+    expect(parseLine('{"a":1,"a":2', "x line 1")).toMatchObject({ reason: "not-json" });
+  });
+
+  const keys = fc.string({ unit: "binary", maxLength: 6 });
+  const objects = fc.dictionary(keys, fc.jsonValue({ maxDepth: 4 }), { maxKeys: 6 });
+
+  it("takes any object JSON.stringify writes, as JSON.parse reads it", () => {
+    fc.assert(
+      fc.property(objects, (value) => {
+        const raw = JSON.stringify(value);
+        expect(parseLine(raw, "x line 1")).toEqual({ line: JSON.parse(raw) });
+      }),
+    );
+  });
+
+  it("refuses any such object with one of its names written again in front, naming it", () => {
+    fc.assert(
+      fc.property(objects, fc.nat(), fc.jsonValue({ maxDepth: 2 }), (value, pick, extra) => {
+        const names = Object.keys(value);
+        fc.pre(names.length > 0);
+        const key = names[pick % names.length] as string;
+        const raw = `{${JSON.stringify(key)}:${JSON.stringify(extra)},${JSON.stringify(value).slice(1)}`;
+        expect(parseLine(raw, "x line 1")).toEqual({
+          error: `x line 1: duplicate key ${pyRepr(key)}`,
+          reason: "duplicate-key",
+        });
+      }),
+    );
   });
 });
