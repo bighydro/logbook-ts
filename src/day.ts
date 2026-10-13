@@ -351,11 +351,12 @@ export function openDayReader(root: string): DayReader {
   const ownerEmails = Array.isArray(meta.owner_emails)
     ? meta.owner_emails.filter((v): v is string => typeof v === "string")
     : [];
+  const settings = readStaySettings(root);
   return {
     root,
     timezone,
-    settings: readStaySettings(root),
-    places: readPlaces(root),
+    settings,
+    places: readPlaces(root, settings.radius_m),
     assets: readAssets(root),
     files,
     judgements,

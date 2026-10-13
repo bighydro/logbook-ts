@@ -82,6 +82,25 @@ export {
   renderPeople,
 } from "./people.js";
 export {
+  type Ceiling,
+  ceiling,
+  ceilings,
+  DEFAULT_CROSSING_POLICY,
+  DEFAULT_IMPORT_POLICY,
+  expiredOn,
+  mcpCeiling,
+  mcpDoor,
+  PolicyError,
+  readCrossingPolicy,
+  readDisabledSources,
+  recipientOf,
+  siteCeiling,
+  vaultCeiling,
+  WRITE_TOOLS,
+  WRITE_WINDOW_DAYS,
+  type WriteTool,
+} from "./policy.js";
+export {
   type DayReading,
   type FlightLine,
   type Night,

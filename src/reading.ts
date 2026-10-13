@@ -152,7 +152,7 @@ export function openWindow(root: string, options: WindowOptions, open: OpenOptio
   checkTimezone(timezone);
 
   const settings = readStaySettings(root);
-  const places = readPlaces(root);
+  const places = readPlaces(root, settings.radius_m);
   const assets = readAssets(root);
   const policy = readOwnerPolicy(root);
   const judgements = readJudgements(monthFiles(root));
