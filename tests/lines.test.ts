@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
-import { eachLine, monthFiles, parseLine } from "../src/lines.js";
+import { eachLine, monthFiles, parseLine, RowReader } from "../src/lines.js";
 import { pyRepr } from "../src/pyrepr.js";
 import { cleanup, SAMPLE, tempDir } from "./helpers.js";
 
@@ -13,9 +13,9 @@ describe("eachLine", () => {
     const file = join(tempDir(), "a.jsonl");
     writeFileSync(file, '{"a":1}\r\n\n  \n{"b":2}\n{"c":3}', "utf-8");
     expect([...eachLine(file)]).toEqual([
-      { raw: '{"a":1}', row: 1, newline: true },
-      { raw: '{"b":2}', row: 4, newline: true },
-      { raw: '{"c":3}', row: 5, newline: false },
+      { raw: '{"a":1}', row: 1, newline: true, offset: 0 },
+      { raw: '{"b":2}', row: 4, newline: true, offset: 13 },
+      { raw: '{"c":3}', row: 5, newline: false, offset: 21 },
     ]);
   });
 
@@ -27,11 +27,11 @@ describe("eachLine", () => {
     expect([...eachLine(file)].map((r) => r.newline)).toEqual([true, false]);
     writeFileSync(file, '{"a":1}\n{"b":', "utf-8");
     expect([...eachLine(file, 3)]).toEqual([
-      { raw: '{"a":1}', row: 1, newline: true },
-      { raw: '{"b":', row: 2, newline: false },
+      { raw: '{"a":1}', row: 1, newline: true, offset: 0 },
+      { raw: '{"b":', row: 2, newline: false, offset: 8 },
     ]);
     writeFileSync(file, '{"a":1}\n   ', "utf-8");
-    expect([...eachLine(file)]).toEqual([{ raw: '{"a":1}', row: 1, newline: true }]);
+    expect([...eachLine(file)]).toEqual([{ raw: '{"a":1}', row: 1, newline: true, offset: 0 }]);
   });
 
   it("streams in chunks without splitting a multi-byte character", () => {
@@ -46,6 +46,33 @@ describe("eachLine", () => {
     const file = join(tempDir(), "c.jsonl");
     writeFileSync(file, "", "utf-8");
     expect([...eachLine(file)]).toEqual([]);
+  });
+});
+
+describe("RowReader", () => {
+  it("gives each row's byte offset, counted in bytes, not characters", () => {
+    const file = join(tempDir(), "e.jsonl");
+    const rows = ['{"t":"Tromsø"}', '{"t":"😀"}', '{"t":"x"}'];
+    writeFileSync(file, `${rows.join("\n")}\n`, "utf-8");
+    const reader = new RowReader(file, 5);
+    const offsets = [reader.next(), reader.next(), reader.next()].map((r) => r?.offset);
+    expect(offsets).toEqual([0, 16, 29]);
+    expect(reader.next()).toBeUndefined();
+  });
+
+  it("reads on from an offset it was sent to, behind or ahead, with the row number it is given", () => {
+    const file = join(tempDir(), "f.jsonl");
+    writeFileSync(file, '{"a":1}\n\n{"b":2}\n{"c":3}\n', "utf-8");
+    const reader = new RowReader(file, 4);
+    const all = [reader.next(), reader.next(), reader.next()];
+    expect(all.map((r) => r?.offset)).toEqual([0, 9, 17]);
+    reader.seek(9, 3);
+    expect(reader.next()).toEqual({ raw: '{"b":2}', row: 3, newline: true, offset: 9 });
+    reader.seek(0, 1);
+    expect(reader.next()).toEqual({ raw: '{"a":1}', row: 1, newline: true, offset: 0 });
+    reader.seek(17, 4);
+    expect(reader.next()).toEqual({ raw: '{"c":3}', row: 4, newline: true, offset: 17 });
+    expect(reader.next()).toBeUndefined();
   });
 });
 

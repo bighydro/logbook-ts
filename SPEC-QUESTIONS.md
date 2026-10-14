@@ -656,3 +656,20 @@ the RFC's words is written here. The RFC's example is synthetic and the fixtures
     (`note`, `proposal` or `reflection`), which every reader here reads as any note (RFC 0010 added
     `labels` on 2026-10-01). Whether the policy's keys belong in the spec's §1, or stay the
     reference's own, is for the spec to say; until then this implementation follows the reference.
+85. **Order within a month file, and what `verify` holds.** SPEC §3 orders the lines by `seq` wherever
+    a line was found and says file order is not chain order; it says nothing of the order *within* a
+    file. A writer appends, so every month file it leaves is in `seq` order, and a verifier that relies
+    on that can merge the files and hold one line per file instead of the record: the reference's
+    `Logbook.lines()` does (its #28; docs/line-to-day.md, *Verify streams*), and so does this
+    implementation now. A file out of order is still valid by §3, so both read such a record again
+    sorted, keeping where each line lies rather than the line. Run on records built for it (a backfilled
+    month, March lines in the January file, a file out of order, one `seq` given twice in one file and
+    across two, a gap), the two agree on valid and on the head. Two differences the probes found, neither
+    new: on a record whose lines are not a chained prefix the reference's `M lines read` is the last
+    line's `seq` (6, for six lines with one of them given twice) and this implementation's the number of
+    lines chained (7), where §3 asks for "the `seq` and `head` … of the lines it read" and only a chained
+    prefix makes the two the same; and a line whose `seq` is a string (`"3"`) sends the reference's merge
+    to its sorted read, which stops with a Python `TypeError` in place of a report, where this
+    implementation reports `seq must be an integer ≥ 1` and passes the line by. Suggest §2 make `seq`
+    order within a file a writer's obligation that a verifier MAY rely on, as placement is for readers,
+    or say that it MUST NOT; and §3 say whether the `seq` reported is a count or the last line's `seq`.

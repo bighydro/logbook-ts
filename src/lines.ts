@@ -1,6 +1,5 @@
 import { closeSync, openSync, readdirSync, readSync } from "node:fs";
 import { join } from "node:path";
-import { StringDecoder } from "node:string_decoder";
 import { pyRepr } from "./pyrepr.js";
 import type { Line } from "./types.js";
 
@@ -54,38 +53,96 @@ export interface Row {
   row: number;
   /** Whether the row ended with `\n`. False only for the last row of a file that ends inside it. */
   newline: boolean;
+  /** The byte in the file at which the row starts. */
+  offset: number;
+}
+
+const NEWLINE = 0x0a;
+const NOTHING = Buffer.alloc(0);
+
+/**
+ * The non-blank rows of a `.jsonl` file, one at a time, read a chunk at a time from where the last
+ * read stopped. No handle is held between reads — each read opens the file, reads and closes it — so
+ * any number of readers can stand open at once, and a file is never held open by one left
+ * unfinished. What is held is the bytes read and not yet taken: one chunk, or one row longer than it.
+ */
+export class RowReader {
+  /** The byte in the file of `held[0]`. */
+  private start = 0;
+  /** Bytes read and not yet taken as rows. */
+  private held: Buffer = NOTHING;
+  /** Whether a read came back empty: the file has nothing past `held`. */
+  private ended = false;
+  private row = 0;
+
+  constructor(
+    readonly file: string,
+    private readonly chunkSize = 64 * 1024,
+  ) {}
+
+  /** The next non-blank row, or undefined at the end of the file. */
+  next(): Row | undefined {
+    let from = 0; // the bytes before it are known to hold no newline
+    for (;;) {
+      const end = this.held.indexOf(NEWLINE, from);
+      if (end === -1 && !this.ended) {
+        from = this.held.length;
+        this.readMore();
+        continue;
+      }
+      if (end === -1 && this.held.length === 0) return undefined;
+      // At the end of the file the bytes after its last `\n` are a row too, one with no newline.
+      const newline = end !== -1;
+      const length = newline ? end : this.held.length;
+      const offset = this.start;
+      const raw = this.held.toString("utf8", 0, length).replace(/\r$/, "");
+      const taken = newline ? length + 1 : length;
+      this.held = this.held.subarray(taken);
+      this.start += taken;
+      this.row += 1;
+      from = 0;
+      if (raw.trim() !== "") return { raw, row: this.row, newline, offset };
+    }
+  }
+
+  /** Read on from byte `offset`, the start of row number `row`; what is already held is not read again. */
+  seek(offset: number, row: number): void {
+    const into = offset - this.start;
+    if (into >= 0 && into <= this.held.length) {
+      this.held = this.held.subarray(into);
+    } else {
+      this.held = NOTHING;
+      this.ended = false;
+    }
+    this.start = offset;
+    this.row = row - 1;
+  }
+
+  private readMore(): void {
+    const chunk = Buffer.alloc(this.chunkSize);
+    const fd = openSync(this.file, "r");
+    let read: number;
+    try {
+      read = readSync(fd, chunk, 0, this.chunkSize, this.start + this.held.length);
+    } finally {
+      closeSync(fd);
+    }
+    if (read === 0) this.ended = true;
+    else
+      this.held =
+        this.held.length === 0
+          ? chunk.subarray(0, read)
+          : Buffer.concat([this.held, chunk.subarray(0, read)]);
+  }
 }
 
 /**
  * The non-blank rows of a `.jsonl` file, read through a fixed buffer so a month of a million
- * lines never sits in memory at once. The handle is closed before the generator returns.
+ * lines never sits in memory at once, and no handle is held between reads (`RowReader`).
  */
 export function* eachLine(file: string, chunkSize = 64 * 1024): Generator<Row> {
-  const fd = openSync(file, "r");
-  try {
-    const buffer = Buffer.alloc(chunkSize);
-    const decoder = new StringDecoder("utf8");
-    let pending = "";
-    let row = 0;
-    for (;;) {
-      const read = readSync(fd, buffer, 0, chunkSize, null);
-      const text = read === 0 ? decoder.end() : decoder.write(buffer.subarray(0, read));
-      pending += text;
-      const parts = pending.split("\n");
-      pending = read === 0 ? "" : (parts.pop() as string);
-      const last = parts.length - 1;
-      for (const [index, part] of parts.entries()) {
-        row += 1;
-        const raw = part.replace(/\r$/, "");
-        // At the end of the file the text after its last `\n` is a row too, one with no newline.
-        const newline = !(read === 0 && index === last);
-        if (raw.trim() !== "") yield { raw, row, newline };
-      }
-      if (read === 0) return;
-    }
-  } finally {
-    closeSync(fd);
-  }
+  const reader = new RowReader(file, chunkSize);
+  for (let row = reader.next(); row !== undefined; row = reader.next()) yield row;
 }
 
 /** Why a row is not a Line: not JSON at all, JSON that gives a member name twice, or JSON that is not an object. */
