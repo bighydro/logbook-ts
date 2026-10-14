@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { checkTimezone, localizer } from "./clock.js";
+import { checkDayStart } from "./dayStart.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
 import { bar, padEnd, padStart, plural, withCommas } from "./table.js";
@@ -89,6 +90,7 @@ export function collectStats(root: string): Stats {
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
+  checkDayStart(meta);
   const timezone = meta.timezone;
   if (typeof timezone !== "string" || timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing");

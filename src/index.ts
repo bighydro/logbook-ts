@@ -1,4 +1,15 @@
 export { contentHash, contentOf, hashLine, lineHash, sha256Hex, ZERO_HASH } from "./chain.js";
+export {
+  CHAPTER_KIND,
+  CHAPTER_SCHEMA,
+  type ChapterState,
+  chapterClashes,
+  chapterKey,
+  chapterOf,
+  chapterProblems,
+  isChapter,
+  standingChapters,
+} from "./chapters.js";
 export { type Io, type MainOptions, main } from "./cli.js";
 export {
   addDays,
@@ -41,6 +52,15 @@ export {
   type UnplacedEntry,
 } from "./day.js";
 export {
+  checkDayStart,
+  DAY_START,
+  DayStartError,
+  DEFAULT_DAY_START,
+  localDayOf,
+  localToday,
+  readDayStart,
+} from "./dayStart.js";
+export {
   type DayRow,
   type DayRowFlight,
   type DayRowNight,
@@ -52,8 +72,47 @@ export {
   renderDayRows,
 } from "./days.js";
 export { distanceText, durationText, healthText, renderDay } from "./dayText.js";
+export {
+  DRAFT_KIND,
+  DRAFT_SCHEMA,
+  type DraftRead,
+  type DraftSegment,
+  draftKey,
+  draftProblems,
+  draftRow,
+  draftTierProblems,
+  isDraft,
+  readDraft,
+  standingDrafts,
+  UNITS,
+  type Unit,
+  unitKey,
+} from "./drafts.js";
+export { FLAGS, FLAGS_ENV, type Flag, FlagError, flagsOn, isOn, RFC0036 } from "./flags.js";
 export { distanceM, fsum, mean, roundHalfEven, roundTo } from "./geo.js";
+export {
+  CLOSING,
+  DISPOSITIONS as GOAL_DISPOSITIONS,
+  GOAL_KIND,
+  GOAL_SCHEMA,
+  type GoalDisposition,
+  goalProblems,
+  HORIZONS,
+  isGoal,
+  isReview,
+  openGoals,
+  PERIODS,
+  REVIEW_KIND,
+  REVIEW_SCHEMA,
+  reviewKey,
+  reviewProblems,
+  reviewRecordProblems,
+  standingGoal,
+  standingGoals,
+  standingReviews,
+} from "./goals.js";
 export { canonicalize, JcsError } from "./jcs.js";
+export { duplicates, type Retracted, standingLines } from "./lineRules.js";
 export {
   eachLine,
   type MonthFile,
@@ -85,15 +144,22 @@ export {
   type Ceiling,
   ceiling,
   ceilings,
+  crossingEntry,
+  type DayGate,
+  type DayGateOptions,
   DEFAULT_CROSSING_POLICY,
   DEFAULT_IMPORT_POLICY,
+  dayGate,
   expiredOn,
+  lineCrosses,
   mcpCeiling,
   mcpDoor,
   PolicyError,
   readCrossingPolicy,
   readDisabledSources,
   recipientOf,
+  SIGNED_WITHIN,
+  signedOn,
   siteCeiling,
   vaultCeiling,
   WRITE_TOOLS,

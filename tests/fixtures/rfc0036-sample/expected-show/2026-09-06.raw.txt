@@ -1,0 +1,3 @@
+2026-09-06  unsigned
+  19:20  chapter    manual         The Lofoten summer
+  19:25  chapter    manual         Ashore, fixing things

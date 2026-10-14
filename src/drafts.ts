@@ -1,0 +1,364 @@
+/**
+ * `draft/v1` (RFC 0036, draft, 2026-10-13, with amendment 1, open at this writing): a model's text about
+ * one unit of the record, kept under one rule. Every segment points at the line ids it rests on, or is
+ * marked unsupported, and a reader never shows an unsupported sentence as fact. A draft is a proposal:
+ * nothing in it is a fact of the record until the owner confirms it through an act of their own.
+ *
+ * The line: `kind` `draft`, `source` `model:<name>` (never `manual`, never an adapter), `end` null,
+ * and a tier that is the highest among the lines the model read, not only those it cites, so a reader
+ * can hold it to no less than the lines a segment cites (`draftTierProblems`). The payload: `unit`
+ * (`day`, `journey`, `event`, `week`, `month`, `year`, `chapter`, and amendment 1's `person`), the
+ * `subject` in the unit's form, `read_head`, `read_count`, `language`, `segments`, and `supersedes`;
+ * amendment 1 adds `window`, MUST on a person and absent elsewhere, and `read_policy`, SHOULD.
+ *
+ * The reference reads a day's draft on the Day and prints its row in `show`, and checks five fields as
+ * it reads (openlogbook 0.6.1, run on synthetic drafts): `read_head`, `read_count`, `language`,
+ * `segments` and `supersedes`. Those sentences are its own, word for word, in its order, and like it
+ * the check names the first malformed segment only; the rest of the field table (unit, subject,
+ * source, window, read_policy) has no reference sentence yet and is checked here in its style
+ * (SPEC-QUESTIONS 89). `readDraft` is the reader's view, the reference's `malformed` list and its
+ * reading of each segment; `draftRow` is the row `show` prints under the `rfc0036` flag. Nothing here
+ * writes a draft, and the Day does not show one yet.
+ */
+
+import {
+  envelopeProblems,
+  type Fields,
+  fieldsOf,
+  isDayString,
+  isObject,
+  isText,
+  oneOf,
+  type Retracted,
+  standingLines,
+} from "./lineRules.js";
+import { pyStr } from "./pyrepr.js";
+import type { JsonValue, Line, Payload } from "./types.js";
+
+export const DRAFT_KIND = "draft";
+export const DRAFT_SCHEMA = "draft/v1";
+/** The units a draft is about; `person` is amendment 1's. */
+export const UNITS = [
+  "day",
+  "journey",
+  "event",
+  "week",
+  "month",
+  "year",
+  "chapter",
+  "person",
+] as const;
+export type Unit = (typeof UNITS)[number];
+const MODEL_SOURCE = /^model:.+$/;
+const HEX64 = /^[0-9a-f]{64}$/;
+/** A BCP 47 tag as the reference accepts one: a language of two or three letters, subtags of two to eight. */
+const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const YEAR = /^\d{4}$/;
+const WEEK = /^(\d{4})-W(\d{2})$/;
+
+/** The one shape rule (RFC 0036, the evidence rule), as the reference says it. */
+const SHAPE = "a segment is {text, evidence} or {text, unsupported: true}, nothing else";
+const NO_TEXT = "(no text)";
+
+/** Whether a line is a `draft/v1` line at all: the kind and the schema. The rest is `draftProblems`. */
+export const isDraft = (line: Line): boolean =>
+  line.kind === DRAFT_KIND && fieldsOf(line).schema === DRAFT_SCHEMA;
+
+/** ISO 8601 weeks in a year: 53 when it begins on a Thursday, or on a Wednesday in a leap year. */
+function isoWeeks(year: number): number {
+  const jan1 = new Date(Date.UTC(year, 0, 1)).getUTCDay();
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return jan1 === 4 || (leap && jan1 === 3) ? 53 : 52;
+}
+
+const isIsoWeek = (v: unknown): boolean => {
+  const m = typeof v === "string" ? WEEK.exec(v) : null;
+  if (m === null) return false;
+  const week = Number(m[2]);
+  return week >= 1 && week <= isoWeeks(Number(m[1]));
+};
+
+const isIdList = (v: unknown): v is string[] => Array.isArray(v) && v.length > 0 && v.every(isText);
+
+/** What the subject of each unit is, as the field table says it. */
+const SUBJECTS: Record<Unit, [(v: unknown) => boolean, string]> = {
+  day: [isDayString, "the local day, YYYY-MM-DD"],
+  week: [isIsoWeek, "the ISO week, YYYY-Www"],
+  month: [(v) => typeof v === "string" && MONTH.test(v), "the month, YYYY-MM"],
+  year: [(v) => typeof v === "string" && YEAR.test(v), "the year, YYYY"],
+  journey: [isIdList, "the ids of the lines the unit is, as an array"],
+  event: [isIdList, "the ids of the lines the unit is, as an array"],
+  chapter: [isIdList, "the ids of the lines the unit is, as an array"],
+  person: [isText, "one canonical person id, as a string"],
+};
+
+const isUnit = (v: unknown): v is Unit => typeof v === "string" && UNITS.includes(v as Unit);
+
+/** A segment as the field table has it: an object with text and either evidence or `unsupported: true`. */
+function segmentIs(segment: unknown): "supported" | "unsupported" | "malformed" {
+  if (!isObject(segment) || !isText(segment.text)) return "malformed";
+  if ("unsupported" in segment) {
+    return segment.unsupported === true && !("evidence" in segment) ? "unsupported" : "malformed";
+  }
+  return isIdList(segment.evidence) ? "supported" : "malformed";
+}
+
+const isCount = (v: unknown): boolean => typeof v === "number" && Number.isInteger(v) && v >= 0;
+
+/**
+ * What the reference's reader says is wrong with a draft, in its words and its order: `read_head`,
+ * `read_count`, `language`, `segments` (the first malformed segment only) and `supersedes`.
+ */
+function readerProblems(p: Fields): string[] {
+  const problems: string[] = [];
+  if (typeof p.read_head !== "string" || !HEX64.test(p.read_head)) {
+    problems.push("read_head must be the record's head, 64 lowercase hex characters");
+  }
+  if (!isCount(p.read_count)) {
+    problems.push("read_count must be how many lines of the unit the model read");
+  }
+  if (typeof p.language !== "string" || !BCP47.test(p.language)) {
+    problems.push("language must be a BCP 47 tag, en or nb");
+  }
+  const segments = p.segments;
+  if (!Array.isArray(segments) || segments.length === 0) {
+    problems.push("segments must be a non-empty list");
+  } else {
+    const first = segments.findIndex((s) => segmentIs(s) === "malformed");
+    if (first !== -1) problems.push(`segment ${first + 1} is malformed: ${SHAPE}`);
+  }
+  if ("supersedes" in p && !isText(p.supersedes)) {
+    problems.push("supersedes must be the id of the earlier draft");
+  }
+  return problems;
+}
+
+const isPolicy = (v: unknown): boolean =>
+  isObject(v) &&
+  isText(v.entry) &&
+  typeof v.max_tier === "number" &&
+  Number.isInteger(v.max_tier) &&
+  v.max_tier >= 0 &&
+  v.max_tier <= 3 &&
+  typeof v.sha256 === "string" &&
+  HEX64.test(v.sha256);
+
+/**
+ * Why a line is not a `draft/v1` line as RFC 0036 and its amendment 1 define one, one sentence per
+ * rule broken; empty when it is one. The envelope first, then `unit`, `subject` and `window`, then the
+ * five fields the reference's reader checks, in its words, then `read_policy`. The tier is the lines'
+ * the model read, so it is not checked here but against them (`draftTierProblems`).
+ */
+export function draftProblems(line: Line): string[] {
+  const p = fieldsOf(line);
+  const problems = envelopeProblems(line, { kind: DRAFT_KIND, schema: DRAFT_SCHEMA });
+  if (typeof line.source !== "string" || !MODEL_SOURCE.test(line.source)) {
+    problems.splice(1, 0, "source must be model:<name>, the model as its runner names it");
+  }
+  const unit = isUnit(p.unit) ? p.unit : undefined;
+  if (unit === undefined) {
+    problems.push(`unit must be ${oneOf(UNITS, p.unit)}`);
+  } else {
+    const [fits, what] = SUBJECTS[unit];
+    if (!fits(p.subject)) problems.push(`subject of a ${unit} draft must be ${what}`);
+  }
+  if (unit === "person") {
+    const window = p.window;
+    if (!isObject(window) || !isDayString(window.from) || !isDayString(window.to)) {
+      problems.push(
+        "window must be { from, to }, two local days YYYY-MM-DD, both inclusive: the stretch of the person the model read",
+      );
+    } else if (window.from > window.to) {
+      problems.push(`window runs backwards: from ${window.from} is after to ${window.to}`);
+    }
+  } else if (unit !== undefined && p.window !== undefined) {
+    problems.push(`window is for a person draft only; the subject of a ${unit} draft bounds it`);
+  }
+  problems.push(...readerProblems(p));
+  if (p.read_policy !== undefined && !isPolicy(p.read_policy)) {
+    problems.push(
+      "read_policy must be { entry, max_tier, sha256 }: the policy entry read through, its ceiling then (0 to 3), and the sha256 of policy/crossing.json as read, 64 lowercase hex characters",
+    );
+  }
+  return problems;
+}
+
+/**
+ * Whether the draft's tier holds against the lines it cites (SPEC §4: derived data inherits the
+ * highest tier of its evidence). The evidence of a draft is every line the model read, which no reader
+ * can list, but every line a segment cites was read, so the tier is never below the highest of them.
+ * `lines` are lines of the record; those no segment cites are ignored. Empty when it holds.
+ */
+export function draftTierProblems(line: Line, lines: Iterable<Line>): string[] {
+  const cited = new Set<string>();
+  const segments = fieldsOf(line).segments;
+  for (const segment of Array.isArray(segments) ? segments : []) {
+    if (segmentIs(segment) === "supported") {
+      for (const named of (segment as Fields).evidence as string[]) cited.add(named);
+    }
+  }
+  let highest: Line | undefined;
+  for (const l of lines) {
+    if (cited.has(l.id) && (highest === undefined || l.tier > highest.tier)) highest = l;
+  }
+  if (highest === undefined || line.tier >= highest.tier) return [];
+  return [
+    `tier is ${line.tier}, below the tier ${highest.tier} of ${highest.id}, a line it cites; a draft's tier is the highest among the lines it read`,
+  ];
+}
+
+/** One segment as a reader shows it: supported with its evidence, or set apart, and why when it is not the writer's mark. */
+export interface DraftSegment {
+  text: string;
+  evidence: string[];
+  supported: boolean;
+  /** Why a segment is shown unsupported when its writer did not mark it so; null otherwise. */
+  why: string | null;
+}
+
+/** A draft as a reader reads it: the line's fields, its segments read, and what the reference's reader says is malformed. */
+export interface DraftRead {
+  line: string;
+  seq: number;
+  source: string;
+  /** The model, as `source` names it after `model:`; null when it does not. */
+  model: string | null;
+  tier: number;
+  at: string;
+  unit: JsonValue;
+  subject: JsonValue;
+  read_head: JsonValue;
+  read_count: JsonValue;
+  language: JsonValue;
+  segments: DraftSegment[];
+  /** How many segments are shown unsupported: marked, malformed, or resting on a line not of the unit. */
+  unsupported: number;
+  supersedes: string | null;
+  malformed: string[];
+}
+
+const textOf = (v: JsonValue | undefined): string =>
+  typeof v === "string"
+    ? v.trim() === ""
+      ? NO_TEXT
+      : v
+    : v === undefined || v === null
+      ? NO_TEXT
+      : pyStr(v);
+
+/**
+ * A draft as a reader shows it (draft/v1 rules 3 and 6). A segment with evidence is supported when
+ * every id it names is a line of the unit (`onUnit`, the ids of the unit's lines, when the reader holds
+ * the record; without it the ids are not checked); one that names another is shown unsupported and
+ * says why. A segment the writer marked `unsupported` is shown so. A malformed segment is treated as
+ * unsupported and the line is said to be malformed; one that is not an object is not shown at all. All
+ * as the reference's Day reads a day's draft (openlogbook 0.6.1, run).
+ */
+export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
+  const p = fieldsOf(line);
+  const unit = p.unit;
+  const elsewhere =
+    unit === "person"
+      ? "evidence names a line that is not one of the person's lines in the window"
+      : `evidence names a line that is not on the ${pyStr(unit)}`;
+  const segments: DraftSegment[] = [];
+  for (const segment of Array.isArray(p.segments) ? p.segments : []) {
+    if (!isObject(segment)) continue;
+    const text = textOf(segment.text);
+    const shape = segmentIs(segment);
+    if (shape === "malformed") {
+      segments.push({ text, evidence: [], supported: false, why: SHAPE });
+    } else if (shape === "unsupported") {
+      segments.push({ text, evidence: [], supported: false, why: null });
+    } else {
+      const evidence = [...(segment.evidence as string[])];
+      const off = onUnit !== undefined && evidence.some((named) => !onUnit.has(named));
+      segments.push({ text, evidence, supported: !off, why: off ? elsewhere : null });
+    }
+  }
+  const source = String(line.source);
+  return {
+    line: String(line.id),
+    seq: line.seq,
+    source,
+    model: source.startsWith("model:") ? source.slice("model:".length) : null,
+    tier: line.tier,
+    at: String(line.at),
+    unit: unit ?? null,
+    subject: p.subject ?? null,
+    read_head: p.read_head ?? null,
+    read_count: p.read_count ?? null,
+    language: p.language ?? null,
+    segments,
+    unsupported: segments.filter((s) => !s.supported).length,
+    supersedes: isText(p.supersedes) ? p.supersedes : null,
+    malformed: readerProblems(p),
+  };
+}
+
+const canonicalSubject = (v: JsonValue | undefined): JsonValue => v ?? null;
+
+/**
+ * The unit a draft is of, as a key: `unit` and `subject`, as written. A person's is its subject alone,
+ * whatever its window (amendment 1: the standing person draft is the latest of the subject).
+ */
+export const unitKey = (unit: JsonValue | undefined, subject: JsonValue | undefined): string =>
+  JSON.stringify([unit ?? null, canonicalSubject(subject)]);
+
+/**
+ * The dedupe key of a draft (draft/v1 rule 1): `(source, unit, subject, read_head)`, and for a person
+ * `(source, unit, subject, window, read_head)`. Undefined for a line that is not a draft.
+ */
+export function draftKey(line: Line): string | undefined {
+  if (!isDraft(line)) return undefined;
+  const p = fieldsOf(line);
+  const window = isObject(p.window) ? [p.window.from ?? null, p.window.to ?? null] : null;
+  const key: JsonValue[] = [String(line.source), p.unit ?? null, canonicalSubject(p.subject)];
+  if (p.unit === "person") key.push(window);
+  key.push(p.read_head ?? null);
+  return JSON.stringify(key);
+}
+
+/**
+ * The standing draft of each unit (draft/v1 rule 2), by `unitKey`: of the drafts not retracted and not
+ * named in a later draft's `supersedes`, the latest by `seq`.
+ */
+export function standingDrafts(lines: Iterable<Line>, retracted: Retracted): Map<string, Line> {
+  const out = new Map<string, Line>();
+  for (const draft of standingLines(lines, retracted, isDraft)) {
+    const p = fieldsOf(draft);
+    out.set(unitKey(p.unit, p.subject), draft);
+  }
+  return out;
+}
+
+/** Python's truth of a JSON value: false for null, false, 0, an empty string, list or object. */
+const truthy = (v: JsonValue | undefined): boolean =>
+  v !== undefined &&
+  v !== null &&
+  v !== false &&
+  v !== 0 &&
+  v !== "" &&
+  !(Array.isArray(v) && v.length === 0) &&
+  !(isObject(v) && Object.keys(v).length === 0);
+
+/**
+ * The row `show` prints for a draft line, as the reference prints it (openlogbook 0.6.1, run): `draft
+ * of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`, then ` · supersedes an
+ * earlier draft` when it names one. A segment counts as unsupported when it is marked so or malformed;
+ * `show` holds no unit to check evidence against.
+ */
+export function draftRow(p: Payload): string {
+  const subject = Array.isArray(p.subject) ? p.subject.map(pyStr).join(", ") : pyStr(p.subject);
+  const count = p.read_count;
+  const one = count === 1 || count === true;
+  const head = truthy(p.read_head) ? pyStr(p.read_head).slice(0, 8) : "";
+  const segments = Array.isArray(p.segments) ? p.segments : [];
+  const unsupported = segments.filter((s) => segmentIs(s) !== "supported").length;
+  let row = `draft of ${pyStr(p.unit)} ${subject} · ${pyStr(count)} line${one ? "" : "s"} read at ${head}`;
+  row += ` · ${segments.length} segment${segments.length === 1 ? "" : "s"}`;
+  if (unsupported > 0) row += `, ${unsupported} unsupported`;
+  if (truthy(p.supersedes)) row += " · supersedes an earlier draft";
+  return row;
+}

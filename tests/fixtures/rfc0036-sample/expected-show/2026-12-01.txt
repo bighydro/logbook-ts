@@ -1,0 +1,2 @@
+2026-12-01  unsigned
+  20:00  chapter    manual         Ashore, fixing things

@@ -13,6 +13,7 @@ import {
   type PeopleContext,
   promotes,
 } from "./day.js";
+import { checkDayStart } from "./dayStart.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { payloadOf } from "./render.js";
 import type { Resolver } from "./resolve.js";
@@ -146,6 +147,7 @@ export function openWindow(root: string, options: WindowOptions, open: OpenOptio
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
+  checkDayStart(meta);
   const timezone = meta.timezone;
   if (typeof timezone !== "string" || timezone === "")
     throw new LogbookError("logbook.json: timezone is missing");
