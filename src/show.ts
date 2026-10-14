@@ -10,6 +10,8 @@ import {
   localizer,
   monthKey,
 } from "./clock.js";
+import { checkDayStart } from "./dayStart.js";
+import { isOn, RFC0036 } from "./flags.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import {
   keeperPhoto,
@@ -168,6 +170,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
+  checkDayStart(meta);
   const timezone = options.timezone ?? meta.timezone;
   if (typeof timezone !== "string" || timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing; pass --tz");
@@ -185,6 +188,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     raw: options.raw === true,
     clock: (at) => local(at)?.clock,
     supersededFlights,
+    rfc0036: isOn(RFC0036),
   };
   // The standing signature per day (RFC 0034 rule 3): the owner's, not retracted.
   const owner = typeof meta.owner_id === "string" ? meta.owner_id : undefined;

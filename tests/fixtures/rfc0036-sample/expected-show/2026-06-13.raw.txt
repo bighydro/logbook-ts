@@ -1,0 +1,6 @@
+2026-06-13  unsigned
+  07:00  health-sample sim-watch      raw_id=steps:2026-06-13T05:00:00Z, type=steps, unit=count, value=4200
+  09:30–15:00  location   sim-phone      2 points
+  16:10  photo      sim-camera     camera=SimPhone 3, file=IMG_0613.jpg
+  18:00  note       manual         The engine sounded right for the first time since May.
+  20:00  location   sim-phone      1 point

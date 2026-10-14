@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, and at 3092b60 (2026-10-08, RFC 0034) for the signed day.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, and at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -673,3 +673,125 @@ the RFC's words is written here. The RFC's example is synthetic and the fixtures
     implementation reports `seq must be an integer ≥ 1` and passes the line by. Suggest §2 make `seq`
     order within a file a writer's obligation that a verifier MAY rely on, as placement is for readers,
     or say that it MUST NOT; and §3 say whether the `seq` reported is a count or the last line's `seq`.
+
+## Found while porting RFC 0036, goals, reviews, drafts and chapters (openlogbook main at f6bb65b, 0.6.1, 2026-10-13; docs/rfcs/0036-goals-reviews-drafts-chapters.md, rfcs/0036-*.md, and amendment 1 as PR 269 proposes it)
+
+The RFC was read, and the reference was run, never read: on the conformance sample with `day_start`
+set to each value below, on synthetic records carrying the RFC's example lines, and on a draft of a day
+varied field by field (`tests/cross-impl.test.ts` repeats those runs). Everything here is behind the
+`rfc0036` flag, off by default; each entry says what this implementation does until the answer comes.
+
+86. **`day_start`: who refuses, in which words, and from when.**
+    a. RFC 0036 says a reader that does not implement it MUST refuse a record that sets `day_start`.
+       Does that bind a conformant reader while RFC 0036 is a draft, or from the day it is Final? With
+       the flag off this implementation reads such a record by the calendar day, as every reader before
+       the RFC did; with it on, it refuses.
+    b. Which commands group lines by day? The reference refuses `show <day>`, `day`, `show days`,
+       `show trips`, `rollup`, `people`, `show stats`, `show keepers`, `digest`, `export --day` and
+       `doctor sources --gaps`, and not `verify` or `doctor sources`. `stats` counts per local year
+       and month rather than per day: is it meant to refuse? This implementation follows the list as
+       run (`stats` refuses).
+    c. The reference reads `"day_start": null` as absent (midnight). Should the RFC say so, beside
+       "absent, it is 00:00"?
+    d. The reference's sentence says the value "is not a clock", which is false for `"06:00"`. What
+       does a reader that parses the value but does not implement the boundary say? docs/settings.md
+       says such a reader "must refuse in the same way": the same exit status and the same naming of
+       the key and the value, or the same sentence? This implementation says `logbook.json has
+       day_start '06:00', and this implementation does not yet put a line on a day by it; a reader
+       that groups lines by day refuses rather than guess (RFC 0036)`, exit 2, prefixed with the
+       command as the reference prefixes its own.
+    e. May an implementation apply the boundary in some readers (say `show` and `day`) and refuse in
+       the rest, or must it adopt it in every reader at once, as the reference did? This one applies
+       it in none yet and refuses in all of them.
+    f. Is `<command>: <sentence>` with exit 2 part of what a second implementation must match, or only
+       the sentence?
+
+87. **`localDayOf` and the edges of the rule.** The rule compares the wall clock after localising, so
+    `02:30` on the night the clocks go back is before `06:00` both times (both on the day before), and
+    this implementation reads it so. Two edges the RFC does not settle: (a) is "today", for `/today` and
+    for `signed_within_days`, the local day of now by the same rule (at 05:59 with `06:00`, still
+    yesterday)? (b) A day's span is "from `day_start` on the date to `day_start` on the next": on the
+    night the clocks go forward, a `day_start` the clock skips (`02:30` in Oslo on 2026-03-29) begins
+    the day at the first instant whose clock reads at or after it (`03:00`). Is that the reading?
+
+88. **`goal/v1`, `review/v1`, `chapter/v1`: the refusal sentences, and what a reader checks.** The
+    reference has no check for any of the three yet: `show` prints a goal's text, a chapter's name and
+    a review as `key=value`, and amendment 1's writers (`goal add`, `goal review`, `chapter open`,
+    `chapter close`) are specified, not implemented. The sentences here are this implementation's
+    (`tests/goals.test.ts`, `tests/chapters.test.ts`), and change to the reference's when it has some.
+    a. What will the writers' refusals say, word for word? Will a reader check these profiles at all,
+       or only the writers?
+    b. The RFC's *What a Day page shows* has `show` print `goal  <text>  (year, from 2026-01-01)`,
+       `review  let go · month · <goal text>` and `chapter  The Lofoten summer  2026-06-20 –
+       2026-08-09`; the reference prints `<text>`, `goal=…, disposition=let go, period=month, note=…`
+       and `The Lofoten summer`. Which is meant? This implementation prints what the reference prints.
+    c. Is a `text` or a chapter `name` of blanks only "empty"? (Here: yes.) Is a goal's `until` before
+       its `from`, or a chapter's `to` before its `from`, a malformed line, or only a writer's refusal?
+       (Here: both.)
+    d. The review key `(goal, period, at)`: is `at` compared as the instant (`2026-08-31T20:00:00Z` and
+       `2026-08-31T22:00:00+02:00` one date) or as written, and `goal` as written or resolved to its
+       chain? (Here: the instant, the id as written.)
+    e. Rule 4 (an `at` not more than five minutes after the writer's clock, not before the goal's
+       `from`): is it held against a line already in the record, by `recorded_at` and the record's
+       zone, or only by a writer? (Here: `reviewRecordProblems` holds a line to it.)
+    f. When the line that rewords a goal, or closes a chapter, is retracted, does the earlier line stand
+       again? Rule 4 of `chapter/v1` speaks of "a retraction that reopened one", and RFC 0034 rule 3
+       says so of a signature; the goal's rule 2 says "not named in a later goal's `supersedes`", which
+       a retracted line still does. (Here: it stands again.)
+    g. `chapter close` writes the same `name` and `from` as the open chapter it supersedes, which is the
+       key of rule 1. Is a line that supersedes the line holding its key exempt from the dedupe? (Here:
+       yes, and it holds the key from then on.)
+
+89. **`draft/v1`: the reference's reader against the field table.** The reference's Day checks five
+    fields as it reads a day's draft, and this implementation says the same in the same order:
+    `read_head must be the record's head, 64 lowercase hex characters`, `read_count must be how many
+    lines of the unit the model read`, `language must be a BCP 47 tag, en or nb`, `segments must be a
+    non-empty list` or `segment N is malformed: a segment is {text, evidence} or {text, unsupported:
+    true}, nothing else`, and `supersedes must be the id of the earlier draft`.
+    a. It names the first malformed segment only, though each malformed segment is shown unsupported
+       with the same reason. Should a reader name every one? (Here: the first, as the reference.)
+    b. It does not check `unit`, `subject`, `source`, `end`, `window` or `read_policy`. Should a reader
+       say a draft whose `source` is not `model:<name>`, or whose `subject` is not in its unit's form, is
+       malformed? `draftProblems` here holds the whole field table, in its own sentences; `readDraft`'s
+       `malformed` holds only the reference's five.
+    c. "A BCP 47 tag": the reference accepts two or three letters, then subtags of two to eight
+       (`en`, `EN`, `nb-NO`, `zh-Hant-TW`, `de-CH-1996`) and refuses `x-private`, `i-klingon`, `en-a`
+       and `english`. Is that the subset the RFC means?
+    d. `supersedes: ""` and `supersedes: null` are malformed to the Day, while `show`'s row treats them
+       as absent (no ` · supersedes an earlier draft`). Which reading is meant?
+    e. `show` exits with a Python `TypeError` on a draft whose `subject` is an array holding a
+       non-string (`["a", 5]`); this implementation prints `a, 5`.
+    f. A segment resting on a line not of the unit says `evidence names a line that is not on the day`.
+       What does it say for the other units? (Here: `… not on the <unit>`, and for a person amendment 1's
+       wording, `… not one of the person's lines in the window`.)
+    g. A segment whose `text` is not a string is shown as Python's `str()` of it (`5`), and an empty one
+       as `(no text)`. Should a reader show a malformed segment's text at all?
+    h. The tier: every line a segment cites was read, so a draft's tier is never below the highest of
+       them (`draftTierProblems`). Should a reader check that, and what does it do with a draft that
+       fails it: hide it, as amendment 1 hides one above the ceiling, or mark it?
+    i. A week's subject: is `2025-W53` (2025 has 52 ISO weeks) malformed? (Here: yes.) And a day's
+       subject is "the local day": by `day_start`?
+    j. Amendment 1: is a `window` on a draft of another unit malformed, or ignored as the reference
+       ignores it? Is `read_policy.max_tier` 0 to 3 ("its ceiling as it counted then", 0 past `until`)
+       or 1 to 3, since a writer refuses to read under an expired entry? (Here: malformed; 0 to 3.)
+
+90. **`signed_within_days`: the window, the day a signature was written, and the words.** The reference
+    documents the key (docs/signed-day.md, docs/line-to-day.md) but does not read it: at 0.6.1 neither
+    `doctor` nor `export crossing` looks at it, and a value of `0`, `-1`, `"14"` or `true` is accepted
+    silently. This implementation reads it under the flag and composes it as the RFC says
+    (`dayGate`, `lineCrosses`).
+    a. The window: the RFC says "from N days before today through today", N + 1 local days;
+       docs/signed-day.md says "in the last fourteen days, today included", N. Which? (Here: the RFC's.)
+    b. "Written on": the local day of the standing signature's `at`, the moment the owner signed, which
+       RFC 0034 amendment 2 lets the owner set with `--at`, or of its `recorded_at`? (Here: `at`.)
+    c. "Today" is the day of the export in the record's zone, while `until` is held against the
+       machine's local date (the reference's `policy.today`). Should the two agree?
+    d. What does a reader say of a value that is not a positive whole number? (Here: `<file>:
+       'cloud-model' has a signed_within_days that is not a positive whole number of days; write it as
+       14, or remove the key for no restriction (RFC 0036)`.) Is `null` absent?
+    e. A signature whose `at` is after today (amendment 2 allows five minutes ahead), or one whose page
+       no longer digests to what was signed (`page_matches` false): does it let the day cross? (Here:
+       the first does not; the second is not looked at.)
+    f. The header a held-back day crosses is "the day, and whether and when it was signed". Does a day
+       held back by RFC 0034's default (unsigned, no `--unsigned`, no `signed_within_days`) cross its
+       header too? (Here: `dayGate` says it may; the command decides.)

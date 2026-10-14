@@ -154,17 +154,61 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 | `weather/v1` (0026) | `null` only | chain | — | SPEC-QUESTIONS 69d |
 | `story/v1` (0028), `received/v1` (0025) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
 | `signed-day/v1` (0034, amendments 1–3) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2 and 3 are the writer's (`--confirm none`, `--at`, the MCP door) and leave the line as it is |
+| `goal/v1`, `review/v1` (0036) | draft (RFC 0036): `standingGoals`, `standingGoal`, `standingReviews` (a review counts for the goals that reword the one it names), `openGoals`; `show` prints a goal's text and a review's `key=value` row as the reference does, flag or not | draft (RFC 0036): `goalProblems`, `reviewProblems` (the field tables; tier 2 and `source` `manual`, MUST), `reviewRecordProblems` (the goal is a goal line not retracted, `at` not before its `from` nor five minutes after `recorded_at`), `reviewKey` `(goal, period, at)`; a goal has no key. The reference checks neither profile yet, so the sentences are this implementation's (SPEC-QUESTIONS 88) | — | the Day's `reviews` row is not read yet; the writers (`goal add`, `goal review`, amendment 1) are the reference's |
+| `draft/v1` (0036, and amendment 1's `person`, `window`, `read_policy` as PR 269 proposes them) | draft (RFC 0036): `readDraft`, a draft as the reference's Day reads it (each segment supported or not and why, `malformed`), `standingDrafts`; `show`'s row (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`) under the flag | draft (RFC 0036): `draftProblems`, the five fields the reference's reader checks in its words (`read_head`, `read_count`, `language`, `segments` with the segment rule, `supersedes`), and `unit`, `subject`, `source` `model:<name>`, `window`, `read_policy` in this implementation's (SPEC-QUESTIONS 89); `draftTierProblems`, never below a line it cites; `draftKey` | — | the Day's draft block is not shown yet; nothing here writes a draft |
+| `chapter/v1` (0036) | draft (RFC 0036): `standingChapters`, `chapterOf` (the standing chapter open on a day, and the clash of rule 4); `show`'s row, the chapter's name, under the flag | draft (RFC 0036): `chapterProblems`, `chapterKey` `(name, from)` (a closing line that supersedes the open one is not a duplicate), `chapterClashes`; sentences this implementation's | — | the Day's header does not name the chapter yet |
 
 | Settings and policy file | Read | Validated as the reference validates it | Written |
 |---|---|---|---|
 | `logbook.json` | yes | format, and the fields a reader needs | `add` rewrites `seq` and `head` atomically |
+| `logbook.json`, `day_start` (RFC 0036) | draft (RFC 0036), under the flag: `readDayStart`, `localDayOf`; midnight, written, absent or null, groups as before | yes: a value that is not a clock `HH:MM` is refused by every reader that groups by day in the reference's words; a clock other than midnight is refused too, since no reader here puts a line on a day by it yet | — |
 | `policy/stays.json` | yes, `aboard_min_s` included | yes (`SettingsError`) | — |
 | `places.json` | yes, the settings' `radius_m` as the default reach | yes | — |
 | `assets.json` | yes, `mmsi`, `icao24`, `registration` included | yes | — |
 | `policy/owner.json` | yes | yes | — (the reference writes the empty file; this reads it as empty) |
 | `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory) |
+| `policy/crossing.json`, `signed_within_days` (RFC 0036) | draft (RFC 0036), under the flag: `crossingEntry`, and its composition with `max_tier` and `until`, `dayGate` and `lineCrosses` | yes, a positive whole number of days, in this implementation's words: the reference documents the key and does not read it yet (SPEC-QUESTIONS 90) | — |
 | `policy/import.json` | yes (`readDisabledSources`) | yes | — (as above); the Day's `readiness` that consumes it is not read yet, SPEC-QUESTIONS 79 |
 | `policy/circle.json` | — | — | — (`receive` is not ported) |
+
+## Draft RFCs behind a flag
+
+An RFC is final only once two implementations agree on it, so a draft is read here to be held to the
+reference, never by default. `LOGBOOK_TS_FLAGS` names the flags that are on, separated by commas or
+spaces; a name this implementation does not know is refused by every command that reads the flags, so
+a typo never reads as a flag left off.
+With no flag on, every reader and the CLI behave as they did before the draft.
+
+```bash
+LOGBOOK_TS_FLAGS=rfc0036 node dist/bin.js show tests/fixtures/rfc0036-sample --day 2026-06-14
+#  2026-06-14  unsigned
+#    08:10  draft      model:qwen2.5-7b-instruct draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported
+```
+
+**`rfc0036`** (RFC 0036, *Goals, reviews, drafts and chapters; the day's boundary; the freshness of a
+signature*, draft of 2026-10-13, with its amendment 1, PR 269, open, as proposed). Off until the RFC is
+Final. With it on:
+
+- every reader that groups lines by day (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`,
+  `sources --gaps`) reads `day_start` from `logbook.json` first. A value that is not a clock `HH:MM` from
+  `00:00` to `23:59` is refused as the reference refuses it, `show: logbook.json has day_start '6am',
+  which is not a clock from 00:00 to 23:59 written HH:MM; a reader that groups lines by day refuses
+  rather than guess (RFC 0036): write it as "06:00", or remove the key for midnight`, exit 2. A clock
+  other than midnight is refused too (`… does not yet put a line on a day by it …`): no reader here
+  moves a line to the day before yet, and the RFC forbids grouping as if the key were absent. `verify`,
+  `add` and the list of sources never group by day and never look;
+- `show` prints a `draft/v1` line and a `chapter/v1` line as the reference does (`draft of day
+  2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`; the chapter's name);
+- `signed_within_days` on an entry of `policy/crossing.json` is read and checked, so a bad value is
+  refused naming the file and the entry.
+
+The profiles' functions (`goalProblems`, `reviewProblems`, `draftProblems`, `readDraft`,
+`chapterProblems`, the standing lines, the dedupe keys, `dayGate`) read a line wherever a caller holds
+one, flag or not, as `signedDayProblems` does for RFC 0034; their names and shapes may change while the
+RFC is a draft. `tests/rfc0036-examples.ts` holds the RFC's example lines; `tests/fixtures/rfc0036-sample`
+is a record of them with the reference's `show` output beside it, and `tests/cross-impl.test.ts` holds
+the two implementations to the same rows, the same `day_start` sentences and the same reading of a
+day's draft, malformed ones included. What the reference does not decide yet is in SPEC-QUESTIONS 86–90.
 
 ## Reading a day
 
@@ -614,6 +658,12 @@ mcpDoor("/path/to/root")?.writes; // the write tools the mcp entry allows today,
 signedDayProblems(line, meta.owner_id); // [] for a signed-day/v1 line as RFC 0034 and its amendments shape it
 const held = { peakHeld: 0 };
 verifyLogbook("/path/to/root", held); // held.peakHeld: lines held at once, one per month file at most; held.unsorted when one was out of order
+// RFC 0036, draft: the profiles, and the policy key under LOGBOOK_TS_FLAGS=rfc0036
+draftProblems(line); // ["segment 2 is malformed: a segment is {text, evidence} or {text, unsupported: true}, nothing else"]
+readDraft(line, new Set(dayLineIds)).segments; // [{ text, evidence, supported, why }, …]
+openGoals(lines, reviews, retracted, "2026-10-13"); // the standing goals no review has closed
+chapterOf(lines, retracted, "2026-07-04").chapter; // { name: "The Lofoten summer", line, from, to }
+dayGate(crossingEntry(root, "cloud-model"), { signedOn, today, signedOnly: true }); // { header, lines, held }
 ```
 
 ## Developing

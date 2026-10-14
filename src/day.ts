@@ -10,6 +10,7 @@ import {
   utcIso,
   weekdayOf,
 } from "./clock.js";
+import { checkDayStart } from "./dayStart.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { keeperPhoto, payloadOf } from "./render.js";
@@ -341,6 +342,7 @@ export function openDayReader(root: string): DayReader {
   const meta = readMeta(root);
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
+  checkDayStart(meta);
   const timezone = meta.timezone;
   if (typeof timezone !== "string" || timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing");

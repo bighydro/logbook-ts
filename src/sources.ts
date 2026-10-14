@@ -8,6 +8,7 @@ import {
   localizer,
   localMidnight,
 } from "./clock.js";
+import { checkDayStart } from "./dayStart.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
 import { formatRefusal, LogbookError, readMeta } from "./store.js";
 import { padEnd, padStart, plural, withCommas } from "./table.js";
@@ -180,6 +181,7 @@ export function sourceGaps(root: string, options: GapsOptions = {}): GapsReport 
   const timezone = typeof meta.timezone === "string" ? meta.timezone : "";
   const refusal = formatRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
+  checkDayStart(meta);
   if (timezone === "") throw new LogbookError("logbook.json: timezone is missing");
   checkTimezone(timezone);
   const local = localizer(timezone);

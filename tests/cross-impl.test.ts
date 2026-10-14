@@ -10,11 +10,14 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
+import { readDayStart } from "../src/dayStart.js";
 import { readDayRows, renderDayRows } from "../src/days.js";
 import { renderDay } from "../src/dayText.js";
+import { readDraft } from "../src/drafts.js";
+import { FLAGS_ENV } from "../src/flags.js";
 import { renderNights, rollupNights } from "../src/nights.js";
 import { readPeople, renderPeople } from "../src/people.js";
 import { readAssets } from "../src/settings.js";
@@ -34,10 +37,13 @@ import {
   expectedShows,
   expectedWindows,
   FIXTURES,
+  readMetaFile,
   SAMPLE_MONTH,
   tempDir,
   windowOptions,
   writeDuplicateKey,
+  writeMeta,
+  writeRecord,
 } from "./helpers.js";
 
 /**
@@ -543,3 +549,175 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts know the sa
     }, 300_000);
   }
 });
+
+/** `logbook <command…>` of the reference on a record, its exit status, stdout and stderr. */
+function referenceAll(copy: string, args: string[]): { status: number; out: string; err: string } {
+  const result = spawnSync("uv", ["run", "--project", REF as string, "logbook", ...args], {
+    cwd: REF,
+    encoding: "utf-8",
+    env: { ...process.env, LOGBOOK_HOME: copy, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
+  });
+  if (result.error) throw result.error;
+  return { status: result.status ?? -1, out: result.stdout, err: result.stderr };
+}
+
+describe.skipIf(!ready)(
+  "RFC 0036, under the rfc0036 flag: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    const fixture = join(FIXTURES, "rfc0036-sample");
+    for (const { day, raw, text } of expectedShows(fixture)) {
+      it(`show rfc0036-sample ${day}${raw ? " --raw" : ""}`, () => {
+        vi.stubEnv(FLAGS_ENV, "rfc0036");
+        const reference = referenceShow(copyOf("rfc0036-sample"), day, raw);
+        expect(showDay(fixture, { day, raw }).text, "logbook-ts disagrees with the reference").toBe(
+          reference,
+        );
+        expect(reference, "the reference moved; re-capture rfc0036-sample/expected-show").toBe(
+          text,
+        );
+      });
+    }
+
+    it("refuse a day_start that is not a clock in the same sentence, on every reader that groups by day", () => {
+      // The reference prefixes its command (`show stats` says `show:`); the sentence after it is compared.
+      const commands = [
+        ["show", "2026-03-02"],
+        ["day", "2026-03-02"],
+        ["show", "days"],
+        ["people"],
+      ];
+      for (const value of ["6am", "24:00", "6:00", 6, "06:00:00", "06:60", "", true, "00:00 "]) {
+        const copy = copyOf("sample-logbook");
+        writeMeta(copy, { ...readMetaFile(copy), day_start: value });
+        let ours = "";
+        try {
+          readDayStart(readMetaFile(copy) as never);
+        } catch (err) {
+          ours = (err as Error).message;
+        }
+        for (const args of commands) {
+          const { status, out, err } = referenceAll(copy, args);
+          expect({ value, args, status, out }).toEqual({ value, args, status: 2, out: "" });
+          // The last line: `uv` may say something of its own before it.
+          const said = err.trimEnd().split("\n").at(-1) ?? "";
+          expect(said.replace(/^[a-z]+: /, ""), `${JSON.stringify(value)}`).toBe(ours);
+        }
+      }
+    }, 300_000);
+
+    it("read a day's draft alike: the malformed list, and each segment supported or not, and why", () => {
+      // The day's lines get the ids 00000000-0000-4000-8000-00000000000N, N their seq.
+      const lineId = (n: number): string =>
+        `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+      const dayLines = [
+        {
+          at: "2026-06-13T07:30:00Z",
+          source: "sim-phone",
+          kind: "location",
+          tier: 1 as const,
+          payload: { schema: "location/v1", lat: 59.911, lon: 10.75, accuracy_m: 12 },
+        },
+        {
+          at: "2026-06-13T14:10:00Z",
+          source: "sim-camera",
+          kind: "photo",
+          tier: 1 as const,
+          payload: { schema: "photo/v1", file: "IMG_0613.jpg" },
+        },
+        {
+          at: "2026-06-13T16:00:00Z",
+          source: "manual",
+          kind: "note",
+          tier: 2 as const,
+          payload: { schema: "note/v1", text: "The engine sounded right." },
+        },
+      ];
+      const good = [
+        { text: "At home, then the boat.", evidence: [lineId(1)] },
+        { text: "One photo from the pontoon.", evidence: [lineId(2)] },
+        { text: "Ola came by.", unsupported: true },
+      ];
+      const variants: Array<Record<string, unknown>> = [
+        {},
+        { segments: [good[0], { text: "x", evidence: [lineId(2)], unsupported: true }] },
+        { segments: [good[0], { text: "x" }, { text: "y", evidence: [] }] },
+        { segments: [{ text: "x", unsupported: false }, good[2]] },
+        {
+          segments: [
+            { text: "", evidence: [lineId(2)] },
+            { text: 5, evidence: [lineId(2)] },
+            "not a segment",
+          ],
+        },
+        {
+          segments: [
+            { text: "x", evidence: [lineId(1), lineId(4)] },
+            { text: "y", evidence: ["019cadd3-6bc0-7dcd-9133-0000000009ff"] },
+          ],
+        },
+        { segments: [] },
+        { segments: "text" },
+        { read_head: undefined, read_count: "5", language: "english", supersedes: 5 },
+        { read_head: "AB".repeat(32), read_count: -1, language: "en-GB", supersedes: "" },
+        { read_count: true, language: "zh-Hant-TW", supersedes: null },
+      ];
+      for (const variant of variants) {
+        const payload: Record<string, unknown> = {
+          schema: "draft/v1",
+          unit: "day",
+          subject: "2026-06-13",
+          read_head: "bb97e90d3f946f6cc637e5e223b080ada65e2beb12b07293727e28d2a279b3d8",
+          read_count: 3,
+          language: "en",
+          segments: good,
+        };
+        for (const [key, value] of Object.entries(variant)) {
+          if (value === undefined) delete payload[key];
+          else payload[key] = value;
+        }
+        const draft = {
+          at: "2026-06-14T06:10:00Z",
+          source: "model:qwen2.5-7b-instruct",
+          kind: "draft",
+          tier: 2 as const,
+          payload,
+        };
+        const root = writeRecord([...dayLines, draft]);
+        const { status, out } = referenceAll(root, ["day", "2026-06-13", "--json"]);
+        expect(status).toBe(0);
+        const theirs = (
+          JSON.parse(out) as {
+            draft: {
+              malformed: string[];
+              segments: Array<Record<string, unknown>>;
+              unsupported: number;
+            };
+          }
+        ).draft;
+        const line = JSON.parse(
+          readFileSync(join(root, "logbook", "2026", "06.jsonl"), "utf-8")
+            .trim()
+            .split("\n")[3] as string,
+        );
+        const ours = readDraft(line, new Set(dayLines.map((_, i) => lineId(i + 1))));
+        expect({ variant, malformed: ours.malformed }).toEqual({
+          variant,
+          malformed: theirs.malformed,
+        });
+        expect(ours.unsupported).toBe(theirs.unsupported);
+        expect(ours.segments).toEqual(
+          theirs.segments.map(({ text, evidence, supported, why }) => ({
+            text,
+            evidence,
+            supported,
+            why,
+          })),
+        );
+      }
+    }, 300_000);
+  },
+);

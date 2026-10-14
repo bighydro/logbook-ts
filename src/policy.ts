@@ -13,6 +13,14 @@
  * the entry has expired. A `recipient` (RFC 0029 §7) is the age recipient a crossing package to the
  * destination is resealed to.
  *
+ * RFC 0036 (draft, the `rfc0036` flag) adds `signed_within_days` to an entry: only the lines of days
+ * whose standing signature was written on one of the local days from N days before today through
+ * today cross through it. It is a third gate beside `max_tier` (on the line) and `until` (on the
+ * entry), on the day; `dayGate` and `lineCrosses` compose the three. The reference documents the key
+ * and does not read it yet (openlogbook 0.6.1, run: neither `doctor` nor `export crossing` looks at
+ * it), so the sentence that refuses a bad value is this implementation's (SPEC-QUESTIONS 90). With
+ * the flag off the key is not read, as before.
+ *
  * `import.json` lists the sources the owner has switched off: `{"disabled": [{"source", "reason"}]}`.
  * The reference's readers consult it for the Day's `readiness` block (not read here yet,
  * SPEC-QUESTIONS 79); the file is read and checked the same way so a malformed one is refused alike.
@@ -20,9 +28,11 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isDay } from "./clock.js";
+import { addDays, isDay } from "./clock.js";
+import { localDayOf } from "./dayStart.js";
+import { isOn, RFC0036 } from "./flags.js";
 import { LogbookError } from "./store.js";
-import type { JsonValue } from "./types.js";
+import type { JsonValue, Line } from "./types.js";
 
 /** The policy file refuses the request, or is not a policy; the message names the file. */
 export class PolicyError extends LogbookError {
@@ -53,6 +63,8 @@ export type WriteTool = (typeof WRITE_TOOLS)[number];
 export const WINDOW = "write_window_days";
 /** The window when the entry does not set one. */
 export const WRITE_WINDOW_DAYS = 60;
+/** RFC 0036: how recently a day must have been signed for its lines to cross through the entry. */
+export const SIGNED_WITHIN = "signed_within_days";
 
 type Obj = { [key: string]: JsonValue };
 
@@ -87,6 +99,8 @@ export interface Ceiling {
   window_days: number;
   max_tier: number;
   writes: WriteTool[];
+  /** RFC 0036, under the `rfc0036` flag: the entry's `signed_within_days`; absent when it sets none. */
+  signed_within_days?: number;
 }
 
 export const policyPath = (root: string): string => join(root, "policy", "crossing.json");
@@ -169,12 +183,25 @@ function windowOf(path: string, destination: string, entry: Obj): number {
   return found;
 }
 
+/** RFC 0036's `signed_within_days`, under the flag: a positive whole number of days, or undefined when absent. */
+function signedWithinOf(path: string, destination: string, entry: Obj): number | undefined {
+  if (!isOn(RFC0036)) return undefined;
+  const found = entry[SIGNED_WITHIN];
+  if (found === undefined || found === null) return undefined;
+  if (typeof found !== "number" || !Number.isInteger(found) || found < 1) {
+    throw new PolicyError(
+      `${path}: ${quoted(destination)} has a ${SIGNED_WITHIN} that is not a positive whole number of days; write it as 14, or remove the key for no restriction (RFC 0036)`,
+    );
+  }
+  return found;
+}
+
 /** `entry` as a Ceiling held against the day `on`; the shape is the caller's to have checked. */
 function entryOf(path: string, destination: string, entry: Obj, on: string): Ceiling {
   const until = untilOf(path, destination, entry);
   const expired = until !== null && on > until;
   const write = writeOf(path, destination, entry);
-  return {
+  const out: Ceiling = {
     destination,
     written: entry.max_tier as number,
     until,
@@ -184,6 +211,9 @@ function entryOf(path: string, destination: string, entry: Obj, on: string): Cei
     max_tier: expired ? EXPIRED_TIER : (entry.max_tier as number),
     writes: expired ? [] : write,
   };
+  const signedWithin = signedWithinOf(path, destination, entry);
+  if (signedWithin !== undefined) out.signed_within_days = signedWithin;
+  return out;
 }
 
 /**
@@ -219,6 +249,89 @@ export function ceiling(root: string, destination: string, on = today()): number
     );
   }
   return entryOf(path, destination, entry, on).max_tier;
+}
+
+/**
+ * `destination`'s entry as it counts on `on` (today by default): its ceiling, its `until`, and under
+ * the `rfc0036` flag its `signed_within_days`. A destination the file does not name is refused, naming
+ * the file, as `ceiling` refuses it.
+ */
+export function crossingEntry(root: string, destination: string, on = today()): Ceiling {
+  const path = policyPath(root);
+  const entry = readCrossingPolicy(root)[destination];
+  if (!hasTier(entry)) {
+    throw new PolicyError(
+      `${path} names no destination ${quoted(destination)} with a max_tier of 1, 2 or 3; add {"${destination}": {"max_tier": 1}} to it to allow a crossing`,
+    );
+  }
+  return entryOf(path, destination, entry, on);
+}
+
+/** What a crossing through an entry lets through of one local day. */
+export interface DayGate {
+  /** The day's header crosses: the day, and whether and when it was signed. Nothing crosses past `until`. */
+  header: boolean;
+  /** The day's lines may cross, each still under the entry's `max_tier` (`lineCrosses`). */
+  lines: boolean;
+  /**
+   * Why the lines stay home: `until`, the entry has expired; `signed_within_days`, the entry's rule, no
+   * signature that fresh; `unsigned`, the command's own default (RFC 0034: signed days only). Null when
+   * they cross.
+   */
+  held: "until" | "signed_within_days" | "unsigned" | null;
+}
+
+export interface DayGateOptions {
+  /** The local day the day's standing signature was written on (`signedOn`); null for an unsigned day. */
+  signedOn: string | null;
+  /** Today, the day of the export or the tool call in the record's zone (`localToday`). */
+  today: string;
+  /** The command's default, RFC 0034's signed days only; false under `--unsigned`. */
+  signedOnly: boolean;
+}
+
+/**
+ * What crosses of one day through `entry` (RFC 0036, *How it composes*): three gates, each the
+ * owner's. `until` is on the entry: past it nothing crosses, the header included. `signed_within_days`
+ * is on the day: only a day whose standing signature was written on one of the local days from N days
+ * before today through today lets its lines cross; another crosses its header only; `--unsigned` does
+ * not lift it, since it is the entry's and not the command's. Without it, the command's default
+ * decides (RFC 0034: signed days, or every day under `--unsigned`). `max_tier` is on the line, after
+ * all of these (`lineCrosses`).
+ */
+export function dayGate(entry: Ceiling, options: DayGateOptions): DayGate {
+  if (entry.expired) return { header: false, lines: false, held: "until" };
+  const { signedOn: day, today: now } = options;
+  const within = entry.signed_within_days;
+  if (within !== undefined) {
+    const fresh = day !== null && day <= now && day >= addDays(now, -within);
+    return { header: true, lines: fresh, held: fresh ? null : "signed_within_days" };
+  }
+  if (options.signedOnly && day === null) return { header: true, lines: false, held: "unsigned" };
+  return { header: true, lines: true, held: null };
+}
+
+/**
+ * Whether a line of `tier` crosses through `entry` on a day `gate` lets through: never above the
+ * entry's `max_tier` (0 past `until`), whatever its day's signature says, and never on a day the gate
+ * holds back, whatever its tier.
+ */
+export const lineCrosses = (entry: Ceiling, gate: DayGate, tier: number): boolean =>
+  gate.lines && tier <= entry.max_tier;
+
+/**
+ * The local day a signature was written on, for `signed_within_days`: the local day of its `at`, the
+ * moment the owner signed (RFC 0034 amendment 2), in the record's zone and by its `day_start`; null
+ * for no signature.
+ */
+export function signedOn(
+  signature: Line | null | undefined,
+  timezone: string,
+  dayStart?: string,
+): string | null {
+  if (signature === null || signature === undefined) return null;
+  const ms = Date.parse(String(signature.at));
+  return Number.isNaN(ms) ? null : localDayOf(ms, timezone, dayStart);
 }
 
 /**

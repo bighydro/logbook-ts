@@ -1,6 +1,7 @@
 import { localOf } from "./clock.js";
 import { renderCountries, rollupCountries } from "./countries.js";
 import { readDay } from "./day.js";
+import { DayStartError } from "./dayStart.js";
 import { type DaysOptions, readDayRows, renderDayRow } from "./days.js";
 import { renderDay } from "./dayText.js";
 import { renderNights, rollupNights } from "./nights.js";
@@ -80,6 +81,10 @@ export const USAGE = `usage:
                                       one object, every number with its lines
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
+
+LOGBOOK_TS_FLAGS=rfc0036 turns on RFC 0036 (draft, off until it is final): every command that groups
+lines by day refuses a day_start in logbook.json that is not midnight, and show prints draft/v1 and
+chapter/v1 lines as the reference does.
 `;
 
 export interface MainOptions {
@@ -245,6 +250,12 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         return usage(io);
     }
   } catch (err) {
+    // RFC 0036: a reader that groups by day refuses a day_start it cannot group by, as the
+    // reference does: the command, the sentence, exit 2.
+    if (err instanceof DayStartError) {
+      io.stderr(`${command}: ${err.message}\n`);
+      return 2;
+    }
     if (err instanceof LogbookError) {
       io.stderr(`error: ${err.message}\n`);
       return 1;

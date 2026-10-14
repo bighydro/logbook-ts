@@ -1,3 +1,4 @@
+import { draftRow } from "./drafts.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import { signedDayRow } from "./signing.js";
@@ -12,6 +13,8 @@ export interface RenderContext {
   clock: (at: string) => string | undefined;
   /** For a `flight/v1` line another flight line supersedes: that line's seq. */
   supersededFlights: Map<string, number>;
+  /** RFC 0036's rows, `draft` and `chapter`, as the reference prints them (the `rfc0036` flag). */
+  rfc0036?: boolean;
 }
 
 /** The one-line summary of a line, as the reference implementation spells it for each profile. */
@@ -44,6 +47,10 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}`;
     case "signed-day":
       return signedDayRow(p);
+    case "draft":
+      return ctx.rfc0036 === true ? draftRow(p) : fallback(line.kind, p);
+    case "chapter":
+      return fallback(line.kind, p, ctx.rfc0036 === true);
     default:
       return fallback(line.kind, p);
   }
@@ -348,10 +355,24 @@ function crossing(p: Payload): string {
   return out;
 }
 
-/** `text`, else `title`, else (a page) `url`, else every field but `schema` as `key=value`. */
-function fallback(kind: string, p: Payload): string {
+/**
+ * `text`, else `title`, else (a page) `url`, else (a chapter, RFC 0036) `name` as the reference prints
+ * it, any value but an empty one, else every field but `schema` as `key=value`.
+ */
+function fallback(kind: string, p: Payload, byName = false): string {
   const own = text(p.text) ?? text(p.title) ?? (kind === "browse" ? text(p.url) : undefined);
   if (own !== undefined) return own;
+  const name = p.name;
+  if (
+    byName &&
+    name !== undefined &&
+    name !== null &&
+    name !== "" &&
+    name !== false &&
+    name !== 0
+  ) {
+    return pyStr(name);
+  }
   return Object.keys(p)
     .filter((k) => k !== "schema")
     .sort()
