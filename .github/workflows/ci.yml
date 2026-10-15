@@ -161,5 +161,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: install the reference
         run: uv sync --project ref
+      - name: both implementations take the writer lock and refuse and repair a tail past logbook.json alike
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl-writer.test.ts
       - name: both implementations print the same day and count the same record
         run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts tests/profiles.test.ts

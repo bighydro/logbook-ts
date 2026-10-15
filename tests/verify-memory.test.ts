@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashLine, ZERO_HASH } from "../src/chain.js";
 import { canonicalize } from "../src/jcs.js";
 import { monthFiles } from "../src/lines.js";
+import { verifyLogbook } from "../src/store.js";
 import type { Line } from "../src/types.js";
 
 /**
@@ -45,6 +46,40 @@ report.verify = {
 started = performance.now();
 const added = addNote(root, "one more, after 25,000", { now: new Date("2026-10-13T12:00:00Z") });
 report.add = { seq: added.seq, ms: Math.round(performance.now() - started), peakRssMiB: peakRss() };
+const again = verifyLogbook(root);
+report.again = { valid: again.valid, lines: again.lines, head: again.head };
+report.heapLimitMiB = mib((await import("node:v8")).getHeapStatistics().heap_size_limit);
+process.stdout.write(JSON.stringify(report));
+`;
+
+/**
+ * The repair of a tail, on the same record: logbook.json set back to seq 0 and GENESIS, so every
+ * line is past its head — the most a crash could leave, and a tail of the whole record. The append
+ * is refused (TailAhead), the dry run lists twenty lines and counts the rest, the repair brings
+ * logbook.json forward, all under the same cap: the repair reads the chain as verify does.
+ */
+const REPAIR_CHILD = `import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { addNote, repairTail, verifyLogbook } from "./logbook-ts.mjs";
+const root = process.argv[2];
+const mib = (bytes) => Math.round((bytes / 1048576) * 10) / 10;
+const peakRss = () => mib(process.resourceUsage().maxRSS * 1024);
+const metaFile = join(root, "logbook.json");
+const meta = JSON.parse(readFileSync(metaFile, "utf-8"));
+writeFileSync(metaFile, JSON.stringify({ ...meta, seq: 0, head: "0".repeat(64) }, null, 2) + "\\n", "utf-8");
+const report = {};
+try {
+  addNote(root, "not past a tail");
+  report.add = "appended";
+} catch (err) {
+  report.add = err.name;
+}
+let started = performance.now();
+const dry = repairTail(root, { dryRun: true });
+report.dry = { count: dry.count, shown: dry.shown.length, written: dry.written, ms: Math.round(performance.now() - started), peakRssMiB: peakRss() };
+started = performance.now();
+const done = repairTail(root);
+report.repair = { count: done.count, written: done.written, to: done.to, ms: Math.round(performance.now() - started), peakRssMiB: peakRss() };
 const again = verifyLogbook(root);
 report.again = { valid: again.valid, lines: again.lines, head: again.head };
 report.heapLimitMiB = mib((await import("node:v8")).getHeapStatistics().heap_size_limit);
@@ -141,6 +176,7 @@ beforeAll(async () => {
     silent: true,
   });
   writeFileSync(join(work, "child.mjs"), CHILD, "utf-8");
+  writeFileSync(join(work, "repair.mjs"), REPAIR_CHILD, "utf-8");
   root = join(work, "record");
   mkdirSync(root);
   head = writeRecord(root);
@@ -176,5 +212,31 @@ describe("verify and add in a fresh process on 25,000 notes of about 2 KiB", () 
     expect(report.verify.peakHeld).toBeLessThanOrEqual(months);
     expect(report.add.seq).toBe(NOTES + 1);
     expect(report.again).toMatchObject({ valid: true, lines: NOTES + 1 });
+  }, 120_000);
+
+  it("repair tail of a tail the whole record long, after an append it refuses, with the heap capped at half the record: memory does not grow with the tail", () => {
+    const capMiB = Math.floor(recordBytes / 1048576 / 2);
+    const months = monthFiles(root).length;
+    const lines = verifyLogbook(root).lines; // 25,001 after the first test's append, 25,000 alone
+    const child = spawnSync(
+      process.execPath,
+      [`--max-old-space-size=${capMiB}`, join(work, "repair.mjs"), root],
+      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20 },
+    );
+    expect(child.stderr).toBe("");
+    expect(child.status).toBe(0);
+    const report = JSON.parse(child.stdout) as {
+      add: string;
+      dry: { count: number; shown: number; written: boolean };
+      repair: { count: number; written: boolean; to: { seq: number } };
+      again: { valid: boolean; lines: number };
+    };
+    console.info(
+      `repair tail of ${lines} lines in ${months} month files, old space capped at ${capMiB} MiB: ${child.stdout}`,
+    );
+    expect(report.add).toBe("TailAhead");
+    expect(report.dry).toMatchObject({ count: lines, shown: 20, written: false });
+    expect(report.repair).toMatchObject({ count: lines, written: true, to: { seq: lines } });
+    expect(report.again).toMatchObject({ valid: true, lines });
   }, 120_000);
 });

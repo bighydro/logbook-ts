@@ -150,6 +150,17 @@ if (flags.includes("--crash-before-meta")) {
     return real.renameSync(from, to);
   };
 }
+// --hold-rename: at the rename that would replace logbook.json, reach "renaming" and pass
+// "rename": the lock is held, the record checked, logbook.json not yet replaced.
+if (flags.includes("--hold-rename")) {
+  fs.renameSync = (from, to) => {
+    if (String(to).endsWith("logbook.json")) {
+      reach("renaming");
+      pass("rename");
+    }
+    return real.renameSync(from, to);
+  };
+}
 // --windows-in-use N: run as on Windows, where a name another process holds open refuses for a
 // moment: the first N opens of writer.lock for reading, links to it and unlinks of it (a lock
 // removed while another writer was reading it, Node 20; a reader that does not share delete) and
@@ -189,7 +200,7 @@ if (inUse) {
 }
 syncBuiltinESMExports();
 
-const { addNote, HeadMoved, WriterBusy } = await import("./logbook-ts.mjs");
+const { addNote, HeadMoved, repairTail, repairTailText, WriterBusy } = await import("./logbook-ts.mjs");
 // --start: loaded, reach "ready.<pid>" and pass "go", so several children start together.
 if (flags.includes("--start")) {
   reach("ready." + process.pid);
@@ -197,6 +208,12 @@ if (flags.includes("--start")) {
 }
 const say = (line) => process.stderr.write(line + "\\n");
 try {
+  // --repair-tail [--dry-run]: run repair tail instead of an append, its report on stdout.
+  if (flags.includes("--repair-tail")) {
+    const report = repairTail(root, { dryRun: flags.includes("--dry-run"), wait: !flags.includes("--no-wait"), say });
+    process.stdout.write(repairTailText(report));
+    process.exit(0);
+  }
   for (let i = 0; i < Number(value("--repeat") ?? 1); i++) {
     const line = addNote(root, text, { wait: !flags.includes("--no-wait"), say });
     process.stdout.write(JSON.stringify(line) + "\\n");
@@ -591,6 +608,82 @@ describe("on Windows, a file another process holds open refuses for a moment", (
     expect(seqOf(run)).toEqual([33]);
     expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
     expect(readMetaFile(root).seq).toBe(33);
+    expect(existsSync(lockOf(root))).toBe(false);
+  }, 60_000);
+});
+
+describe("a crash between the two writes of an append (SPEC §3, write order; decision B)", () => {
+  it("leaves the line on disk and logbook.json behind it; the next append takes over the dead lock and refuses in one sentence naming repair tail, writing nothing; repair tail, which a second writer waits on by name, brings logbook.json forward; the append after it writes seq 34", async () => {
+    const root = copySample();
+    const crashed = start(root, "the line that made it to disk", ["--crash-before-meta"]);
+    const run = await crashed.done;
+    expect(run.code).not.toBe(0);
+    expect(run.out).toBe("");
+
+    // The files are ahead of logbook.json, never behind: the line is whole and chained, the
+    // old logbook.json intact, and verify says exactly that (SPEC §3).
+    const rows = allRows(root);
+    expect(rows).toHaveLength(33);
+    const written = JSON.parse(rows[32] as string) as Line;
+    expect(written.seq).toBe(33);
+    expect(written.prev).toBe(EXPECTED.head);
+    expect(written.hash).toBe(hashLine(written));
+    expect(readMetaFile(root)).toMatchObject({ seq: 32, head: EXPECTED.head });
+    const torn = verifyLogbook(root);
+    expect(torn.valid).toBe(false);
+    expect(torn.lines).toBe(33);
+    expect(torn.head).toBe(written.hash);
+    expect(torn.errors).toEqual([
+      `logbook.json: seq 32 does not match the last line (33)`,
+      `logbook.json: head ${EXPECTED.head} does not match the last line (${written.hash})`,
+    ]);
+    // The crashed writer's lock is still there, naming a process that is gone.
+    const left = JSON.parse(readFileSync(lockOf(root), "utf-8")) as { pid: number; since: string };
+    expect(left.pid).toBe(crashed.pid);
+
+    // The next append takes the dead writer's lock over and refuses: nothing is brought forward
+    // behind the owner's back (decision B), and nothing is written.
+    const refused = await start(root, "after the crash").done;
+    expect(refused.code).toBe(2);
+    expect(refused.out).toBe("");
+    expect(refused.err).toBe(
+      `a stale lock from logbook-ts add (pid ${crashed.pid}, since ${left.since}) whose process is gone; taking it over\n` +
+        `TailAhead: the files are ahead of logbook.json: they end at seq 33 head ${written.hash.slice(0, 12)}…, logbook.json says seq 32 head ${EXPECTED.head.slice(0, 12)}… (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\`\n`,
+    );
+    expect(allRows(root)).toHaveLength(33);
+    expect(readMetaFile(root)).toMatchObject({ seq: 32, head: EXPECTED.head });
+    expect(existsSync(lockOf(root))).toBe(false);
+
+    // repair tail holds the lock as `logbook-ts repair tail` until logbook.json is replaced; a
+    // writer that comes meanwhile waits on it by name.
+    const gates = gatesFolder();
+    const repair = start(root, "-", ["--repair-tail", "--gates", gates.dir, "--hold-rename"]);
+    await until(() => gates.reached("renaming"), [repair]);
+    const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as {
+      pid: number;
+      command: string;
+      since: string;
+    };
+    expect(holder).toMatchObject({ pid: repair.pid, command: "logbook-ts repair tail" });
+    const next = start(root, "after the repair");
+    await until(() => next.err().endsWith("; waiting\n"), [repair, next]);
+    expect(next.err()).toBe(
+      `another logbook command is writing to this record (logbook-ts repair tail, since ${holder.since}); waiting\n`,
+    );
+    gates.open("rename");
+    const [repaired, appended] = await Promise.all([repair.done, next.done]);
+    expect(repaired.code, repaired.err).toBe(0);
+    expect(repaired.out.split("\n").slice(-3)).toEqual([
+      `logbook.json: seq 33, head ${written.hash.slice(0, 12)}…`,
+      `valid — 33 lines, head ${written.hash}`,
+      "",
+    ]);
+    expect(appended.code, appended.err).toBe(0);
+    expect(seqOf(appended)).toEqual([34]);
+    const result = verifyLogbook(root);
+    expect(result.errors).toEqual([]);
+    expect(result.lines).toBe(34);
+    expect(readMetaFile(root).seq).toBe(34);
     expect(existsSync(lockOf(root))).toBe(false);
   }, 60_000);
 });

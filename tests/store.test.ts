@@ -16,7 +16,11 @@ import {
   addNote,
   HeadMoved,
   LogbookError,
+  RepairRefused,
+  repairTail,
+  repairTailText,
   rfc3339,
+  TailAhead,
   takeWriterLock,
   verifyLogbook,
   WriterBusy,
@@ -952,10 +956,322 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     expect(existsSync(join(root, "state"))).toBe(false);
   });
 
-  it("HeadMoved is a LogbookError, as WriterBusy is, so a caller that catches one catches both", () => {
+  it("HeadMoved is a LogbookError, as WriterBusy is, so a caller that catches one catches both; TailAhead is a HeadMoved, as the reference's is", () => {
     expect(new HeadMoved("x")).toBeInstanceOf(LogbookError);
     expect(new WriterBusy("x")).toBeInstanceOf(LogbookError);
+    expect(new TailAhead("x")).toBeInstanceOf(HeadMoved);
+    expect(new RepairRefused("x")).toBeInstanceOf(LogbookError);
     expect(new HeadMoved("x").name).toBe("HeadMoved");
     expect(new WriterBusy("x").name).toBe("WriterBusy");
+    expect(new TailAhead("x").name).toBe("TailAhead");
+    expect(new RepairRefused("x").name).toBe("RepairRefused");
+  });
+});
+
+describe("the files ahead of logbook.json (SPEC §3, write order): add refuses, repair tail brings it forward (decision B; the reference's #294)", () => {
+  const THREE: Draft[] = ["one", "two", "three"].map((text, i) => ({
+    at: `2026-04-0${i + 1}T10:00:00Z`,
+    source: "manual",
+    kind: "note",
+    payload: { schema: "note/v1", text },
+  }));
+  const APRIL = join("logbook", "2026", "04.jsonl");
+  const linesOf = (root: string, rel = APRIL): Line[] =>
+    readLines(root, rel).map((row) => JSON.parse(row) as Line);
+  const short = (hash: string): string => `${hash.slice(0, 12)}…`;
+  /** logbook.json set back to the line at `seq` (GENESIS for 0), as a crash before its rename leaves it. */
+  const setBack = (root: string, seq: number): void => {
+    const head = seq === 0 ? ZERO_HASH : (linesOf(root)[seq - 1] as Line).hash;
+    writeMeta(root, { ...readMetaFile(root), seq, head });
+  };
+  const metaText = (root: string): string => readFileSync(join(root, "logbook.json"), "utf-8");
+
+  it("addNote refuses, in the reference's sentence naming repair tail, while the files end past logbook.json, and writes nothing (was: brought logbook.json forward itself)", () => {
+    const root = writeRecord(THREE);
+    setBack(root, 1);
+    const [, , third] = linesOf(root) as [Line, Line, Line];
+    const before = metaText(root);
+    const said: string[] = [];
+    let thrown: unknown;
+    try {
+      addNote(root, "four", { say: (l) => said.push(l) });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(TailAhead);
+    expect((thrown as Error).message).toBe(
+      `the files are ahead of logbook.json: they end at seq 3 head ${short(third.hash)}, logbook.json says seq 1 head ${short((linesOf(root)[0] as Line).hash)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\``,
+    );
+    expect(said).toEqual([]);
+    expect(readLines(root, APRIL)).toHaveLength(3);
+    expect(metaText(root)).toBe(before);
+    expect(existsSync(join(root, "state"))).toBe(false);
+  });
+
+  it("from seq 0 and GENESIS too", () => {
+    const root = writeRecord(THREE.slice(0, 1));
+    setBack(root, 0);
+    expect(() => addNote(root, "two")).toThrow(
+      /^the files are ahead of logbook\.json: they end at seq 1 head [0-9a-f]{12}…, logbook\.json says seq 0 head 000000000000… /,
+    );
+    expect(readLines(root, APRIL)).toHaveLength(1);
+  });
+
+  it("addNote refuses in the reference's other sentence when the files end at logbook.json's seq under another head", () => {
+    const root = writeRecord(THREE);
+    const head = (linesOf(root)[2] as Line).hash;
+    writeMeta(root, { ...readMetaFile(root), head: "a".repeat(64) });
+    expect(() => addNote(root, "no")).toThrow(
+      new TailAhead(
+        `the files do not end where logbook.json says: they end at seq 3 head ${short(head)}, logbook.json says seq 3 head aaaaaaaaaaaa…; nothing was written: run \`logbook-ts repair tail\``,
+      ),
+    );
+    expect(readLines(root, APRIL)).toHaveLength(3);
+  });
+
+  it("addNote refuses a logbook.json behind the files at a head the chain never held in the same sentence as any lag; repair tail is what tells them apart", () => {
+    const root = writeRecord(THREE);
+    writeMeta(root, { ...readMetaFile(root), seq: 2, head: "a".repeat(64) });
+    expect(() => addNote(root, "no")).toThrow(TailAhead);
+    expect(readLines(root, APRIL)).toHaveLength(3);
+    expect(readMetaFile(root)).toMatchObject({ seq: 2, head: "a".repeat(64) });
+  });
+
+  it("addNote refuses as before, not in the lag's sentence, when logbook.json is ahead of the files, a tail is torn inside its last line, or a line past the head does not recompute", () => {
+    const ahead = writeRecord(THREE);
+    writeMeta(ahead, { ...readMetaFile(ahead), seq: 5 });
+    expect(() => addNote(ahead, "no")).toThrow(
+      /^refusing to append to a record that does not verify/,
+    );
+    expect(readLines(ahead, APRIL)).toHaveLength(3);
+
+    const torn = writeRecord(THREE);
+    cutInsideLastLine(torn, APRIL);
+    expect(() => addNote(torn, "no")).toThrow(/cut short/);
+    expect(readMetaFile(torn).seq).toBe(2);
+
+    const wrong = writeRecord(THREE);
+    const rows = readLines(wrong, APRIL);
+    const third = JSON.parse(rows[2] as string) as Line;
+    third.payload = { ...third.payload, text: "edited" };
+    writeLines(wrong, [rows[0] as string, rows[1] as string, JSON.stringify(third)], APRIL);
+    setBack(wrong, 2);
+    expect(() => addNote(wrong, "no")).toThrow(/does not recompute/);
+    expect(readMetaFile(wrong).seq).toBe(2);
+  });
+
+  it("repair tail --dry-run lists each line past the head by seq, file, row and hash, says what it would set, and writes nothing — as the reference prints it, without the index it keeps", () => {
+    const root = writeRecord(THREE);
+    setBack(root, 1);
+    const lines = linesOf(root);
+    const before = metaText(root);
+    const report = repairTail(root, { dryRun: true });
+    expect(report.written).toBe(false);
+    expect(repairTailText(report)).toBe(
+      [
+        `logbook.json says seq=1 head=${short((lines[0] as Line).hash)}; the files hold 2 lines past it, each verified (envelope, seq, prev, hash):`,
+        `  seq 2  ${APRIL} line 2  hash ${short((lines[1] as Line).hash)}`,
+        `  seq 3  ${APRIL} line 3  hash ${short((lines[2] as Line).hash)}`,
+        `would set logbook.json to seq=3 head=${short((lines[2] as Line).hash)}`,
+        "nothing written — run without --dry-run to repair",
+        "",
+      ].join("\n"),
+    );
+    expect(metaText(root)).toBe(before);
+    expect(existsSync(join(root, "state"))).toBe(false);
+  });
+
+  it("repair tail sets logbook.json to the last line's seq and head, keeping its other keys, verify is then valid, and addNote appends the next seq: never 1, 2, 2", () => {
+    const root = writeRecord(THREE);
+    setBack(root, 1);
+    const meta = readMetaFile(root);
+    const lines = linesOf(root);
+    const report = repairTail(root);
+    expect(report.written).toBe(true);
+    const third = lines[2] as Line;
+    expect(repairTailText(report).split("\n").slice(-3)).toEqual([
+      `logbook.json: seq 3, head ${short(third.hash)}`,
+      `valid — 3 lines, head ${third.hash}`,
+      "",
+    ]);
+    expect(readMetaFile(root)).toEqual({ ...meta, seq: 3, head: third.hash });
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 3, head: third.hash });
+    const line = addNote(root, "four", { now: new Date("2026-04-04T10:00:00Z") });
+    expect(line).toMatchObject({ seq: 4, prev: third.hash });
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 4 });
+  });
+
+  it("a tail across two month files is listed and brought forward in seq order", () => {
+    const drafts: Draft[] = [
+      ...THREE,
+      {
+        at: "2026-05-01T10:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "may" },
+      },
+    ];
+    const root = writeRecord(drafts);
+    setBack(root, 2);
+    const may = join("logbook", "2026", "05.jsonl");
+    const report = repairTail(root, { dryRun: true });
+    expect(report.shown.map((line) => line.where)).toEqual([`${APRIL} line 3`, `${may} line 1`]);
+    expect(repairTail(root).written).toBe(true);
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 4 });
+  });
+
+  it("lists the first twenty lines past the head and counts the rest, as the reference does", () => {
+    const root = writeRecord(
+      Array.from({ length: 33 }, (_, i) => ({
+        at: `2026-04-${String(Math.floor(i / 2) + 1).padStart(2, "0")}T${i % 2 ? 18 : 6}:00:00Z`,
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: `note ${i + 1}` },
+      })),
+    );
+    setBack(root, 0);
+    const report = repairTail(root, { dryRun: true });
+    expect(report.count).toBe(33);
+    expect(report.shown).toHaveLength(20);
+    const text = repairTailText(report).split("\n");
+    expect(text[0]).toBe(
+      "logbook.json says seq=0 head=000000000000…; the files hold 33 lines past it, each verified (envelope, seq, prev, hash):",
+    );
+    expect(text[21]).toBe("  … and 13 more lines");
+    setBack(root, 12);
+    expect(repairTailText(repairTail(root, { dryRun: true })).split("\n")[21]).toBe(
+      "  … and 1 more line",
+    );
+  });
+
+  it("on a record that verifies, does nothing and says so", () => {
+    const root = writeRecord(THREE);
+    const before = metaText(root);
+    const head = (linesOf(root)[2] as Line).hash;
+    for (const dryRun of [true, false]) {
+      const report = repairTail(root, { dryRun });
+      expect(report.written).toBe(false);
+      expect(repairTailText(report)).toBe(
+        `nothing to repair: the files end where logbook.json says, seq=3 head=${short(head)}\n`,
+      );
+    }
+    expect(metaText(root)).toBe(before);
+  });
+
+  /** repair tail's refusal on a record, and that it changed nothing. */
+  function refusal(root: string): string {
+    const before = metaText(root);
+    const rows = readLines(root, APRIL);
+    let thrown: unknown;
+    try {
+      repairTail(root);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(RepairRefused);
+    expect(metaText(root)).toBe(before);
+    expect(readLines(root, APRIL)).toEqual(rows);
+    expect(existsSync(join(root, "state"))).toBe(false);
+    return (thrown as Error).message;
+  }
+
+  it("refuses, changing nothing, when the files end before logbook.json: no crash leaves that", () => {
+    const root = writeRecord(THREE);
+    const head = (linesOf(root)[2] as Line).hash;
+    writeMeta(root, { ...readMetaFile(root), seq: 4 });
+    expect(refusal(root)).toBe(
+      `logbook.json says seq=4 head=${short(head)}, the files end at seq=3 head=${short(head)}: the files are behind logbook.json, which no crash leaves (SPEC §3); restore the month files from a backup; nothing was changed`,
+    );
+  });
+
+  it("refuses, changing nothing, when the files end at logbook.json's seq under another head: not a lag", () => {
+    const root = writeRecord(THREE);
+    const head = (linesOf(root)[2] as Line).hash;
+    writeMeta(root, { ...readMetaFile(root), head: "a".repeat(64) });
+    expect(refusal(root)).toBe(
+      `logbook.json says seq=3 head=aaaaaaaaaaaa…, the files end at seq=3 head=${short(head)}: no line is past the head and the head is not the files'; run \`logbook-ts verify\`; nothing was changed`,
+    );
+  });
+
+  it("refuses, changing nothing, when logbook.json names a head the chain does not hold at its seq: the first line past it does not chain from it", () => {
+    const root = writeRecord(THREE);
+    const second = linesOf(root)[1] as Line;
+    writeMeta(root, { ...readMetaFile(root), seq: 1, head: "b".repeat(64) });
+    expect(refusal(root)).toBe(
+      `${APRIL} line 2: seq 2 — prev ${second.prev} does not match previous hash ${"b".repeat(64)}; nothing was changed`,
+    );
+  });
+
+  it("refuses, changing nothing, a tail torn inside its last line, naming the line as verify does", () => {
+    const root = writeRecord(THREE);
+    const first = (linesOf(root)[0] as Line).hash;
+    cutInsideLastLine(root, APRIL);
+    writeMeta(root, { ...readMetaFile(root), seq: 1, head: first });
+    expect(refusal(root)).toBe(
+      `${APRIL} line 3: the file ends inside this line (cut short); nothing was changed`,
+    );
+  });
+
+  it("refuses, changing nothing, a line past the head whose hash does not recompute, or a second line of one seq: never adopted", () => {
+    const wrong = writeRecord(THREE);
+    const rows = readLines(wrong, APRIL);
+    const third = JSON.parse(rows[2] as string) as Line;
+    writeLines(
+      wrong,
+      [
+        rows[0] as string,
+        rows[1] as string,
+        JSON.stringify({ ...third, payload: { ...third.payload, text: "edited" } }),
+      ],
+      APRIL,
+    );
+    setBack(wrong, 1);
+    expect(refusal(wrong)).toMatch(
+      new RegExp(
+        `^${APRIL.replace(/\\/g, "\\\\")} line 3: seq 3 — hash ${third.hash} does not recompute \\(got [0-9a-f]{64}\\); nothing was changed$`,
+      ),
+    );
+
+    const forked = writeRecord(THREE);
+    const again = readLines(forked, APRIL);
+    writeLines(forked, [...again, again[2] as string], APRIL);
+    setBack(forked, 2);
+    expect(refusal(forked)).toMatch(/line 4: seq 3 — expected seq 4; nothing was changed$/);
+  });
+
+  it("refuses, changing nothing, a record wrong before the head as well, where the reference would bring logbook.json forward and only then report it: the whole chain is verified first", () => {
+    const root = writeRecord(THREE);
+    const rows = readLines(root, APRIL);
+    const first = JSON.parse(rows[0] as string) as Line;
+    writeLines(
+      root,
+      [
+        JSON.stringify({ ...first, recorded_at: "2026-10-01T12:00:01Z" }),
+        rows[1] as string,
+        rows[2] as string,
+      ],
+      APRIL,
+    );
+    setBack(root, 2);
+    expect(refusal(root)).toMatch(
+      /line 1: seq 1 — hash .* does not recompute .*; nothing was changed$/,
+    );
+  });
+
+  it("holds the writer lock throughout, the dry run too: WriterBusy while a living writer holds it, the lock left to it", () => {
+    const root = writeRecord(THREE);
+    setBack(root, 1);
+    const planted = `{"pid": ${livingPid(20_000)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
+    plantLock(root, planted);
+    for (const dryRun of [true, false]) {
+      expect(() => repairTail(root, { dryRun, wait: false })).toThrow(
+        new WriterBusy(
+          "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
+        ),
+      );
+    }
+    expect(readFileSync(lockOf(root), "utf-8")).toBe(planted);
+    expect(readMetaFile(root).seq).toBe(1);
+    rmSync(join(root, "state"), { recursive: true, force: true });
   });
 });

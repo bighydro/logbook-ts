@@ -26,9 +26,9 @@ import {
   type VerifyResult,
 } from "./types.js";
 import { uuidV7 } from "./uuid.js";
-import { readChain, type VerifyStats } from "./verify.js";
+import { readChain, type TailLine, type VerifyStats } from "./verify.js";
 
-export type { VerifyStats } from "./verify.js";
+export type { TailLine, VerifyStats } from "./verify.js";
 
 export class LogbookError extends Error {
   override readonly name: string = "LogbookError";
@@ -45,6 +45,21 @@ export class WriterBusy extends LogbookError {
  */
 export class HeadMoved extends LogbookError {
   override readonly name: string = "HeadMoved";
+}
+
+/**
+ * The files end past `logbook.json`, or at its seq under another head: an append that crashed
+ * between its line and `logbook.json` (SPEC §3, write order), or a record that only looks like one.
+ * A writer refuses, writing nothing, and names `repair tail`; as the reference has it, it is a
+ * HeadMoved to the CLI, one line and exit 2.
+ */
+export class TailAhead extends HeadMoved {
+  override readonly name: string = "TailAhead";
+}
+
+/** `repair tail` would not bring `logbook.json` forward over what the files hold. Nothing was changed. */
+export class RepairRefused extends LogbookError {
+  override readonly name: string = "RepairRefused";
 }
 
 const META_FILE = "logbook.json";
@@ -636,7 +651,12 @@ function appendNote(root: string, text: string, options: AddOptions): Line {
     throw new LogbookError("logbook.json: timezone is missing");
   }
   const chain = readChain(root);
-  const errors = [...chain.errors, ...metaErrors(meta, chain.count, chain.head)];
+  const behind = metaErrors(meta, chain.count, chain.head);
+  if (chain.errors.length === 0 && behind.length > 0) {
+    const lag = tailAhead(meta, chain.count, chain.head);
+    if (lag !== undefined) throw new TailAhead(lag);
+  }
+  const errors = [...chain.errors, ...behind];
   if (errors.length > 0) {
     throw new LogbookError(
       `refusing to append to a record that does not verify:\n${errors.join("\n")}`,
@@ -673,6 +693,177 @@ function appendNote(root: string, text: string, options: AddOptions): Line {
   appendLine(root, stamp, `${canonicalize(line)}\n`);
   writeMetaDurably(root, { ...meta, seq: line.seq, head: line.hash });
   return line;
+}
+
+/** A hash as the reference prints it in a sentence: twelve hex digits and an ellipsis. */
+function short(hash: unknown): string {
+  return `${String(hash).slice(0, 12)}…`;
+}
+
+/** Whether `logbook.json` names a seq and a head at all: a whole number from 0, and 64 hex digits. */
+function namesAHead(meta: Meta): boolean {
+  return (
+    typeof meta.seq === "number" &&
+    Number.isInteger(meta.seq) &&
+    meta.seq >= 0 &&
+    typeof meta.head === "string" &&
+    /^[0-9a-f]{64}$/.test(meta.head)
+  );
+}
+
+/**
+ * The reference's sentence for a record whose files, which verify, end past `logbook.json`, or at
+ * its seq under another head; undefined for any other disagreement (files that end before it), which
+ * is refused as a record that does not verify. Its words, but for the program it names.
+ */
+function tailAhead(meta: Meta, count: number, head: string): string | undefined {
+  if (!namesAHead(meta)) return undefined;
+  if (count > meta.seq) {
+    return `the files are ahead of logbook.json: they end at seq ${count} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\``;
+  }
+  if (count === meta.seq && head !== meta.head) {
+    return `the files do not end where logbook.json says: they end at seq ${count} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)}; nothing was written: run \`logbook-ts repair tail\``;
+  }
+  return undefined;
+}
+
+/** How many of the lines past the head `repair tail` lists; the rest it counts, as the reference does. */
+const LISTED = 20;
+
+export interface RepairTailOptions extends WriterLockOptions {
+  /** List the tail and what would be set, and write nothing. */
+  dryRun?: boolean;
+}
+
+/** What `repair tail` found, and did. */
+export interface RepairTail {
+  dryRun: boolean;
+  /** The seq and head `logbook.json` named. */
+  from: { seq: number; head: string };
+  /** The seq and head the files end at: what `logbook.json` is, or would be, set to. */
+  to: { seq: number; head: string };
+  /** Lines past the head; 0 when there was nothing to repair. */
+  count: number;
+  /** The first twenty of them, in seq order. */
+  shown: TailLine[];
+  /** Whether `logbook.json` was replaced. */
+  written: boolean;
+  /** Verify, after the repair. */
+  verified?: VerifyResult;
+}
+
+/**
+ * `repair tail`, decision B (the reference's #294): bring `logbook.json` forward over the tail a
+ * crash between a line and `logbook.json` left past it (SPEC §3, write order), only after every line
+ * of the record verifies, and never during an append (an append refuses, TailAhead). Under the writer
+ * lock throughout, the dry run too, its holder `logbook-ts repair tail`. The chain is read as verify
+ * reads it, streamed, one line per month file; of the tail only the first twenty are kept, to list.
+ * Refused (RepairRefused, nothing changed): a record this implementation cannot read; a logbook.json
+ * that names no seq and head; any fault in the files, before the head or past it, named as verify
+ * names it; the files ending before logbook.json; the files ending at its seq under another head; a
+ * first line past the head that does not chain from it. Otherwise logbook.json is written through
+ * a fsynced temp file and a rename, its other keys kept, and the record verified again. No month
+ * file is touched.
+ */
+export function repairTail(root: string, options: RepairTailOptions = {}): RepairTail {
+  const lock = lockOptions({ command: "logbook-ts repair tail", ...options });
+  return withWriterLock(root, () => repairUnderLock(root, options.dryRun === true), lock);
+}
+
+function repairUnderLock(root: string, dryRun: boolean): RepairTail {
+  const meta = readMeta(root);
+  const refusal = formatRefusal(meta);
+  if (refusal) throw new RepairRefused(`${refusal}; nothing was changed`);
+  if (!namesAHead(meta)) {
+    throw new RepairRefused(
+      `logbook.json: seq ${String(meta.seq)}, head ${String(meta.head)} name no line of a chain (a whole number from 0, and 64 hex digits); nothing was changed`,
+    );
+  }
+  const from = { seq: meta.seq, head: meta.head };
+  let shown: TailLine[] = [];
+  let count = 0;
+  let first: TailLine | undefined;
+  const chain = readChain(root, undefined, {
+    at: from.seq,
+    begin: () => {
+      shown = [];
+      count = 0;
+      first = undefined;
+    },
+    tail: (line) => {
+      count += 1;
+      first ??= line;
+      if (shown.length < LISTED) shown.push(line);
+    },
+  });
+  const said = (text: string): RepairRefused => new RepairRefused(`${text}; nothing was changed`);
+  if (chain.errors.length > 0) throw said(chain.errors[0] as string);
+  const to = { seq: chain.count, head: chain.head };
+  const ends = `logbook.json says seq=${from.seq} head=${short(from.head)}, the files end at seq=${to.seq} head=${short(to.head)}`;
+  if (to.seq === from.seq && to.head === from.head) {
+    return { dryRun, from, to, count: 0, shown: [], written: false };
+  }
+  if (to.seq < from.seq) {
+    throw said(
+      `${ends}: the files are behind logbook.json, which no crash leaves (SPEC §3); restore the month files from a backup`,
+    );
+  }
+  if (to.seq === from.seq) {
+    throw said(
+      `${ends}: no line is past the head and the head is not the files'; run \`logbook-ts verify\``,
+    );
+  }
+  const next = first as TailLine;
+  if (next.prev !== from.head) {
+    throw said(
+      `${next.where}: seq ${next.seq} — prev ${next.prev} does not match previous hash ${from.head}`,
+    );
+  }
+  if (dryRun) return { dryRun, from, to, count, shown, written: false };
+
+  // The guard behind the lock, as in an append: a writer that did not take it moved the head.
+  const again = readMeta(root);
+  if (again.seq !== meta.seq || again.head !== meta.head) {
+    throw new HeadMoved(
+      `the record's head moved while the tail was being checked: logbook.json named seq ${meta.seq}, head ${meta.head}, and names seq ${again.seq}, head ${again.head} now; nothing was changed`,
+    );
+  }
+  writeMetaDurably(root, { ...meta, seq: to.seq, head: to.head });
+  return { dryRun, from, to, count, shown, written: true, verified: verifyLogbook(root) };
+}
+
+/**
+ * What `repair tail` prints, as the reference prints it: the lines past the head and what is, or
+ * would be, set, then verify's verdict after a repair; or that there is nothing to repair. The
+ * reference's clauses about its index are left out: this implementation keeps none.
+ */
+export function repairTailText(report: RepairTail): string {
+  if (report.count === 0) {
+    return `nothing to repair: the files end where logbook.json says, seq=${report.to.seq} head=${short(report.to.head)}\n`;
+  }
+  const rows = [
+    `logbook.json says seq=${report.from.seq} head=${short(report.from.head)}; the files hold ${report.count} line${report.count === 1 ? "" : "s"} past it, each verified (envelope, seq, prev, hash):`,
+    ...report.shown.map((line) => `  seq ${line.seq}  ${line.where}  hash ${short(line.hash)}`),
+  ];
+  const more = report.count - report.shown.length;
+  if (more > 0) rows.push(`  … and ${more} more line${more === 1 ? "" : "s"}`);
+  if (!report.written) {
+    rows.push(
+      `would set logbook.json to seq=${report.to.seq} head=${short(report.to.head)}`,
+      "nothing written — run without --dry-run to repair",
+    );
+    return `${rows.join("\n")}\n`;
+  }
+  rows.push(`logbook.json: seq ${report.to.seq}, head ${short(report.to.head)}`);
+  const verified = report.verified as VerifyResult;
+  if (verified.valid) rows.push(`valid — ${verified.lines} lines, head ${verified.head}`);
+  else {
+    rows.push(
+      `invalid after the repair — ${verified.errors.length} error${verified.errors.length === 1 ? "" : "s"}; ${verified.lines} lines read, head ${verified.head}`,
+      ...verified.errors.map((error) => `  ${error}`),
+    );
+  }
+  return `${rows.join("\n")}\n`;
 }
 
 /**

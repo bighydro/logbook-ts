@@ -11,7 +11,17 @@ import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
 import { BadRange, gapsText, listSources, sourceGaps, sourcesText } from "./sources.js";
 import { collectStats, statsText } from "./stats.js";
-import { addNote, HeadMoved, LogbookError, readMeta, verifyLogbook, WriterBusy } from "./store.js";
+import {
+  addNote,
+  HeadMoved,
+  LogbookError,
+  RepairRefused,
+  readMeta,
+  repairTail,
+  repairTailText,
+  verifyLogbook,
+  WriterBusy,
+} from "./store.js";
 import { readTrips, renderTrips } from "./trips.js";
 
 export interface Io {
@@ -25,7 +35,15 @@ export const USAGE = `usage:
   logbook-ts add <root> "<text>" [--no-wait]
                                       append one note (note/v1, tier 2, source manual) under the
                                       record's writer lock, state/writer.lock; waits for another
-                                      writer unless --no-wait, which refuses and exits 2
+                                      writer unless --no-wait, which refuses and exits 2; refuses
+                                      and exits 2 while the files end past logbook.json (a crash
+                                      between a line and logbook.json): run repair tail
+  logbook-ts repair tail <root> [--dry-run] [--no-wait]
+                                      the files end past logbook.json after a crash (SPEC §3, write
+                                      order): verify the whole chain and bring logbook.json forward
+                                      to the last line, under the writer lock; --dry-run lists the
+                                      lines past the head and writes nothing; a record that is not
+                                      that crash is refused, exit 2, nothing changed
   logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
@@ -166,6 +184,28 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         const trips = readTrips(root, window);
         io.stdout(json ? `${JSON.stringify(trips)}\n` : renderTrips(trips, readAssets(root)));
         return 0;
+      }
+      case "repair": {
+        const [repairRoot, ...flagsGiven] = rest;
+        if (root !== "tail" || repairRoot === undefined) return usage(io);
+        if (flagsGiven.some((flag) => flag !== "--dry-run" && flag !== "--no-wait"))
+          return usage(io);
+        try {
+          const report = repairTail(repairRoot, {
+            dryRun: flagsGiven.includes("--dry-run"),
+            wait: !flagsGiven.includes("--no-wait"),
+            say: (notice) => io.stderr(`${notice}\n`),
+          });
+          io.stdout(repairTailText(report));
+          return report.verified === undefined || report.verified.valid ? 0 : 1;
+        } catch (err) {
+          // The reference: `repair tail: …; nothing was changed`, and the lock's refusal as `repair: …`.
+          if (err instanceof RepairRefused) {
+            io.stderr(`repair tail: ${err.message}\n`);
+            return 2;
+          }
+          return refusedWriter("repair", err, io);
+        }
       }
       case "rollup": {
         const [rollupRoot, ...flagsGiven] = rest;
