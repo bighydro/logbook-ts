@@ -17,7 +17,34 @@ import {
  * and `add` and `repair tail` on the files ahead of logbook.json (SPEC §3, write order; decision B).
  */
 
-afterEach(cleanup);
+/** The detached sleepers a test started as living holders, killed once it is done. */
+const sleepers: number[] = [];
+
+afterEach(() => {
+  for (const pid of sleepers.splice(0)) {
+    try {
+      process.kill(pid);
+    } catch {
+      // gone already
+    }
+  }
+  cleanup();
+});
+
+/** A living process that is not this one: a detached sleeper, killed after the test. */
+function livingPid(): number {
+  const holder = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `const c = require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { detached: true, stdio: "ignore", windowsHide: true }); c.unref(); process.stdout.write(String(c.pid));`,
+    ],
+    { encoding: "utf-8" },
+  );
+  const pid = Number(holder.stdout);
+  sleepers.push(pid);
+  return pid;
+}
 
 function run(argv: string[]): { code: number; out: string; err: string } {
   let out = "";
@@ -43,21 +70,15 @@ describe("logbook-ts add under the writer lock", () => {
   it("with --no-wait, says who holds the writer lock as the reference does, exits 2 and writes nothing", () => {
     const root = copySample();
     // A living holder that is not this process: a detached child that outlives the test.
-    const holder = spawnSync(
-      process.execPath,
-      [
-        "-e",
-        `const c = require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { detached: true, stdio: "ignore", windowsHide: true }); c.unref(); process.stdout.write(String(c.pid));`,
-      ],
-      { encoding: "utf-8" },
-    );
+    const holder = livingPid();
     plantLock(
       root,
-      `{"pid": ${Number(holder.stdout)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
+      `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
     );
     for (const argv of [
       ["add", root, "--no-wait", "held"],
       ["add", root, "held", "--no-wait"],
+      ["add", "--no-wait", root, "held"],
     ]) {
       const { code, out, err } = run(argv);
       expect(code).toBe(2);
@@ -122,6 +143,8 @@ describe("logbook-ts add and repair tail on the files ahead of logbook.json (SPE
     const before = metaText(root);
     const header = `logbook.json says seq=32 head=${short(EXPECTED.head)}; the files hold 1 line past it, each verified (envelope, seq, prev, hash):\n  seq 33  ${month} line 1  hash ${short(head)}\n`;
     const dry = run(["repair", "tail", root, "--dry-run"]);
+    // The flags go anywhere after the command, as the reference's go before its verb.
+    expect(run(["repair", "tail", "--dry-run", root])).toEqual(dry);
     expect(dry).toEqual({
       code: 0,
       out: `${header}would set logbook.json to seq=33 head=${short(head)}\nnothing written — run without --dry-run to repair\n`,
@@ -217,23 +240,17 @@ describe("logbook-ts add and repair tail on the files ahead of logbook.json (SPE
 
   it("repair tail under --no-wait while a living writer holds the lock: `repair: …; --no-wait, so not waiting`, exit 2, as the reference says it", () => {
     const { root } = lagging();
-    const holder = spawnSync(
-      process.execPath,
-      [
-        "-e",
-        `const c = require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { detached: true, stdio: "ignore", windowsHide: true }); c.unref(); process.stdout.write(String(c.pid));`,
-      ],
-      { encoding: "utf-8" },
-    );
+    const holder = livingPid();
     mkdirSync(join(root, "state"), { recursive: true });
     writeFileSync(
       join(root, "state", "writer.lock"),
-      `{"pid": ${Number(holder.stdout)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
+      `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
       "utf-8",
     );
     for (const argv of [
       ["repair", "tail", root, "--no-wait"],
       ["repair", "tail", root, "--dry-run", "--no-wait"],
+      ["repair", "--no-wait", "tail", "--dry-run", root],
     ]) {
       expect(run(argv)).toEqual({
         code: 2,

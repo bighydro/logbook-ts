@@ -54,10 +54,11 @@ export class HeadMoved extends LogbookError {
  * The files end past `logbook.json`, or at its seq under another head, or a month file ends inside
  * its last line: what a crash between a line and `logbook.json`, or inside the line, leaves (SPEC §3,
  * write order and truncation), or a record that only looks like it. A writer refuses, writing
- * nothing, in one sentence naming `repair tail`; as the reference has it, it is a HeadMoved to the
- * CLI, one line and exit 2.
+ * nothing, in one sentence naming `repair tail`; the CLI says it as it says a moved head, one line
+ * and exit 2, as the reference's does. Not a HeadMoved: reading the head again and retrying, the
+ * answer to a head that moved, never mends this.
  */
-export class TailAhead extends HeadMoved {
+export class TailAhead extends LogbookError {
   override readonly name: string = "TailAhead";
 }
 
@@ -515,17 +516,25 @@ function createInTwoSteps(file: string, text: string): boolean {
     }
     throw cannotTake(file, err);
   }
+  let lost: boolean;
   try {
-    writeSync(fd, text, null, "utf-8");
-    fsyncSync(fd);
-    // Held between the two steps for longer than rule A's half second, this lock was a leftover to
-    // another writer, which removed it: the holder went into a file with no name. Not held, then;
-    // the caller reads the lock again and finds that writer's.
-    if (fstatSync(fd, { bigint: true }).nlink === 0n) return false;
-  } finally {
-    closeSync(fd);
+    try {
+      writeSync(fd, text, null, "utf-8");
+      fsyncSync(fd);
+      // Held between the two steps for longer than rule A's half second, this lock was a leftover
+      // to another writer, which removed it: the holder went into a file with no name. Not held,
+      // then; the caller reads the lock again and finds that writer's.
+      lost = fstatSync(fd, { bigint: true }).nlink === 0n;
+    } finally {
+      closeSync(fd);
+    }
+  } catch (err) {
+    // The holder could not be written (a full disk): the empty lock this writer made is removed,
+    // not left for another to wait out.
+    removeIfPossible(file);
+    throw cannotTake(file, err);
   }
-  return true;
+  return !lost;
 }
 
 /** What a take of the lock carries from one read to the next. */
@@ -671,8 +680,15 @@ export function takeWriterLock(root: string, options: WriterLockOptions = {}): (
   return () => {
     held.delete(key);
     // Only the lock this writer holds: one another writer holds by then is left to it, as the
-    // reference leaves it.
-    if (look(file)?.text === mine) unlinkQuietly(file);
+    // reference leaves it. One that cannot be read back is not this writer's; a release never
+    // throws over what the writer itself threw.
+    let ours = false;
+    try {
+      ours = look(file)?.text === mine;
+    } catch {
+      // unreadable: left as it is
+    }
+    if (ours) unlinkQuietly(file);
     try {
       rmdirSync(dir); // only when nothing else lives in state/, as the reference leaves it
     } catch {
@@ -911,8 +927,9 @@ function repairUnderLock(root: string, dryRun: boolean): RepairTail {
       `${ends}: no line is past the head and the head is not the files'; run \`logbook-ts verify\``,
     );
   }
+  // logbook.json names a line of the chain, or seq 0 and GENESIS; said by the first line past it.
   const next = first as TailLine;
-  if (next.prev !== from.head) {
+  if (chain.headAt !== from.head) {
     throw said(
       `${next.where}: seq ${next.seq} — prev ${next.prev} does not match previous hash ${from.head}`,
     );

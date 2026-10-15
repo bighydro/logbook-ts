@@ -112,6 +112,10 @@ if (flags.includes("--two-step")) {
     if (fd === lockFd) {
       lockFd = -1;
       if (flags.includes("--crash-in-window")) process.kill(process.pid, "SIGKILL");
+      // --fail-lock-write: the write of the holder fails, as on a full disk.
+      if (flags.includes("--fail-lock-write")) {
+        throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+      }
       reach("window");
       pass("fill");
     }
@@ -201,7 +205,7 @@ if (inUse) {
 }
 syncBuiltinESMExports();
 
-const { addNote, HeadMoved, repairTail, repairTailText, WriterBusy } = await import("./logbook-ts.mjs");
+const { addNote, HeadMoved, repairTail, repairTailText, TailAhead, WriterBusy } = await import("./logbook-ts.mjs");
 // --start: loaded, reach "ready.<pid>" and pass "go", so several children start together.
 if (flags.includes("--start")) {
   reach("ready." + process.pid);
@@ -221,7 +225,7 @@ try {
   }
 } catch (err) {
   process.stderr.write(err.name + ": " + err.message + "\\n");
-  process.exit(err instanceof WriterBusy || err instanceof HeadMoved ? 2 : 1);
+  process.exit(err instanceof WriterBusy || err instanceof HeadMoved || err instanceof TailAhead ? 2 : 1);
 }
 `;
 
@@ -523,6 +527,16 @@ describe("rule A: a lock that names no holder (the reference makes its lock, the
     expect(seqOf(a)).toEqual([33]);
     expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
     expect(existsSync(lockOf(root))).toBe(false);
+  }, 60_000);
+
+  it("a writer whose write of its holder fails in the two steps (a full disk) removes the empty lock it made and says it cannot take the lock: nothing is left for another writer to wait out", async () => {
+    const root = copySample();
+    const run = await start(root, "never written", ["--two-step", "--fail-lock-write"]).done;
+    expect(run.code).toBe(1);
+    expect(run.out).toBe("");
+    expect(run.err).toMatch(/^LogbookError: .*writer\.lock: cannot take the writer lock \(ENOSPC/);
+    expect(existsSync(lockOf(root))).toBe(false);
+    expect(allRows(root)).toHaveLength(32);
   }, 60_000);
 
   it("one left by a writer killed between its create and its write is a leftover once half a second has passed: the next writer takes it without a word, under --no-wait too, as the reference does", async () => {

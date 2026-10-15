@@ -847,7 +847,9 @@ traceback; those inputs were not pursued and nothing here is drawn from the line
       passed since it was created, judged by its mtime, and removed then without a word and taken, under
       `--no-wait` too; before that, waited for and read again. The reference's own steps are kept as well — the same file must have named no holder on
       every read for half a second, so a lock that is replaced or touched meanwhile starts the half second
-      again — and both must hold before it is removed. For a lock that has been there a while the two are
+      again — and both must hold before it is removed (on a filesystem with coarse mtimes, FAT's two
+      seconds, the mtime half is only as fine as they are, and the reference's half second is what
+      holds). For a lock that has been there a while the two are
       the reference's half second; they part only where the reference would remove an empty lock made
       less than half a second ago (one put in place of another during its wait, or dated ahead by a
       clock), which is a writer that may be alive between its create and its write. Until the mtime is
@@ -871,8 +873,12 @@ traceback; those inputs were not pursued and nothing here is drawn from the line
     half a second loses it under rule A, in either implementation, as the reference's own rule has it.
     This implementation's two-step fallback notices (the file it wrote its holder into has no name any
     more) and waits on the writer that took the lock; the reference's writer, run so, goes on beside the
-    other, and only the head re-check stands between them. A writer that writes its holder in the
-    instant between another's last read and its unlink is not caught by any rule on the lock either.
+    other, and only the head re-check stands between them. A two-step writer that writes its holder in
+    the instant between another's last read and its unlink is caught here only when that unlink comes
+    before its own check that its file still has a name; the reference's writer makes no such check.
+    And a lock left by an earlier process given this pid, written in the second this process started,
+    reads as another thread's (`since` has seconds only) and is waited for; the message says to remove
+    it if no writer is running.
 
     Suggest a paragraph in SPEC §3 beside *Write order*:
 
@@ -946,7 +952,8 @@ traceback; those inputs were not pursued and nothing here is drawn from the line
       digits, which names no line to bring forward from, before it takes the lock, so a folder that is no
       record gets no `state/`; the reference, given a `seq` that is a string, says there is nothing to
       repair, and given a head of three digits, its same-seq refusal.
-    - `add` refuses in the reference's one sentence and exit 2 (`TailAhead`, a `HeadMoved`) where the
+    - `add` refuses in the reference's one sentence and exit 2 (`TailAhead`, said as a moved head is,
+      but not a `HeadMoved`, since reading the head again does not mend it) where the
       reference's `add` does — a month file cut inside its last line; the files ending, at their last
       line's `seq` and hash, past `logbook.json` or at its `seq` under another head — whatever else is
       wrong with the record. Anything else that does not verify is refused as before, every problem

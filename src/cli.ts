@@ -19,6 +19,7 @@ import {
   readMeta,
   repairTail,
   repairTailText,
+  TailAhead,
   verifyLogbook,
   WriterBusy,
 } from "./store.js";
@@ -138,11 +139,13 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         return 1;
       }
       case "add": {
-        const words = rest.filter((word) => word !== "--no-wait");
-        if (root === undefined || words.length === 0) return usage(io);
+        // `--no-wait` anywhere after the command, as the reference's goes anywhere before its verb.
+        const given = argv.slice(1);
+        const [addRoot, ...words] = given.filter((word) => word !== "--no-wait");
+        if (addRoot === undefined || words.length === 0) return usage(io);
         try {
-          const line = addNote(root, words.join(" "), {
-            wait: words.length === rest.length,
+          const line = addNote(addRoot, words.join(" "), {
+            wait: !given.includes("--no-wait"),
             say: (notice) => io.stderr(`${notice}\n`),
           });
           io.stdout(`added seq ${line.seq} ${line.id} at ${line.at}, head ${line.hash}\n`);
@@ -186,8 +189,11 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         return 0;
       }
       case "repair": {
-        const [repairRoot, ...flagsGiven] = rest;
-        if (root !== "tail" || repairRoot === undefined) return usage(io);
+        // `repair tail <root>`, its flags anywhere after the command.
+        const given = argv.slice(1);
+        const flagsGiven = given.filter((word) => word.startsWith("--"));
+        const [what, repairRoot, ...more] = given.filter((word) => !word.startsWith("--"));
+        if (what !== "tail" || repairRoot === undefined || more.length > 0) return usage(io);
         if (flagsGiven.some((flag) => flag !== "--dry-run" && flag !== "--no-wait"))
           return usage(io);
         try {
@@ -316,15 +322,16 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
 }
 
 /**
- * A writer's refusals, as the reference prints them: another writer under `--no-wait`, and a head
- * that moved under the lock, each one line naming the command, exit 2. Anything else is thrown on.
+ * A writer's refusals, as the reference prints them: another writer under `--no-wait`, a head that
+ * moved under the lock, and the shapes a crash leaves (TailAhead), each one line naming the command,
+ * exit 2. Anything else is thrown on.
  */
 function refusedWriter(command: string, err: unknown, io: Io): number {
   if (err instanceof WriterBusy) {
     io.stderr(`${command}: ${err.message}; --no-wait, so not waiting\n`);
     return 2;
   }
-  if (err instanceof HeadMoved) {
+  if (err instanceof HeadMoved || err instanceof TailAhead) {
     io.stderr(`${command}: ${err.message}\n`);
     return 2;
   }

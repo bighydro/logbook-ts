@@ -1,5 +1,13 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
@@ -38,12 +46,23 @@ interface Ran {
   err: string;
 }
 
-/** The reference CLI on a record: its exit code, stdout and stderr (without what `uv` says of itself). */
+/**
+ * The reference CLI on a record: its exit code, stdout and stderr (without what `uv` says of itself).
+ * It keeps its index outside the record, under the cache folder by the record's owner id, which
+ * every copy of the sample shares; each run gets an empty cache of its own, so what it says of its
+ * index never depends on another run.
+ */
 function reference(root: string, args: string[]): Ran {
   const result = spawnSync("uv", ["run", "--project", REF as string, "logbook", ...args], {
     cwd: REF,
     encoding: "utf-8",
-    env: { ...process.env, LOGBOOK_HOME: root, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
+    env: {
+      ...process.env,
+      LOGBOOK_HOME: root,
+      XDG_CACHE_HOME: tempDir(),
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
+    },
   });
   if (result.error) throw result.error;
   const err = result.stderr
@@ -74,14 +93,15 @@ const asReference = (text: string): string =>
     .replaceAll("`logbook-ts repair tail`", "`logbook repair tail`")
     .replaceAll("`logbook-ts verify`", "`logbook verify`");
 
-/** The reference's words, without the index this implementation does not keep. */
+/**
+ * The reference's words, without the index this implementation does not keep: whatever follows the
+ * head on the line that says what is, or would be, set (`, and build no index (…)`, `, and rebuild
+ * the index, N lines`, `; no index (…)`, `; index rebuilt, N lines`, …).
+ */
 const withoutIndex = (text: string): string =>
   text
-    .replace(
-      /, and (build no index|extend the index by \d+ lines?|build the index again)[^\n]*/g,
-      "",
-    )
-    .replace(/; (no index|the index)[^\n]*/g, "");
+    .replace(/^(would set logbook\.json to seq=\d+ head=[0-9a-f]{12}…),[^\n]*$/gm, "$1")
+    .replace(/^(logbook\.json: seq \d+, head [0-9a-f]{12}…);[^\n]*$/gm, "$1");
 
 /** Two copies of a record, the reference's and ours. */
 function twice(root: string): [string, string] {
@@ -307,6 +327,15 @@ function toucher(file: string, ms: number): ReturnType<typeof spawn> {
   );
 }
 
+/** Wait until `file`'s mtime is past `ms`: the toucher has begun, so the lock is not a leftover when it is read. */
+function touchedSince(file: string, ms: number): void {
+  const end = Date.now() + 30_000;
+  while (statSync(file).mtimeMs <= ms) {
+    if (Date.now() > end) throw new Error(`${file} was never touched`);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+  }
+}
+
 /** Row `row` (1-based) of a month file rewritten by `edit`, re-serialized by JSON.stringify. */
 function rewriteRow(root: string, rel: string, row: number, edit: (line: Line) => Line): void {
   const file = join(root, rel);
@@ -366,6 +395,7 @@ describe.skipIf(!ready)("the reference and logbook-ts: rule A at its edges", () 
     const [theirs, mine] = twice(copySample());
     const theirLock = planted(theirs, "", Date.now() - 10_000);
     const t1 = toucher(theirLock, 2_000);
+    touchedSince(theirLock, Date.now() - 5_000);
     const r = reference(theirs, ["--no-wait", "add", "over a lock being touched"]);
     expect(r.code, r.err).toBe(0);
     expect(r.err).toBe("");
@@ -373,6 +403,7 @@ describe.skipIf(!ready)("the reference and logbook-ts: rule A at its edges", () 
 
     const myLock = planted(mine, "", Date.now() - 10_000);
     const t2 = toucher(myLock, 2_000);
+    touchedSince(myLock, Date.now() - 5_000);
     const o = ours(["add", mine, "over a lock being touched", "--no-wait"]);
     expect(o.code).toBe(2);
     expect(o.err).toBe(`add: ${NO_HOLDER_YET}; --no-wait, so not waiting\n`);

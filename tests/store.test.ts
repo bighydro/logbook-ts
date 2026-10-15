@@ -50,7 +50,19 @@ import {
   writeRecord,
 } from "./helpers.js";
 
-afterEach(cleanup);
+/** The detached sleepers a test started as living holders, killed once it is done. */
+const sleepers: number[] = [];
+
+afterEach(() => {
+  for (const pid of sleepers.splice(0)) {
+    try {
+      process.kill(pid);
+    } catch {
+      // gone already
+    }
+  }
+  cleanup();
+});
 
 const RFC3339_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -687,7 +699,9 @@ const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, ${ms})"], { d
 child.unref();
 process.stdout.write(String(child.pid));`;
   const result = spawnSync(process.execPath, ["-e", script], { encoding: "utf-8" });
-  return Number(result.stdout);
+  const pid = Number(result.stdout);
+  sleepers.push(pid);
+  return pid;
 }
 
 /** What a writer says, and under `--no-wait` refuses with, while a lock names no holder and is not yet half a second old. */
@@ -942,6 +956,28 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     expect(readLines(young)).toHaveLength(32);
   });
 
+  it("a release that cannot read the lock back does not hide what the writer threw: the writer's error is the one seen", () => {
+    const root = copySample();
+    expect(() =>
+      withWriterLock(root, () => {
+        // The lock replaced, under the writer, by something that is not a file.
+        rmSync(lockOf(root));
+        mkdirSync(lockOf(root));
+        throw new Error("the writer's own");
+      }),
+    ).toThrow("the writer's own");
+    // And when the writer ends well, a lock it cannot read back is not its own: left, nothing thrown.
+    const kept = copySample();
+    expect(
+      withWriterLock(kept, () => {
+        rmSync(lockOf(kept));
+        mkdirSync(lockOf(kept));
+        return "done";
+      }),
+    ).toBe("done");
+    expect(existsSync(lockOf(kept))).toBe(true);
+  });
+
   it("releases only its own lock: one another writer holds by then is left to it, as the reference leaves it", () => {
     const root = copySample();
     const release = takeWriterLock(root);
@@ -958,10 +994,11 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     expect(existsSync(join(root, "state"))).toBe(false);
   });
 
-  it("HeadMoved is a LogbookError, as WriterBusy is, so a caller that catches one catches both; TailAhead is a HeadMoved, as the reference's is", () => {
+  it("HeadMoved, WriterBusy and TailAhead are LogbookErrors, so a caller that catches one catches all; TailAhead is not a HeadMoved, so a caller that reads the head again and retries does not retry a crash's shape", () => {
     expect(new HeadMoved("x")).toBeInstanceOf(LogbookError);
     expect(new WriterBusy("x")).toBeInstanceOf(LogbookError);
-    expect(new TailAhead("x")).toBeInstanceOf(HeadMoved);
+    expect(new TailAhead("x")).toBeInstanceOf(LogbookError);
+    expect(new TailAhead("x")).not.toBeInstanceOf(HeadMoved);
     expect(new RepairRefused("x")).toBeInstanceOf(LogbookError);
     expect(new HeadMoved("x").name).toBe("HeadMoved");
     expect(new WriterBusy("x").name).toBe("WriterBusy");
