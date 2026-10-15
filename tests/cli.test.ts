@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
@@ -139,6 +141,55 @@ describe("logbook-ts add", () => {
     expect(code).toBe(1);
     expect(err).toMatch(/logbook\/0\.1/);
     expect(readLines(root)).toHaveLength(32);
+  });
+
+  /** A `state/writer.lock` as the reference writes it, planted by hand. */
+  function plantLock(root: string, text: string): void {
+    mkdirSync(join(root, "state"), { recursive: true });
+    writeFileSync(join(root, "state", "writer.lock"), text, "utf-8");
+  }
+
+  it("with --no-wait, says who holds the writer lock as the reference does, exits 2 and writes nothing", () => {
+    const root = copySample();
+    // A living holder that is not this process: a detached child that outlives the test.
+    const holder = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `const c = require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { detached: true, stdio: "ignore", windowsHide: true }); c.unref(); process.stdout.write(String(c.pid));`,
+      ],
+      { encoding: "utf-8" },
+    );
+    plantLock(
+      root,
+      `{"pid": ${Number(holder.stdout)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
+    );
+    for (const argv of [
+      ["add", root, "--no-wait", "held"],
+      ["add", root, "held", "--no-wait"],
+    ]) {
+      const { code, out, err } = run(argv);
+      expect(code).toBe(2);
+      expect(out).toBe("");
+      expect(err).toBe(
+        "add: another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z); --no-wait, so not waiting\n",
+      );
+    }
+    expect(readLines(root)).toHaveLength(32);
+    rmSync(join(root, "state"), { recursive: true, force: true });
+  });
+
+  it("takes over a stale lock with one line on stderr, and appends", () => {
+    const root = copySample();
+    const pid = spawnSync(process.execPath, ["-e", ""]).pid;
+    plantLock(root, `{"pid": ${pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
+    const { code, out, err } = run(["add", root, "after a stale lock"]);
+    expect(code).toBe(0);
+    expect(err).toBe(
+      `a stale lock from add (pid ${pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over\n`,
+    );
+    expect(out).toMatch(/^added seq 33 /);
+    expect(existsSync(join(root, "state"))).toBe(false);
   });
 });
 
@@ -341,7 +392,15 @@ describe("logbook-ts people", () => {
 
 describe("logbook-ts usage", () => {
   it("prints usage and exits 2 without a command, with an unknown command, or with missing args", () => {
-    for (const argv of [[], ["frobnicate"], ["verify"], ["add"], ["add", SAMPLE]]) {
+    for (const argv of [
+      [],
+      ["frobnicate"],
+      ["verify"],
+      ["add"],
+      ["add", SAMPLE],
+      // A copy: were --no-wait ever read as the note, it would be appended to it, not to the fixture.
+      ["add", copySample(), "--no-wait"],
+    ]) {
       const { code, err } = run(argv);
       expect(code).toBe(2);
       expect(err).toMatch(/usage/i);

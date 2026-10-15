@@ -256,10 +256,15 @@ export {
   type AddOptions,
   addNote,
   formatRefusal,
+  HeadMoved,
   LogbookError,
   readMeta,
   rfc3339,
+  takeWriterLock,
   verifyLogbook,
+  WriterBusy,
+  type WriterLockOptions,
+  withWriterLock,
   writeRefusal,
 } from "./store.js";
 export {

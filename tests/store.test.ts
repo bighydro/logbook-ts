@@ -1,9 +1,27 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
 import { hashLine, ZERO_HASH } from "../src/chain.js";
-import { addNote, LogbookError, verifyLogbook } from "../src/store.js";
+import {
+  addNote,
+  HeadMoved,
+  LogbookError,
+  rfc3339,
+  takeWriterLock,
+  verifyLogbook,
+  WriterBusy,
+  withWriterLock,
+} from "../src/store.js";
 import type { Line } from "../src/types.js";
 import {
   cleanup,
@@ -411,9 +429,10 @@ describe("addNote", () => {
     expect(readMetaFile(root).seq).toBe(32);
   });
 
-  it("refuses when logbook.json is missing and refuses empty text", () => {
+  it("refuses when logbook.json is missing and refuses empty text, and makes no folder for the lock", () => {
     const root = join(copySample(), "missing");
     expect(() => addNote(root, "no")).toThrow(LogbookError);
+    expect(existsSync(root)).toBe(false);
     expect(() => addNote(copySample(), "")).toThrow(LogbookError);
     expect(() => addNote(copySample(), "   ")).toThrow(LogbookError);
   });
@@ -630,5 +649,313 @@ describe("verifyLogbook — a member name given twice in one object (SPEC §2)",
     writeDuplicateKey(root, DUPLICATE_KEYS[0] as DuplicateKey);
     expect(() => addNote(root, "onto a line with a key twice")).toThrow(/duplicate key 'kind'/);
     expect(readLines(root)).toHaveLength(32);
+  });
+});
+
+/** The lock the reference and this implementation share: `state/writer.lock` in the record folder. */
+const lockOf = (root: string): string => join(root, "state", "writer.lock");
+
+/**
+ * A lock file as the reference writes it, planted by hand; `mtimeMs`, when given, is set as its
+ * modification time, the clock rule A judges an empty lock's age by.
+ */
+function plantLock(root: string, text: string, mtimeMs?: number): void {
+  mkdirSync(join(root, "state"), { recursive: true });
+  writeFileSync(lockOf(root), text, "utf-8");
+  if (mtimeMs !== undefined) utimesSync(lockOf(root), mtimeMs / 1000, mtimeMs / 1000);
+}
+
+/** The pid of a process that has already exited: spawnSync reaps it before returning. */
+function deadPid(): number {
+  return spawnSync(process.execPath, ["-e", ""]).pid;
+}
+
+/**
+ * The pid of a process that lives `ms` longer, started detached by a child that exits at once, so
+ * that it is not a child of this process: a synchronous wait here would never reap a child, and on
+ * POSIX an unreaped child still answers `kill(pid, 0)`.
+ */
+function livingPid(ms: number): number {
+  const script = `const { spawn } = require("node:child_process");
+const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, ${ms})"], { detached: true, stdio: "ignore", windowsHide: true });
+child.unref();
+process.stdout.write(String(child.pid));`;
+  const result = spawnSync(process.execPath, ["-e", script], { encoding: "utf-8" });
+  return Number(result.stdout);
+}
+
+/** What a writer says, and under `--no-wait` refuses with, while a lock names no holder and is not yet half a second old. */
+const NO_HOLDER_YET =
+  "another logbook command is taking the lock on this record (state/writer.lock names no holder yet; if none is running, remove it)";
+
+describe("the writer lock (one writer at a time, as the reference's state/writer.lock)", () => {
+  it("holds state/writer.lock while it runs — pid, command and since, as the reference writes them — and leaves nothing behind", () => {
+    const root = copySample();
+    const before = Date.now();
+    const held = withWriterLock(root, () => readFileSync(lockOf(root), "utf-8"));
+    const holder = JSON.parse(held) as { pid: number; command: string; since: string };
+    expect(holder.pid).toBe(process.pid);
+    expect(holder.command).toBe("logbook-ts add");
+    expect(holder.since).toMatch(RFC3339_SECONDS);
+    expect(Math.abs(Date.parse(holder.since) - before)).toBeLessThan(5000);
+    expect(Object.keys(holder).sort()).toEqual(["command", "pid", "since"]);
+    expect(existsSync(lockOf(root))).toBe(false);
+    expect(existsSync(join(root, "state"))).toBe(false);
+
+    addNote(root, "under the lock", { command: "logbook-ts add" });
+    expect(existsSync(join(root, "state"))).toBe(false);
+    expect(readdirSync(root).filter((n) => n.includes("lock"))).toEqual([]);
+  });
+
+  it("names the command the caller gives, and leaves what else lives in state/ alone", () => {
+    const root = copySample();
+    mkdirSync(join(root, "state"));
+    writeFileSync(join(root, "state", "home.json"), "{}\n", "utf-8");
+    const holder = withWriterLock(
+      root,
+      () => JSON.parse(readFileSync(lockOf(root), "utf-8")) as { command: string },
+      { command: "sync immich" },
+    );
+    expect(holder.command).toBe("sync immich");
+    expect(readdirSync(join(root, "state"))).toEqual(["home.json"]);
+  });
+
+  it("releases the lock when the function throws", () => {
+    const root = copySample();
+    expect(() =>
+      withWriterLock(root, () => {
+        throw new Error("halfway");
+      }),
+    ).toThrow("halfway");
+    expect(existsSync(lockOf(root))).toBe(false);
+    const release = takeWriterLock(root);
+    expect(existsSync(lockOf(root))).toBe(true);
+    release();
+    expect(existsSync(lockOf(root))).toBe(false);
+  });
+
+  it("refuses at once with WriterBusy when told not to wait, naming the holder as the reference does, and writes nothing", () => {
+    const root = copySample();
+    const pid = livingPid(20_000);
+    const planted = `{"pid": ${pid}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
+    plantLock(root, planted);
+    const said: string[] = [];
+    expect(() => addNote(root, "no", { wait: false, say: (l) => said.push(l) })).toThrow(
+      WriterBusy,
+    );
+    expect(() => addNote(root, "no", { wait: false })).toThrow(
+      "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
+    );
+    expect(said).toEqual([]);
+    expect(readFileSync(lockOf(root), "utf-8")).toBe(planted); // the holder's lock is not touched
+    expect(readLines(root)).toHaveLength(32);
+    expect(readMetaFile(root).seq).toBe(32);
+    rmSync(join(root, "state"), { recursive: true, force: true });
+  });
+
+  it("waits for a lock whose process is alive, saying so once, and goes on when that process is gone", () => {
+    const root = copySample();
+    const pid = livingPid(1500);
+    expect(pid).toBeGreaterThan(0);
+    plantLock(root, `{"pid": ${pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
+    const said: string[] = [];
+    const started = Date.now();
+    const line = addNote(root, "after waiting", { say: (l) => said.push(l) });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1000);
+    expect(line.seq).toBe(33);
+    expect(said).toEqual([
+      "another logbook command is writing to this record (add, since 2026-10-13T06:00:00Z); waiting",
+      `a stale lock from add (pid ${pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over`,
+    ]);
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
+    expect(existsSync(lockOf(root))).toBe(false);
+  }, 20_000);
+
+  it("takes over a lock whose process is gone, with one line saying so, as the reference does", () => {
+    const root = copySample();
+    const pid = deadPid();
+    plantLock(root, `{"pid": ${pid}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`);
+    const said: string[] = [];
+    const line = addNote(root, "after a dead lock", { say: (l) => said.push(l) });
+    expect(line.seq).toBe(33);
+    expect(said).toEqual([
+      `a stale lock from sync immich (pid ${pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over`,
+    ]);
+    expect(existsSync(lockOf(root))).toBe(false);
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
+  });
+
+  it("reads a lock whose pid is not a number as one whose process is gone, as the reference does", () => {
+    const root = copySample();
+    plantLock(root, '{"pid": "x", "command": "add", "since": "2026-10-13T06:00:00Z"}');
+    const said: string[] = [];
+    addNote(root, "after a bad pid", { say: (l) => said.push(l) });
+    expect(said).toEqual([
+      "a stale lock from add (pid x, since 2026-10-13T06:00:00Z) whose process is gone; taking it over",
+    ]);
+    expect(existsSync(lockOf(root))).toBe(false);
+  });
+
+  it("names a holder as the reference prints it: `?` for a field that is missing, `None` for null, Python's str() for the rest; a pid that is not a positive whole number is gone", () => {
+    const cases: Array<[string, string]> = [
+      ["{}", "a stale lock from ? (pid None, since ?)"],
+      ['{"pid": null}', "a stale lock from ? (pid None, since ?)"],
+      ['{"pid": 1.5, "command": null, "since": 7}', "a stale lock from None (pid 1.5, since 7)"],
+      ['{"pid": "123"}', "a stale lock from ? (pid 123, since ?)"],
+      ['{"pid": 0}', "a stale lock from ? (pid 0, since ?)"],
+      ['{"pid": -1}', "a stale lock from ? (pid -1, since ?)"],
+      ['{"pid": 12345678901234567890}', "a stale lock from ? (pid 12345678901234567000, since ?)"],
+      [
+        '{"pid": [1], "command": ["a"], "since": {"x": 1}}',
+        "a stale lock from ['a'] (pid [1], since {'x': 1})",
+      ],
+    ];
+    for (const [bytes, said] of cases) {
+      const root = copySample();
+      plantLock(root, bytes);
+      const notices: string[] = [];
+      expect(addNote(root, "after an odd holder", { say: (l) => notices.push(l) }).seq).toBe(33);
+      expect(notices).toEqual([`${said} whose process is gone; taking it over`]);
+    }
+  });
+
+  it("a lock naming this process's own pid, dated before it started, is a leftover of an earlier process given the same pid: taken over, as the reference takes it", () => {
+    const root = copySample();
+    plantLock(root, `{"pid": ${process.pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
+    const said: string[] = [];
+    expect(addNote(root, "after my own pid", { say: (l) => said.push(l) }).seq).toBe(33);
+    expect(said).toEqual([
+      `a stale lock from add (pid ${process.pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over`,
+    ]);
+  });
+
+  it("a lock naming this process's own pid, dated since it started, may be another thread's: waited for, never taken over", () => {
+    const root = copySample();
+    const since = rfc3339(new Date());
+    const planted = `{"pid": ${process.pid}, "command": "logbook-ts add", "since": "${since}"}`;
+    plantLock(root, planted);
+    expect(() => addNote(root, "not past a thread of mine", { wait: false })).toThrow(
+      new WriterBusy(
+        `another logbook command is writing to this record (logbook-ts add, since ${since})`,
+      ),
+    );
+    expect(readFileSync(lockOf(root), "utf-8")).toBe(planted);
+  });
+
+  it("a writer that already holds the lock and asks for it again is refused, not left waiting on itself", () => {
+    const root = copySample();
+    expect(() => withWriterLock(root, () => withWriterLock(root, () => "inner"))).toThrow(
+      LogbookError,
+    );
+    expect(existsSync(lockOf(root))).toBe(false);
+    expect(addNote(root, "after the refusal").seq).toBe(33);
+  });
+
+  it("a lock that names no holder — empty, cut short, not JSON, not an object — made more than half a second ago is a leftover of a crash: read again for the reference's half second, then removed without a word and taken, under --no-wait too (rule A)", () => {
+    for (const bytes of ["", '{"pid": 12', "garbage\n", "[1]", "  ", "null"]) {
+      const root = copySample();
+      plantLock(root, bytes, Date.now() - 10_000);
+      const said: string[] = [];
+      const started = Date.now();
+      const line = addNote(root, "over a lock a crash left empty", {
+        wait: false,
+        say: (l) => said.push(l),
+      });
+      // The reference reads such a lock, sleeps half a second, reads it again, and removes it.
+      expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+      expect(line.seq).toBe(33);
+      expect(said).toEqual([]);
+      expect(existsSync(join(root, "state"))).toBe(false);
+      expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
+    }
+  });
+
+  it("a lock that names no holder and is not yet half a second old by its mtime is someone taking it: never taken over; under --no-wait refused after half a second with the no-holder sentence, and left byte for byte (rule A)", () => {
+    for (const bytes of ["", '{"pid": 12', "garbage\n", "[1]"]) {
+      const root = copySample();
+      // An mtime ahead of the clock: a lock just made, as far as its mtime says, for the whole test.
+      plantLock(root, bytes, Date.now() + 60_000);
+      const said: string[] = [];
+      const started = Date.now();
+      expect(() =>
+        addNote(root, "not over a lock that may be being written", {
+          wait: false,
+          say: (l) => said.push(l),
+        }),
+      ).toThrow(new WriterBusy(NO_HOLDER_YET));
+      expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+      expect(said).toEqual([]);
+      expect(readFileSync(lockOf(root), "utf-8")).toBe(bytes);
+      expect(readLines(root)).toHaveLength(32);
+      expect(readdirSync(join(root, "state"))).toEqual(["writer.lock"]);
+    }
+  });
+
+  it("a lock that names no holder is waited for, with one line saying so, until half a second after its mtime; then taken (rule A)", () => {
+    const root = copySample();
+    const made = Date.now() + 1200;
+    plantLock(root, "", made);
+    const said: string[] = [];
+    const line = addNote(root, "once the empty lock is old enough", { say: (l) => said.push(l) });
+    expect(Date.now()).toBeGreaterThanOrEqual(made + 500);
+    expect(line.seq).toBe(33);
+    expect(said).toEqual([`${NO_HOLDER_YET}; waiting`]);
+    expect(existsSync(lockOf(root))).toBe(false);
+  }, 20_000);
+
+  it("clears a reclaim left by a writer that died taking over a stale lock", () => {
+    const root = copySample();
+    plantLock(root, `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
+    writeFileSync(join(root, "state", "writer.lock.reclaim"), String(deadPid()), "utf-8");
+    expect(addNote(root, "after a dead reclaimer").seq).toBe(33);
+    expect(existsSync(join(root, "state"))).toBe(false);
+  });
+
+  it("a reclaim that names no writer is held to the lock's rule: older than half a second it is a leftover, cleared, and the stale lock taken; younger, it is waited for, and under --no-wait refused (rule A)", () => {
+    const stale = `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`;
+    const guard = (root: string): string => join(root, "state", "writer.lock.reclaim");
+
+    const old = copySample();
+    plantLock(old, stale);
+    writeFileSync(guard(old), "", "utf-8");
+    utimesSync(guard(old), (Date.now() - 10_000) / 1000, (Date.now() - 10_000) / 1000);
+    expect(addNote(old, "past a reclaim a crash left empty", { wait: false }).seq).toBe(33);
+    expect(existsSync(join(old, "state"))).toBe(false);
+
+    const young = copySample();
+    plantLock(young, stale);
+    writeFileSync(guard(young), "", "utf-8");
+    utimesSync(guard(young), (Date.now() + 60_000) / 1000, (Date.now() + 60_000) / 1000);
+    expect(() => addNote(young, "not past a reclaim being made", { wait: false })).toThrow(
+      new WriterBusy(
+        "another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names no holder yet; if none is running, remove it)",
+      ),
+    );
+    expect(readFileSync(lockOf(young), "utf-8")).toBe(stale);
+    expect(readFileSync(guard(young), "utf-8")).toBe("");
+    expect(readLines(young)).toHaveLength(32);
+  });
+
+  it("releases only its own lock: one another writer holds by then is left to it, as the reference leaves it", () => {
+    const root = copySample();
+    const release = takeWriterLock(root);
+    const other = `{"pid": ${process.pid}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
+    writeFileSync(lockOf(root), other, "utf-8");
+    release();
+    expect(readFileSync(lockOf(root), "utf-8")).toBe(other);
+  });
+
+  it("takes the lock in one step: nothing but the lock is left in state/ while it is held", () => {
+    const root = copySample();
+    const inside = withWriterLock(root, () => readdirSync(join(root, "state")));
+    expect(inside).toEqual(["writer.lock"]);
+    expect(existsSync(join(root, "state"))).toBe(false);
+  });
+
+  it("HeadMoved is a LogbookError, as WriterBusy is, so a caller that catches one catches both", () => {
+    expect(new HeadMoved("x")).toBeInstanceOf(LogbookError);
+    expect(new WriterBusy("x")).toBeInstanceOf(LogbookError);
+    expect(new HeadMoved("x").name).toBe("HeadMoved");
+    expect(new WriterBusy("x").name).toBe("WriterBusy");
   });
 });

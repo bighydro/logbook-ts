@@ -1,8 +1,30 @@
-import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+import {
+  closeSync,
+  fstatSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { hashLine, ZERO_HASH } from "./chain.js";
 import { canonicalize } from "./jcs.js";
-import { FORMAT, type Line, type Meta, SEALED_FORMAT, type VerifyResult } from "./types.js";
+import { pyStr } from "./pyrepr.js";
+import {
+  FORMAT,
+  type JsonValue,
+  type Line,
+  type Meta,
+  SEALED_FORMAT,
+  type VerifyResult,
+} from "./types.js";
 import { uuidV7 } from "./uuid.js";
 import { readChain, type VerifyStats } from "./verify.js";
 
@@ -12,8 +34,39 @@ export class LogbookError extends Error {
   override readonly name: string = "LogbookError";
 }
 
+/** Another writer holds the record's lock and the caller chose not to wait. Nothing was written. */
+export class WriterBusy extends LogbookError {
+  override readonly name: string = "WriterBusy";
+}
+
+/**
+ * `logbook.json` moved between the read a line was chained from and the write: a writer that did
+ * not take the lock, or took it over wrongly. Nothing was written.
+ */
+export class HeadMoved extends LogbookError {
+  override readonly name: string = "HeadMoved";
+}
+
 const META_FILE = "logbook.json";
 const LOG_DIR = "logbook";
+const STATE_DIR = "state";
+const LOCK_FILE = "writer.lock";
+const RECLAIM_FILE = "writer.lock.reclaim";
+/** How often a waiting writer reads the lock again. */
+const POLL_MS = 100;
+/**
+ * Rule A's half second. A lock that names no holder is a writer between its create and its write
+ * until it has named none, read after read, for this long, and its mtime is this far past; then it
+ * is a leftover of a crash. The reference reads such a lock, sleeps half a second, reads it again.
+ */
+const GRACE_MS = 500;
+/** How long Windows' refusal of a file another process holds open is waited out (patientOnWindows). */
+const IN_USE_MS = 5000;
+/**
+ * The second this process started (`process.uptime` is the process's, in a worker thread too): a
+ * lock naming this pid and dated before it was written by an earlier process given the same pid.
+ */
+const STARTED_SECOND = Math.floor((Date.now() - process.uptime() * 1000) / 1000) * 1000;
 
 /** Read and minimally check `logbook.json`. Throws LogbookError if it is missing or not JSON. */
 export function readMeta(root: string): Meta {
@@ -95,7 +148,462 @@ export function rfc3339(date: Date): string {
   return `${date.toISOString().slice(0, 19)}Z`;
 }
 
-export interface AddOptions {
+export interface WriterLockOptions {
+  /**
+   * Wait for another writer to finish (the default; a line says so once), or refuse at once with
+   * WriterBusy, as the reference's `--no-wait` does.
+   */
+  wait?: boolean;
+  /** What the lock names as its holder, for another writer's message. Defaults to `logbook-ts add`. */
+  command?: string;
+  /** Where one-line notices go: waiting for another writer, taking over a stale lock. */
+  say?: (line: string) => void;
+}
+
+/** What `state/writer.lock` holds when it names a holder: a JSON object, whatever is in it. */
+type Holder = { [key: string]: JsonValue };
+
+/** A lock file (or the reclaim file) as read on one handle: its bytes and what says it is this file. */
+interface Sighting {
+  text: string;
+  ino: bigint;
+  size: bigint;
+  mtimeNs: bigint;
+}
+
+/** What a writer says, and under `--no-wait` refuses with, while the lock names no holder and is young. */
+const NO_HOLDER_LOCK =
+  "another logbook command is taking the lock on this record (state/writer.lock names no holder yet; if none is running, remove it)";
+const NO_HOLDER_RECLAIM =
+  "another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names no holder yet; if none is running, remove it)";
+
+/** The locks this thread holds now, by file, with the bytes it wrote: a second take of one is refused. */
+const held = new Map<string, string>();
+
+/** Block the thread for `ms`; the lock is taken synchronously, as everything here is. */
+function sleep(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Run `fn`, and on Windows run it again while it fails with EPERM, EACCES or EBUSY, for up to
+ * IN_USE_MS. Windows refuses to replace a file another process has open (the rename of
+ * `logbook.json` while another writer reads it, before it takes the lock), and Node 20 (libuv before
+ * 1.49) removes a file another process has open only when that handle closes, so until then its
+ * name can be neither opened nor made again (the lock a waiting writer was reading the moment its
+ * holder removed it); a reader that does not share delete (Python's `open`) makes an unlink fail.
+ * Each lasts as long as the other process's read; a refusal that outlasts the bound is a real one
+ * and is thrown. Elsewhere these errors are real at once.
+ */
+function patientOnWindows<T>(fn: () => T): T {
+  if (process.platform !== "win32") return fn();
+  const end = Date.now() + IN_USE_MS;
+  for (;;) {
+    try {
+      return fn();
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") || Date.now() >= end) {
+        throw err;
+      }
+      sleep(10);
+    }
+  }
+}
+
+/** Whether a process with this pid exists. Signal 0 tests without sending; EPERM means it exists and is not ours. */
+function alive(pid: number | undefined): boolean {
+  if (pid === undefined || !Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * The pid a holder names as the reference reads it: a whole number (Python's `true` and `false`
+ * being the ints 1 and 0); anything else, a string of digits among them, names none.
+ */
+function pidOf(holder: Holder): number | undefined {
+  const pid = holder.pid;
+  if (pid === true) return 1;
+  if (pid === false) return 0;
+  return typeof pid === "number" && Number.isInteger(pid) ? pid : undefined;
+}
+
+/**
+ * Whether a holder may still be writing: its pid names a living process. This process's own pid
+ * names a leftover of an earlier process given the same pid when the lock is dated before this
+ * process started, as the reference reads it; dated since, it may be another thread's, and is waited for.
+ */
+function mayHold(holder: Holder): boolean {
+  const pid = pidOf(holder);
+  if (pid !== process.pid) return alive(pid);
+  const since = typeof holder.since === "string" ? Date.parse(holder.since) : Number.NaN;
+  return !Number.isNaN(since) && since >= STARTED_SECOND;
+}
+
+/** A field of a holder as the reference prints it: `?` when it is missing, `None` for null, Python's str() else. */
+function field(holder: Holder, key: string): string {
+  return holder[key] === undefined ? "?" : pyStr(holder[key]);
+}
+
+/**
+ * The holder a lock's bytes name, or undefined when they name none: empty, cut short, not JSON, or
+ * JSON that is not an object. A JSON object names a holder whatever it holds, as the reference
+ * reads it (`{}` is a holder whose pid is None, so one whose process is gone).
+ */
+function parseHolder(text: string): Holder | undefined {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed))
+      return parsed as Holder;
+  } catch {
+    // names no holder (yet)
+  }
+  return undefined;
+}
+
+/**
+ * A file's bytes, inode, size and mtime, read on one handle so they are of one file; undefined when
+ * there is no such file.
+ */
+function look(file: string): Sighting | undefined {
+  let fd: number;
+  try {
+    fd = patientOnWindows(() => openSync(file, "r"));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw new LogbookError(`${file}: cannot read the writer lock (${(err as Error).message})`);
+  }
+  try {
+    const stat = fstatSync(fd, { bigint: true });
+    const bytes = Buffer.alloc(Number(stat.size));
+    let got = 0;
+    while (got < bytes.length) {
+      const n = readSync(fd, bytes, got, bytes.length - got, got);
+      if (n === 0) break;
+      got += n;
+    }
+    return {
+      text: bytes.subarray(0, got).toString("utf-8"),
+      ino: stat.ino,
+      size: stat.size,
+      mtimeNs: stat.mtimeNs,
+    };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Whether two sightings are of one file, unchanged between them. */
+function same(a: Sighting, b: Sighting): boolean {
+  return a.text === b.text && a.ino === b.ino && a.size === b.size && a.mtimeNs === b.mtimeNs;
+}
+
+/**
+ * Rule A, the owner's decision of 15 October: a lock that names no holder is a writer between its
+ * create and its write (the reference makes its lock so) until half a second has passed since it was
+ * made, by its mtime, and then a leftover of a crash, to be removed and taken. The reference's own
+ * steps are kept too: the same file, read again and again, must have named no holder for that half
+ * second, so one replaced or touched meanwhile starts it over. Both, before it is a leftover. An
+ * mtime ahead of the clock (another machine's, on a shared folder) is a lock not yet half a second
+ * old until the clock passes it.
+ */
+class NoHolder {
+  private watching: { sighting: Sighting; since: number } | undefined;
+  private first: number | undefined;
+
+  constructor(private readonly sentence: string) {}
+
+  /**
+   * Judge a sighting of a file that names no holder: true when it is a leftover; otherwise false,
+   * once the writer has said, or under `wait: false` refused, that it waits for whoever is making it.
+   */
+  leftover(sighting: Sighting, wait: boolean, once: (line: string) => void): boolean {
+    const now = performance.now();
+    this.first ??= now;
+    if (this.watching === undefined || !same(this.watching.sighting, sighting))
+      this.watching = { sighting, since: now };
+    const watched = now - this.watching.since >= GRACE_MS;
+    const made = Number(sighting.mtimeNs / 1_000_000n);
+    if (watched && Date.now() - made >= GRACE_MS) return true;
+    if (now - this.first >= GRACE_MS) {
+      if (!wait) throw new WriterBusy(this.sentence);
+      once(`${this.sentence}; waiting`);
+    }
+    return false;
+  }
+
+  /** The file names a holder now, or is gone: the next one that names none is judged afresh. */
+  reset(): void {
+    this.watching = undefined;
+    this.first = undefined;
+  }
+}
+
+function unlinkQuietly(file: string): void {
+  try {
+    patientOnWindows(() => unlinkSync(file));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}
+
+/** Remove `file` only while it is still the one `seen`: read again on one handle right before the unlink. */
+function removeIfSame(file: string, seen: Sighting): void {
+  const now = look(file);
+  if (now !== undefined && same(now, seen)) unlinkQuietly(file);
+}
+
+/** Remove a file of this process's own that no one else names, if it can be removed now. */
+function removeIfPossible(file: string): void {
+  try {
+    unlinkSync(file);
+  } catch {
+    // gone already, or held open for a moment by a reader on Windows: a stray temp file, no more
+  }
+}
+
+/** Make `state/` in the record folder, which must exist: a folder that is no record gets nothing. */
+function makeStateDir(dir: string): void {
+  try {
+    mkdirSync(dir);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return;
+    throw new LogbookError(
+      `${dir}: cannot make the folder for the writer lock (${(err as Error).message})`,
+    );
+  }
+}
+
+function cannotTake(file: string, err: unknown): LogbookError {
+  return new LogbookError(`${file}: cannot take the writer lock (${(err as Error).message})`);
+}
+
+/**
+ * Create `file` holding `text` in one step, or return false when it already exists. The text is
+ * written and fsynced to a temp file of this process beside it, which is then hard-linked to the
+ * name: `link`, like the exclusive create (`O_EXCL`) the reference makes its lock with, fails when
+ * the name exists, so of two writers racing for it, of either implementation, exactly one gets it,
+ * and the file appears with its holder in it, never empty or cut short. A rename would not do: it
+ * replaces a name that exists, on every platform Node runs on. A filesystem that cannot link (FAT,
+ * some network shares; and a link Windows still refuses after IN_USE_MS) gets the reference's own
+ * two steps, the create and then the write, whose moment of an empty lock rule A waits out. A
+ * folder that vanished meanwhile (a release removes an empty `state/`) is made again.
+ */
+function createExclusively(file: string, text: string): boolean {
+  const dir = dirname(file);
+  const temp = join(dir, `${basename(file)}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`);
+  let fd: number;
+  try {
+    fd = openSync(temp, "wx");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      makeStateDir(dir);
+      return false;
+    }
+    throw cannotTake(file, err);
+  }
+  try {
+    try {
+      writeSync(fd, text, null, "utf-8");
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  } catch (err) {
+    removeIfPossible(temp);
+    throw cannotTake(file, err);
+  }
+  try {
+    patientOnWindows(() => linkSync(temp, file));
+    return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return false;
+    if (code === "ENOENT") {
+      makeStateDir(dir);
+      return false;
+    }
+    return createInTwoSteps(file, text);
+  } finally {
+    removeIfPossible(temp);
+  }
+}
+
+/** The reference's way, where `link` is not to be had: the exclusive create, then the write. */
+function createInTwoSteps(file: string, text: string): boolean {
+  let fd: number;
+  try {
+    fd = patientOnWindows(() => openSync(file, "wx"));
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return false;
+    if (code === "ENOENT") {
+      makeStateDir(dirname(file));
+      return false;
+    }
+    throw cannotTake(file, err);
+  }
+  try {
+    writeSync(fd, text, null, "utf-8");
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
+}
+
+/** What a take of the lock carries from one read to the next. */
+interface Take {
+  wait: boolean;
+  once: (line: string) => void;
+  /** Rule A for `writer.lock`, and for the reclaim file. */
+  lock: NoHolder;
+  reclaim: NoHolder;
+}
+
+/**
+ * Take the reclaim file, `state/writer.lock.reclaim`, holding this pid, or return false (after a
+ * poll when another writer is in the middle of a reclaim): the caller reads the lock again either
+ * way. A reclaim whose pid is gone is cleared; one naming this pid is another thread's, unless it
+ * was made before this process started; one that names no pid is held to rule A, as the lock is.
+ */
+function takeReclaim(dir: string, take: Take): boolean {
+  const file = join(dir, RECLAIM_FILE);
+  if (createExclusively(file, String(process.pid))) return true;
+  const seen = look(file);
+  if (seen === undefined) return false;
+  if (/^[1-9][0-9]*$/.test(seen.text)) {
+    take.reclaim.reset();
+    const pid = Number(seen.text);
+    const mine = pid === process.pid && Number(seen.mtimeNs / 1_000_000n) >= STARTED_SECOND;
+    if (mine || (pid !== process.pid && alive(pid))) sleep(POLL_MS);
+    else removeIfSame(file, seen);
+    return false;
+  }
+  if (take.reclaim.leftover(seen, take.wait, take.once)) removeIfSame(file, seen);
+  else sleep(POLL_MS);
+  return false;
+}
+
+/**
+ * Remove the lock, and only the one `seen` — a holder whose process is gone, or a leftover that
+ * names none: under the reclaim file, so that two writers that both judged it cannot remove,
+ * between them, the lock a third writer took the moment the first had cleared the old one; and read
+ * again on one handle right before the unlink, so a lock replaced or written since it was judged is
+ * left alone. The caller reads the lock again afterwards, whatever happened.
+ */
+function reclaim(dir: string, seen: Sighting, take: Take): void {
+  if (!takeReclaim(dir, take)) return;
+  const guard = join(dir, RECLAIM_FILE);
+  try {
+    removeIfSame(join(dir, LOCK_FILE), seen);
+  } finally {
+    if (look(guard)?.text === String(process.pid)) unlinkQuietly(guard);
+  }
+}
+
+/**
+ * Take `state/writer.lock` in the record folder, as the reference does (one writer at a time): the
+ * file names the holder's `pid`, `command` and `since`, and appears with them in it (see
+ * createExclusively). A lock that names a holder whose process lives is waited for, with one line
+ * saying so, or refused at once with WriterBusy when `wait` is false, however old its `since`: the
+ * reference reclaims by the pid alone. A holder whose pid is gone, or is not a positive whole number,
+ * or is this process's own from before it started, is taken over, with one line saying so. A lock
+ * that names no holder (empty, cut short, not a JSON object) is held to rule A (NoHolder): read
+ * again until it is a leftover, then removed without a word and taken, as the reference removes it.
+ * Readers never take it. The lock is the courtesy between writers; what keeps the chain whole is
+ * that a writer reads `logbook.json` again before it writes (HeadMoved). Returns the release, which
+ * removes the lock only while it is still this writer's.
+ */
+export function takeWriterLock(root: string, options: WriterLockOptions = {}): () => void {
+  const { wait = true, command = "logbook-ts add", say } = options;
+  const dir = join(root, STATE_DIR);
+  const file = join(dir, LOCK_FILE);
+  makeStateDir(dir);
+  const mine = JSON.stringify({ pid: process.pid, command, since: rfc3339(new Date()) });
+  const said = new Set<string>();
+  const take: Take = {
+    wait,
+    once: (line) => {
+      if (said.has(line)) return;
+      said.add(line);
+      say?.(line);
+    },
+    lock: new NoHolder(NO_HOLDER_LOCK),
+    reclaim: new NoHolder(NO_HOLDER_RECLAIM),
+  };
+  for (;;) {
+    // Read first, so a writer waiting out a long hold polls by reading, not by making temp files.
+    const seen = look(file);
+    if (seen === undefined) {
+      take.lock.reset();
+      if (createExclusively(file, mine)) break;
+      continue;
+    }
+    if (seen.text === held.get(resolve(file))) {
+      throw new LogbookError(
+        `${file}: this writer holds the lock on this record already; a second take would wait on itself`,
+      );
+    }
+    const holder = parseHolder(seen.text);
+    if (holder === undefined) {
+      if (take.lock.leftover(seen, wait, take.once)) reclaim(dir, seen, take);
+      else sleep(POLL_MS);
+      continue;
+    }
+    take.lock.reset();
+    if (mayHold(holder)) {
+      const who = `another logbook command is writing to this record (${field(holder, "command")}, since ${field(holder, "since")})`;
+      if (!wait) throw new WriterBusy(who);
+      take.once(`${who}; waiting`);
+      sleep(POLL_MS);
+      continue;
+    }
+    take.once(
+      `a stale lock from ${field(holder, "command")} (pid ${pyStr(holder.pid)}, since ${field(holder, "since")}) whose process is gone; taking it over`,
+    );
+    reclaim(dir, seen, take);
+  }
+  held.set(resolve(file), mine);
+  return () => {
+    held.delete(resolve(file));
+    // Only the lock this writer holds: one another writer holds by then is left to it, as the
+    // reference leaves it.
+    if (look(file)?.text === mine) unlinkQuietly(file);
+    try {
+      rmdirSync(dir); // only when nothing else lives in state/, as the reference leaves it
+    } catch {
+      // not empty, or already gone
+    }
+  };
+}
+
+/** Run `fn` holding the writer lock, released however `fn` ends. */
+export function withWriterLock<T>(root: string, fn: () => T, options: WriterLockOptions = {}): T {
+  const release = takeWriterLock(root, options);
+  try {
+    return fn();
+  } finally {
+    release();
+  }
+}
+
+/** The lock options among a caller's options, without the keys it left undefined. */
+function lockOptions(options: WriterLockOptions): WriterLockOptions {
+  const lock: WriterLockOptions = {};
+  if (options.wait !== undefined) lock.wait = options.wait;
+  if (options.command !== undefined) lock.command = options.command;
+  if (options.say !== undefined) lock.say = options.say;
+  return lock;
+}
+
+export interface AddOptions extends WriterLockOptions {
   /** The clock: `at` and `recorded_at`. Defaults to now. */
   now?: Date;
   /** Line id. Defaults to a fresh UUIDv7. */
@@ -103,22 +611,35 @@ export interface AddOptions {
 }
 
 /**
- * Append one `note/v1` line (tier 2, source manual, tz from logbook.json) and update
- * logbook.json atomically. Refuses a record that is not logbook/0.2 or logbook/0.3 without
+ * Append one `note/v1` line (tier 2, source manual, tz from logbook.json) and bring logbook.json
+ * forward, in the SPEC §3 write order: the line flushed and fsynced to its month file first, then
+ * logbook.json written to a temporary file, fsynced and renamed into place. The whole of it holds
+ * the writer lock, and `logbook.json` is read again right before the write and the append refused
+ * (HeadMoved) when it moved. Refuses a record that is not logbook/0.2 or logbook/0.3 without
  * recipients, or that does not verify.
  */
 export function addNote(root: string, text: string, options: AddOptions = {}): Line {
   if (text.trim() === "") throw new LogbookError("nothing to add: the note is empty");
+  // Refused before the lock is taken, so a folder that is no record, or one this implementation
+  // cannot write to, gets no state/ folder; read again under the lock, where it counts.
+  const refusal = writeRefusal(readMeta(root));
+  if (refusal) throw new LogbookError(refusal);
+  return withWriterLock(root, () => appendNote(root, text, options), lockOptions(options));
+}
+
+/** The append, under the lock. */
+function appendNote(root: string, text: string, options: AddOptions): Line {
   const meta = readMeta(root);
   const refusal = writeRefusal(meta);
   if (refusal) throw new LogbookError(refusal);
   if (typeof meta.timezone !== "string" || meta.timezone === "") {
     throw new LogbookError("logbook.json: timezone is missing");
   }
-  const state = verifyLogbook(root);
-  if (!state.valid) {
+  const chain = readChain(root);
+  const errors = [...chain.errors, ...metaErrors(meta, chain.count, chain.head)];
+  if (errors.length > 0) {
     throw new LogbookError(
-      `refusing to append to a record that does not verify:\n${state.errors.join("\n")}`,
+      `refusing to append to a record that does not verify:\n${errors.join("\n")}`,
     );
   }
 
@@ -126,7 +647,7 @@ export function addNote(root: string, text: string, options: AddOptions = {}): L
   const stamp = rfc3339(now);
   const line: Line = {
     id: options.id ?? uuidV7(now),
-    seq: state.lines + 1,
+    seq: chain.count + 1,
     at: stamp,
     end: null,
     tz: meta.timezone,
@@ -135,23 +656,87 @@ export function addNote(root: string, text: string, options: AddOptions = {}): L
     tier: 2,
     payload: { schema: "note/v1", text },
     recorded_at: stamp,
-    prev: state.head,
+    prev: chain.head,
     hash: "",
   };
   line.hash = hashLine(line);
 
-  const dir = join(root, LOG_DIR, stamp.slice(0, 4));
-  mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, `${stamp.slice(5, 7)}.jsonl`), `${canonicalize(line)}\n`, "utf-8");
+  // The guard behind the courtesy of the lock: a writer that did not take it, or took it over
+  // wrongly, moved the head since the line was chained; then nothing is written.
+  const again = readMeta(root);
+  if (again.seq !== meta.seq || again.head !== meta.head) {
+    throw new HeadMoved(
+      `the record's head moved while the line was being prepared: logbook.json named seq ${meta.seq}, head ${meta.head}, and names seq ${again.seq}, head ${again.head} now; nothing was written`,
+    );
+  }
 
-  writeMetaAtomically(root, { ...meta, seq: line.seq, head: line.hash });
+  appendLine(root, stamp, `${canonicalize(line)}\n`);
+  writeMetaDurably(root, { ...meta, seq: line.seq, head: line.hash });
   return line;
 }
 
-/** Write to a sibling temp file, then rename over logbook.json; a crash leaves the old file intact. */
-function writeMetaAtomically(root: string, meta: Meta): void {
+/**
+ * Append a line to the month file of `stamp` and fsync it, and the folder that names the file, and
+ * every folder made for it in the one above: the line is on disk before logbook.json names it.
+ */
+function appendLine(root: string, stamp: string, text: string): void {
+  const dir = join(root, LOG_DIR, stamp.slice(0, 4));
+  const made = mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${stamp.slice(5, 7)}.jsonl`);
+  const fd = openSync(file, "a");
+  try {
+    writeSync(fd, text, null, "utf-8");
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  syncFolder(dir);
+  if (made === undefined) return;
+  for (let child = dir; ; child = dirname(child)) {
+    syncFolder(dirname(child));
+    if (resolve(child) === resolve(made)) break;
+  }
+}
+
+/**
+ * Write logbook.json to a sibling temp file, fsynced, then rename it over the target, then fsync
+ * the folder: a crash leaves the old file whole, never a half-written one.
+ */
+function writeMetaDurably(root: string, meta: Meta): void {
   const target = join(root, META_FILE);
   const tmp = join(root, `.${META_FILE}.${process.pid}.tmp`);
-  writeFileSync(tmp, `${JSON.stringify(meta, null, 2)}\n`, "utf-8");
-  renameSync(tmp, target);
+  const fd = openSync(tmp, "w");
+  try {
+    writeSync(fd, `${JSON.stringify(meta, null, 2)}\n`, null, "utf-8");
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    patientOnWindows(() => renameSync(tmp, target));
+  } catch (err) {
+    removeIfPossible(tmp);
+    throw err;
+  }
+  syncFolder(root);
+}
+
+/**
+ * fsync a folder, so a name created or renamed in it is on disk too. Windows cannot open a folder
+ * for this and refuses; there the files' own fsyncs are what SPEC §3 asks for, and the call is skipped.
+ */
+function syncFolder(dir: string): void {
+  let fd: number;
+  try {
+    fd = openSync(dir, "r");
+  } catch {
+    return;
+  }
+  try {
+    fsyncSync(fd);
+  } catch {
+    // a filesystem that cannot fsync a folder
+  } finally {
+    closeSync(fd);
+  }
 }

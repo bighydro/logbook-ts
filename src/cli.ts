@@ -11,7 +11,7 @@ import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
 import { BadRange, gapsText, listSources, sourceGaps, sourcesText } from "./sources.js";
 import { collectStats, statsText } from "./stats.js";
-import { addNote, LogbookError, readMeta, verifyLogbook } from "./store.js";
+import { addNote, HeadMoved, LogbookError, readMeta, verifyLogbook, WriterBusy } from "./store.js";
 import { readTrips, renderTrips } from "./trips.js";
 
 export interface Io {
@@ -22,7 +22,10 @@ export interface Io {
 export const USAGE = `usage:
   logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>", or the
                                       errors after "invalid — N errors; M lines read, head <hex>"
-  logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
+  logbook-ts add <root> "<text>" [--no-wait]
+                                      append one note (note/v1, tier 2, source manual) under the
+                                      record's writer lock, state/writer.lock; waits for another
+                                      writer unless --no-wait, which refuses and exits 2
   logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
@@ -117,10 +120,18 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         return 1;
       }
       case "add": {
-        if (root === undefined || rest.length === 0) return usage(io);
-        const line = addNote(root, rest.join(" "));
-        io.stdout(`added seq ${line.seq} ${line.id} at ${line.at}, head ${line.hash}\n`);
-        return 0;
+        const words = rest.filter((word) => word !== "--no-wait");
+        if (root === undefined || words.length === 0) return usage(io);
+        try {
+          const line = addNote(root, words.join(" "), {
+            wait: words.length === rest.length,
+            say: (notice) => io.stderr(`${notice}\n`),
+          });
+          io.stdout(`added seq ${line.seq} ${line.id} at ${line.at}, head ${line.hash}\n`);
+          return 0;
+        } catch (err) {
+          return refusedWriter("add", err, io);
+        }
       }
       case "show": {
         if (root === undefined) return usage(io);
@@ -262,6 +273,22 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
     }
     throw err;
   }
+}
+
+/**
+ * A writer's refusals, as the reference prints them: another writer under `--no-wait`, and a head
+ * that moved under the lock, each one line naming the command, exit 2. Anything else is thrown on.
+ */
+function refusedWriter(command: string, err: unknown, io: Io): number {
+  if (err instanceof WriterBusy) {
+    io.stderr(`${command}: ${err.message}; --no-wait, so not waiting\n`);
+    return 2;
+  }
+  if (err instanceof HeadMoved) {
+    io.stderr(`${command}: ${err.message}\n`);
+    return 2;
+  }
+  throw err;
 }
 
 type ShowFlags = ShowRangeOptions & { day?: string; json?: boolean };
