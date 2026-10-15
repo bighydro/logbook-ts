@@ -27,6 +27,38 @@ export interface Chain {
   errors: string[];
   count: number;
   head: string;
+  /**
+   * Under a probe, the hash of the first line taken with the seq it asks about: GENESIS for 0,
+   * undefined when no line has that seq. Meaningful only when `errors` is empty.
+   */
+  headAt?: string;
+}
+
+/** A line past the seq a probe asks about, as the walk takes it; nothing more of it is kept. */
+export interface TailLine {
+  seq: number;
+  /** `<file> line <row>`, as the chain's problems name a line. */
+  where: string;
+  hash: string;
+  prev: string;
+}
+
+/**
+ * What a caller asks of the walk besides the chain (`repair tail`): the hash at one seq, and each
+ * line past it, one at a time, in seq order. Nothing is gathered for it: memory stays one line per
+ * month file.
+ */
+export interface ChainProbe {
+  /** The seq asked about, usually the one `logbook.json` names: a whole number, 0 for none. */
+  at: number;
+  /** Each line taken with a seq past `at`, in seq order, after its checks. */
+  tail?: (line: TailLine) => void;
+  /**
+   * A walk of the chain begins: once for the merge, and once more when a month file out of seq order
+   * sends the record to the sorted read, which takes the lines again from the first, so what `tail`
+   * was given before is to be dropped.
+   */
+  begin?: () => void;
 }
 
 /**
@@ -39,9 +71,13 @@ export interface Chain {
  * the order they always were: rows that are no line, then each line's envelope, file by file, then
  * the chain in seq order.
  */
-export function readChain(root: string, stats: VerifyStats = { peakHeld: 0 }): Chain {
+export function readChain(
+  root: string,
+  stats: VerifyStats = { peakHeld: 0 },
+  probe?: ChainProbe,
+): Chain {
   const months = monthFiles(root);
-  return mergedChain(months, stats) ?? sortedChain(months, stats);
+  return mergedChain(months, stats, probe) ?? sortedChain(months, stats, probe);
 }
 
 /** Field checks needed before a line can be hashed at all. Returns problems, empty if none. */
@@ -162,9 +198,18 @@ class MonthReader {
 class Walk {
   count = 0;
   head = ZERO_HASH;
+  /** Under a probe, the hash of the line at the seq it asks about (see Chain.headAt). */
+  headAt: string | undefined;
   private expectedSeq = 1;
 
-  constructor(private readonly errors: string[]) {}
+  constructor(
+    private readonly errors: string[],
+    private readonly probe?: ChainProbe,
+  ) {
+    if (probe === undefined) return;
+    if (probe.at === 0) this.headAt = ZERO_HASH;
+    probe.begin?.();
+  }
 
   take(line: Line, where: string): void {
     if (line.seq !== this.expectedSeq) {
@@ -189,6 +234,19 @@ class Walk {
     this.head = String(line.hash);
     this.expectedSeq = line.seq + 1;
     this.count += 1;
+    const probe = this.probe;
+    if (probe === undefined) return;
+    if (line.seq === probe.at && this.headAt === undefined) this.headAt = this.head;
+    if (line.seq > probe.at) {
+      probe.tail?.({ seq: line.seq, where, hash: this.head, prev: String(line.prev) });
+    }
+  }
+
+  /** The chain walked so far, with what the probe asked. */
+  chain(errors: string[]): Chain {
+    const chain: Chain = { errors, count: this.count, head: this.head };
+    if (this.headAt !== undefined) chain.headAt = this.headAt;
+    return chain;
   }
 }
 
@@ -205,9 +263,13 @@ const before = (a: Waiting, b: Waiting): boolean =>
  * The merge: one line per file in a heap, the least taken and its file read on. Undefined when a
  * file gives a seq below the one before it, for the merge to be no order then.
  */
-function mergedChain(months: MonthFile[], stats: VerifyStats): Chain | undefined {
+function mergedChain(
+  months: MonthFile[],
+  stats: VerifyStats,
+  probe: ChainProbe | undefined,
+): Chain | undefined {
   const problems = new Problems(months.length);
-  const walk = new Walk(problems.chain);
+  const walk = new Walk(problems.chain, probe);
   const heap = new Heap<Waiting>(before);
   for (const [index, month] of months.entries()) {
     const file = new MonthReader(index, month, problems, OPEN_CHUNK);
@@ -226,7 +288,7 @@ function mergedChain(months: MonthFile[], stats: VerifyStats): Chain | undefined
     heap.push({ ...next, file: taken.file });
     stats.peakHeld = Math.max(stats.peakHeld, heap.size);
   }
-  return { errors: problems.list(), count: walk.count, head: walk.head };
+  return walk.chain(problems.list());
 }
 
 /**
@@ -235,9 +297,13 @@ function mergedChain(months: MonthFile[], stats: VerifyStats): Chain | undefined
  * file as the merge does; the places are put in seq order, file order among equal seqs, and a
  * second pass reads each line again where it lies and walks the chain. One line is held at a time.
  */
-function sortedChain(months: MonthFile[], stats: VerifyStats): Chain {
+function sortedChain(
+  months: MonthFile[],
+  stats: VerifyStats,
+  probe: ChainProbe | undefined,
+): Chain {
   const problems = new Problems(months.length);
-  const walk = new Walk(problems.chain);
+  const walk = new Walk(problems.chain, probe);
   const places = new Places();
   for (const [index, month] of months.entries()) {
     const file = new MonthReader(index, month, problems, 64 * 1024);
@@ -260,7 +326,7 @@ function sortedChain(months: MonthFile[], stats: VerifyStats): Chain {
     stats.peakHeld = Math.max(stats.peakHeld, 1);
     walk.take(parsed.line, where);
   }
-  return { errors: problems.list(), count: walk.count, head: walk.head };
+  return walk.chain(problems.list());
 }
 
 /** Where each line lies, and nothing else of it: seq, file, row and byte offset in typed arrays. */

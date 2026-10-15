@@ -6,6 +6,7 @@ import { hashLine, ZERO_HASH } from "../src/chain.js";
 import { canonicalize } from "../src/jcs.js";
 import { addNote, type VerifyStats, verifyLogbook } from "../src/store.js";
 import type { Line } from "../src/types.js";
+import { type ChainProbe, readChain, type TailLine } from "../src/verify.js";
 import { cleanup, tempDir, writeMeta } from "./helpers.js";
 
 // Every handle opened and closed goes through here to the real calls, so a test can count the files
@@ -282,4 +283,124 @@ describe("verifyLogbook streams the month files in seq order (SPEC §3)", () => 
       { numRuns: 150 },
     );
   }, 60_000);
+});
+
+describe("readChain's probe: the hash at one seq and the lines past it, holding none of them (repair tail)", () => {
+  /** What a probe saw: the walks begun, the hash at `at`, and each line past it as it was taken. */
+  function probe(
+    root: string,
+    at: number,
+  ): { begun: number; headAt: string | undefined; tail: TailLine[]; peakHeld: number } {
+    const tail: TailLine[] = [];
+    let begun = 0;
+    const watch: ChainProbe = {
+      at,
+      begin: () => {
+        begun += 1;
+        tail.splice(0);
+      },
+      tail: (line) => tail.push(line),
+    };
+    const stats: VerifyStats = { peakHeld: 0 };
+    const chain = readChain(root, stats, watch);
+    expect(chain.errors).toEqual([]);
+    return { begun, headAt: chain.headAt, tail, peakHeld: stats.peakHeld };
+  }
+
+  it("names the hash of the line at the seq asked, GENESIS at 0 and nothing past the end, and gives each line past it in seq order with where it lies", () => {
+    const lines = chained(cycling(12, 3));
+    const last = lines[11] as Line;
+    const root = record(placed(lines), last.seq, last.hash);
+    const seen = probe(root, 9);
+    expect(seen.begun).toBe(1);
+    expect(seen.headAt).toBe((lines[8] as Line).hash);
+    expect(seen.tail).toEqual(
+      lines.slice(9).map((line) => ({
+        seq: line.seq,
+        where: `${rel(`2026/${line.at.slice(5, 7)}`)} line ${Math.floor((line.seq - 1) / 3) + 1}`,
+        hash: line.hash,
+        prev: line.prev,
+      })),
+    );
+    expect(seen.peakHeld).toBe(3);
+    expect(probe(root, 0)).toMatchObject({ headAt: ZERO_HASH });
+    expect(probe(root, 0).tail).toHaveLength(12);
+    expect(probe(root, 12)).toMatchObject({ headAt: last.hash, tail: [] });
+    expect(probe(root, 13)).toMatchObject({ headAt: undefined, tail: [] });
+  });
+
+  it("when a file out of seq order sends the record to the sorted read, begins again, and gives the tail once, in seq order", () => {
+    const lines = chained([
+      "2026-05-01T10:00:00Z",
+      "2026-04-01T10:00:00Z",
+      "2026-05-02T10:00:00Z",
+      "2026-04-02T10:00:00Z",
+      "2026-05-03T10:00:00Z",
+    ]);
+    const [one, two, three, four, five] = lines as [Line, Line, Line, Line, Line];
+    const root = record({ "2026/04": [four, two], "2026/05": [one, three, five] }, 5, five.hash);
+    const seen = probe(root, 2);
+    expect(seen.begun).toBe(2);
+    expect(seen.headAt).toBe(two.hash);
+    expect(seen.tail.map((line) => [line.seq, line.where])).toEqual([
+      [3, `${rel("2026/05")} line 2`],
+      [4, `${rel("2026/04")} line 1`],
+      [5, `${rel("2026/05")} line 3`],
+    ]);
+    expect(seen.peakHeld).toBeLessThanOrEqual(2); // the merge's two files, before it gave way
+  });
+
+  it("whatever the files and their order, the hash at the seq asked and the lines past it are those of one file in seq order", () => {
+    const layout = fc.record({
+      count: fc.integer({ min: 1, max: 30 }),
+      at: fc.nat(),
+      files: fc.integer({ min: 1, max: 4 }),
+      picks: fc.array(fc.nat(), { minLength: 30, maxLength: 30 }),
+      shuffled: fc.boolean(),
+      order: fc.array(fc.nat(), { minLength: 30, maxLength: 30 }),
+    });
+    fc.assert(
+      fc.property(layout, (how) => {
+        const lines = chained(cycling(how.count, 3));
+        const last = lines[how.count - 1] as Line;
+        const at = how.at % (how.count + 1);
+        const spread: Record<string, Line[]> = {};
+        lines.forEach((line, i) => {
+          const month = `2026/0${((how.picks[i] ?? 0) % how.files) + 1}`;
+          spread[month] = [...(spread[month] ?? []), line];
+        });
+        if (how.shuffled) {
+          for (const rows of Object.values(spread)) {
+            const sorted = rows.map((row, i) => ({ row, key: how.order[i] ?? 0, i }));
+            sorted.sort((a, b) => a.key - b.key || a.i - b.i);
+            rows.splice(0, rows.length, ...sorted.map((s) => s.row));
+          }
+        }
+        const without = (seen: ReturnType<typeof probe>) => ({
+          headAt: seen.headAt,
+          tail: seen.tail.map(({ seq, hash, prev }) => ({ seq, hash, prev })),
+        });
+        const one = probe(record({ "2026/01": lines }, how.count, last.hash), at);
+        const many = probe(record(spread, how.count, last.hash), at);
+        expect(without(many)).toEqual(without(one));
+        expect(one.headAt).toBe(at === 0 ? ZERO_HASH : (lines[at - 1] as Line).hash);
+        expect(one.tail.map((line) => line.seq)).toEqual(lines.slice(at).map((line) => line.seq));
+        expect(many.peakHeld).toBeLessThanOrEqual(Object.keys(spread).length);
+        cleanup();
+      }),
+      { numRuns: 150 },
+    );
+  }, 60_000);
+
+  it("holds one parsed line per month file with a probe as without one: 6 for 600 lines, the whole record past the head", () => {
+    const lines = chained(cycling(600, 6));
+    const last = lines[599] as Line;
+    const root = record(placed(lines), last.seq, last.hash);
+    let count = 0;
+    const stats: VerifyStats = { peakHeld: 0 };
+    const chain = readChain(root, stats, { at: 0, tail: () => (count += 1) });
+    expect([chain.count, chain.head, chain.headAt]).toEqual([600, last.hash, ZERO_HASH]);
+    expect(count).toBe(600);
+    expect(stats.peakHeld).toBe(6);
+  });
 });
