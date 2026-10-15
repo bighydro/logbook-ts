@@ -94,7 +94,8 @@ SPEC §6, the conformance rule, and the readers.
 | Command | Does |
 |---|---|
 | `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or `invalid — N errors; M lines read, head <hex>` and the errors on stderr and exits 1: the seq and head of the lines read, so a record whose month file a crash cut inside a line (SPEC §3, truncation) reports the last whole line and its hash, never 0 and GENESIS while the first line is whole, and names the cut line `<file> line N: the file ends inside this line (cut short)`. A line that is not one is reported by file and line number and its file is read no further; a last line whole but for its newline is a line. A line whose JSON text gives a member name twice in one object, at any depth, is not one (SPEC §2), however the name is spelled: `<file> line N: duplicate key 'kind'`, as the reference names it. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. The month files are merged in `seq` order as the reference merges them, one line held from each and no file left open between reads, so memory is one line per month file whatever the length of the record, and so is `add`'s, which verifies first; a month file out of `seq` order, which SPEC §3 allows, is read again sorted, keeping only where each line lies. |
-| `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
+| `logbook-ts add <root> "<text>" [--no-wait]` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. One writer at a time, as the reference: the whole run holds `state/writer.lock` in the record folder (the holder's `pid`, `command` and `since`, the file the reference's writers hold and honour, written to a temp file and hard-linked into place so that it never exists empty); a second writer prints `another logbook command is writing to this record (<command>, since <time>); waiting` and waits, or with `--no-wait` refuses and exits 2; a lock whose process is gone is taken over with one line saying so. A lock that names no holder (the reference creates the file and then writes it) is a writer between the two until half a second after its mtime, and is waited for; after that it is a leftover of a crash and is removed without a word (rule A, SPEC-QUESTIONS 91). The write order of SPEC §3: the line is appended and fsynced to its month file, then `logbook.json` is written to a temp file, fsynced and renamed into place; `logbook.json` is read again right before the write and the append refused (exit 2, nothing written) when the head moved under the lock. While the files end past `logbook.json` (a crash between the two writes) it refuses with the reference's sentence, exit 2, writing nothing: run `repair tail`. Refuses to append to a record that does not verify otherwise, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
+| `logbook-ts repair tail <root> [--dry-run] [--no-wait]` | The files end past `logbook.json` after a crash between a line and it (SPEC §3, write order): verifies the whole chain, then sets `logbook.json` to the last line's `seq` and head, under the writer lock, and prints the lines past the head, what it set and `verify`'s verdict, as the reference's `logbook repair tail` prints them; `--dry-run` lists and writes nothing. A record that is not that crash — a fault in the files, the files ending before `logbook.json` or at its `seq` under another head — is refused, `repair tail: …; nothing was changed`, exit 2. No month file is touched. |
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
 | `logbook-ts day <root> [YYYY-MM-DD] [--json]` | The day read back whole, as the reference's `logbook day` prints it: the nights either side, the country, the timeline of stays, stops, moves, gaps, runs aboard an asset and flights, with what attached to each and who was there, what was placed nowhere, the health line, the sources. Today in the record's zone when no day is given. Only reads. See below. |
@@ -636,7 +637,9 @@ import {
 } from "logbook-ts";
 
 const result = verifyLogbook("/path/to/root"); // { valid, lines, head, errors }
-const line = addNote("/path/to/root", "a note"); // the Line that was written
+const line = addNote("/path/to/root", "a note"); // the Line that was written, under state/writer.lock
+// { wait: false } refuses with WriterBusy while another writer holds the lock; { say } takes the notices;
+// TailAhead while the files end past logbook.json, and then repairTail("/path/to/root") brings it forward
 const day = showDay("/path/to/root", { day: "2026-03-14", timezone: "Europe/Oslo" }); // { text, timezone, rows, detail }
 for (const shown of showDays("/path/to/root", { since: "2026-03-01", profiles: ["note"] })) {
   shown.detail.rows; // what --json prints: [{ time, kind, source, summary, lines }, …], a day at a time
@@ -686,6 +689,20 @@ and the test writes the reference's demo record into a temp folder to read and c
 git clone https://github.com/bighydro/logbook /tmp/logbook-ref
 LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
 ```
+
+`tests/cross-impl-writer.test.ts` holds the writer to the reference the same way: the lock's sentences, an
+empty lock a crash left, the refusal of an append past `logbook.json` and `repair tail`, on copies of one
+record (`LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl-writer.test.ts`).
+
+`tests/writer-lock.test.ts` drives real processes on one record: it bundles `src/` once with tsup into a
+temp folder and spawns `node` on it, each child injecting its fault (a held append, a pause after the record
+is read, a lock taken in the reference's two steps and stopped or killed between them, a stop before a
+reclaim, Windows' refusal of a file another process holds open, a crash at the rename of `logbook.json`)
+by patching `node:fs` before the bundle loads, so the lock, the wait, `--no-wait`, rule A, the write order,
+the refusal after a crash and `repair tail` are checked from outside the library. A child stops at a gate,
+a file it waits for in a folder the test owns, and goes on when the test makes it; where rule A's half
+second is the subject the empty lock's mtime is set ahead of the clock or behind it: no test waits a fixed
+time, so the steps come in the same order on a slow runner as on a fast one.
 
 `tests/fixtures/capture-expected-show.mjs`, `capture-expected-day.mjs`, `capture-expected-trips.mjs` and
 `capture-expected-readers.mjs` re-capture a fixture's expected output from the reference;
