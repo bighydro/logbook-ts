@@ -93,7 +93,9 @@ describe("logbook-ts add under the writer lock", () => {
 
   it("takes over a stale lock with one line on stderr, and appends", () => {
     const root = copySample();
-    const pid = spawnSync(process.execPath, ["-e", ""]).pid;
+    // No process's pid (above any the platforms CI runs give out): an exited child's pid would not
+    // do, as Windows soon gives it to the next process, and `add` would wait on that one.
+    const pid = 2_147_483_644;
     plantLock(root, `{"pid": ${pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
     const { code, out, err } = run(["add", root, "after a stale lock"]);
     expect(code).toBe(0);

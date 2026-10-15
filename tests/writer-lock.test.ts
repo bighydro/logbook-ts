@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -77,11 +77,15 @@ const real = {
 let appendFd = -1;
 let scanFd = -1;
 let lockFd = -1;
+let takenFd = -1;
 fs.openSync = (path, flags, mode) => {
   const fd = real.openSync(path, flags, mode);
   if (String(path).endsWith(".jsonl") && flags === "a") appendFd = fd;
   if (String(path).endsWith(".jsonl") && flags === "r") scanFd = fd;
-  if (String(path).endsWith("writer.lock") && flags === "wx") lockFd = fd;
+  if (String(path).endsWith("writer.lock") && flags === "wx") {
+    lockFd = fd;
+    takenFd = fd;
+  }
   return fd;
 };
 // --hold-append: once the append is fsynced, reach "holding" and pass "release", so the lock is
@@ -120,6 +124,17 @@ if (flags.includes("--two-step")) {
       pass("fill");
     }
     return real.writeSync(fd, ...rest);
+  };
+}
+// --links-kept: the lock made by the exclusive create has one link while this child holds it open,
+// removed by another writer or not, as Windows before libuv 1.49 (Node 20) reports a file removed
+// while a handle holds it: its name stays, delete-pending, until the handle is closed.
+if (flags.includes("--links-kept")) {
+  const { fstatSync } = fs;
+  fs.fstatSync = (fd, options) => {
+    const stat = fstatSync(fd, options);
+    if (fd === takenFd) stat.nlink = typeof stat.nlink === "bigint" ? 1n : 1;
+    return stat;
   };
 }
 // --gate-reclaim: about to take the reclaim file, before the lock is read again and removed,
@@ -256,7 +271,20 @@ afterAll(() => {
   rmSync(bundleDir, { recursive: true, force: true });
 });
 
-afterEach(cleanup);
+/** Every child a test started, with the promise of its end. */
+const running: Array<{ child: ChildProcess; done: Promise<Run> }> = [];
+
+afterEach(async () => {
+  // A test that failed may leave a child waiting at a gate for ever: it is stopped here and waited
+  // for, so it holds no file of the record when the record is removed, and no pid a later test meets.
+  await Promise.all(
+    running.splice(0).map(({ child, done }) => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      return done;
+    }),
+  );
+  cleanup();
+});
 
 interface Run {
   code: number | null;
@@ -294,6 +322,7 @@ function start(root: string, text: string, flags: string[] = []): Started {
       resolve({ code, signal, out, err });
     });
   });
+  running.push({ child, done });
   return { pid: child.pid as number, done, err: () => err, exited: () => exited };
 }
 
@@ -458,6 +487,16 @@ describe("two processes on one record", () => {
     expect(existsSync(lockOf(root))).toBe(false);
   }, 60_000);
 });
+
+/**
+ * Whether a file removed while another process holds it open loses its name at once, as on POSIX,
+ * or keeps it, delete-pending, until that process lets go: Windows before libuv 1.49 (Node 20).
+ */
+const POSIX_DELETE =
+  process.platform !== "win32" ||
+  ((major, minor) => major > 1 || (major === 1 && minor >= 49))(
+    ...(process.versions.uv.split(".").map(Number) as [number, number]),
+  );
 
 /** Set a file's mtime: ahead of the clock, a lock still being made; behind it, a leftover. */
 const setMtime = (file: string, ms: number): void => utimesSync(file, ms / 1000, ms / 1000);
@@ -755,33 +794,65 @@ describe("the guard behind the lock", () => {
 });
 
 describe("rule A and the take at their edges", () => {
-  it("a writer taking the lock in two steps, slow between them past half a second, loses it under rule A, notices (the file it wrote its holder into has no name), and waits on the writer that took it", async () => {
-    const root = copySample();
-    const g1 = gatesFolder();
-    const g2 = gatesFolder();
-    const first = start(root, "first", ["--gates", g1.dir, "--two-step"]);
-    await until(() => g1.reached("window"), [first]);
-    // In its window for longer than half a second, by its mtime: a leftover to anyone else.
-    setMtime(lockOf(root), Date.now() - 10_000);
-    const second = start(root, "second", ["--gates", g2.dir, "--hold-append", "--no-wait"]);
-    await until(() => g2.reached("holding"), [first, second]);
-    // The second took the leftover over, holds the lock and has its line on disk; the inode the
-    // first is about to write its holder into has no name any more.
-    const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as { pid: number };
-    expect(holder.pid).toBe(second.pid);
+  for (const kept of [false, true]) {
+    it.runIf(POSIX_DELETE)(
+      `a writer taking the lock in two steps, slow between them past half a second, loses it under rule A, notices (the file it wrote its holder into has no name${kept ? ", though its links are reported as Windows before libuv 1.49 reports them, one while it is held open: the name, read once the file is closed, is another's" : ""}), and waits on the writer that took it`,
+      async () => {
+        const root = copySample();
+        const g1 = gatesFolder();
+        const g2 = gatesFolder();
+        const first = start(root, "first", [
+          "--gates",
+          g1.dir,
+          "--two-step",
+          ...(kept ? ["--links-kept"] : []),
+        ]);
+        await until(() => g1.reached("window"), [first]);
+        // In its window for longer than half a second, by its mtime: a leftover to anyone else.
+        setMtime(lockOf(root), Date.now() - 10_000);
+        const second = start(root, "second", ["--gates", g2.dir, "--hold-append", "--no-wait"]);
+        await until(() => g2.reached("holding"), [first, second]);
+        // The second took the leftover over, holds the lock and has its line on disk; the inode the
+        // first is about to write its holder into has no name any more.
+        const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as { pid: number };
+        expect(holder.pid).toBe(second.pid);
 
-    g1.open("fill");
-    // Had it not noticed, it would go on with no lock and read the record the second is halfway
-    // through writing, and refuse it as a crash's, or write beside it.
-    await until(() => first.err().includes("is writing to this record"), [first, second]);
-    g2.open("release");
-    const [a, b] = await Promise.all([first.done, second.done]);
-    expect(b.code, b.err).toBe(0);
-    expect(seqOf(b)).toEqual([33]);
-    expect(a.code, a.err).toBe(0);
-    expect(seqOf(a)).toEqual([34]);
-    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 34 });
-  }, 60_000);
+        g1.open("fill");
+        // Had it not noticed, it would go on with no lock and read the record the second is halfway
+        // through writing, and refuse it as a crash's, or write beside it.
+        await until(() => first.err().includes("is writing to this record"), [first, second]);
+        g2.open("release");
+        const [a, b] = await Promise.all([first.done, second.done]);
+        expect(b.code, b.err).toBe(0);
+        expect(seqOf(b)).toEqual([33]);
+        expect(a.code, a.err).toBe(0);
+        expect(seqOf(a)).toEqual([34]);
+        expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 34 });
+      },
+      60_000,
+    );
+  }
+
+  it.runIf(!POSIX_DELETE)(
+    "where a file removed while another process holds it open keeps its name until that process lets go (Windows before libuv 1.49, Node 20), the writer that removes a stalled two-step writer's lock cannot make its own while the stalled one holds it: it refuses after Windows' retries, and only the stalled writer writes",
+    async () => {
+      const root = copySample();
+      const g1 = gatesFolder();
+      const first = start(root, "first", ["--gates", g1.dir, "--two-step"]);
+      await until(() => g1.reached("window"), [first]);
+      setMtime(lockOf(root), Date.now() - 10_000);
+      const b = await start(root, "second", ["--no-wait"]).done;
+      expect(b.code).toBe(1);
+      expect(b.out).toBe("");
+      expect(b.err).toMatch(/^LogbookError: .*writer\.lock: cannot read the writer lock \(EPERM/);
+      g1.open("fill");
+      const a = await first.done;
+      expect(a.code, a.err).toBe(0);
+      expect(seqOf(a)).toEqual([33]);
+      expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
+    },
+    60_000,
+  );
 
   it.skipIf(process.platform === "win32")(
     "state/ a dangling symlink: the take is refused with a LogbookError, not spun on without a sleep or a word",

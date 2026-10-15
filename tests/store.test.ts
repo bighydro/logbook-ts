@@ -683,9 +683,14 @@ function plantLock(root: string, text: string, mtimeMs?: number): void {
   if (mtimeMs !== undefined) utimesSync(lockOf(root), mtimeMs / 1000, mtimeMs / 1000);
 }
 
-/** The pid of a process that has already exited: spawnSync reaps it before returning. */
+/**
+ * The pid of no process: above any pid the platforms CI runs give out (Linux at most 2^22, macOS
+ * 99,999, Windows far below 2^31). The pid of a process that has exited will not do: Windows soon
+ * gives it to the next process started, by this suite as well, and a wait here on a holder that
+ * lives is synchronous, which no test timeout ends.
+ */
 function deadPid(): number {
-  return spawnSync(process.execPath, ["-e", ""]).pid;
+  return 2_147_483_644;
 }
 
 /**

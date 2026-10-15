@@ -51,9 +51,8 @@ describe("addNote writes in the order of SPEC §3", () => {
     addNote(root, "in order", { now: new Date("2026-03-09T10:00:00Z") });
     const tmp = `.logbook.json.${process.pid}.tmp`;
     const syncs = recordCalls();
-    // Folders are fsynced where the platform can open them; Windows cannot, and there it is skipped.
-    const folder = (name: string): string[] =>
-      process.platform === "win32" ? [] : [`fsync ${name}`];
+    // Folders are opened and fsynced on every platform Node runs on, Windows included.
+    const folder = (name: string): string[] => [`fsync ${name}`];
     expect(syncs).toEqual([
       "mkdir 2026",
       "write 03.jsonl",
@@ -75,12 +74,10 @@ describe("addNote writes in the order of SPEC §3", () => {
     const renamed = syncs.findIndex((call) => call.startsWith("rename "));
     const before = syncs.slice(0, renamed);
     expect(before.slice(0, 3)).toEqual(["mkdir 2027", "write 01.jsonl", "fsync 01.jsonl"]);
-    if (process.platform !== "win32") {
-      // the month file's folder, the folder that gained 2027, and the record that gained logbook/
-      expect(before).toEqual(
-        expect.arrayContaining(["fsync 2027", "fsync logbook", `fsync ${basename(root)}`]),
-      );
-    }
+    // the month file's folder, the folder that gained 2027, and the record that gained logbook/
+    expect(before).toEqual(
+      expect.arrayContaining(["fsync 2027", "fsync logbook", `fsync ${basename(root)}`]),
+    );
     expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 1 });
   });
 });

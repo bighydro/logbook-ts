@@ -872,10 +872,16 @@ traceback; those inputs were not pursued and nothing here is drawn from the line
     What is left open: a writer that makes its lock in two steps and is held between them for more than
     half a second loses it under rule A, in either implementation, as the reference's own rule has it.
     This implementation's two-step fallback notices (the file it wrote its holder into has no name any
-    more) and waits on the writer that took the lock; the reference's writer, run so, goes on beside the
-    other, and only the head re-check stands between them. A two-step writer that writes its holder in
-    the instant between another's last read and its unlink is caught here only when that unlink comes
-    before its own check that its file still has a name; the reference's writer makes no such check.
+    more: its links are down to none, or, once it is closed, the lock's name is another file or none)
+    and waits on the writer that took the lock; the reference's writer, run so, goes on beside the
+    other, and only the head re-check stands between them. The name is read once the file is closed
+    because Windows before libuv 1.49 (Node 20) keeps a removed file's name, delete-pending, with one
+    link, while a handle holds it; there the writer that removed such a lock cannot make its own until
+    the stalled writer closes it, and refuses, `cannot read the writer lock (EPERM …)`, after the five
+    seconds Windows' refusals are retried, with nothing written. A two-step writer that writes its
+    holder in the instant between another's last read and its unlink is caught here only when that
+    unlink comes before its own check that its file still has the name; the reference's writer makes
+    no such check.
     And a lock left by an earlier process given this pid, written in the second this process started,
     reads as another thread's (`since` has seconds only) and is waited for; the message says to remove
     it if no writer is running.

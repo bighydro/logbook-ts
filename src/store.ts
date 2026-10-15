@@ -300,6 +300,11 @@ function look(file: string): Sighting | undefined {
   }
   try {
     const stat = fstatSync(fd, { bigint: true });
+    // A folder by the lock's name opens for reading (on Windows as well, where Node opens folders),
+    // and is no lock: said, never read as an empty one, which rule A would then try to remove.
+    if (!stat.isFile()) {
+      throw new LogbookError(`${file}: cannot read the writer lock (it is not a file)`);
+    }
     const bytes = Buffer.alloc(Number(stat.size));
     let got = 0;
     while (got < bytes.length) {
@@ -314,7 +319,7 @@ function look(file: string): Sighting | undefined {
       mtimeNs: stat.mtimeNs,
     };
   } catch (err) {
-    // A folder by the lock's name opens for reading and then refuses the read (EISDIR): said, not thrown raw.
+    if (err instanceof LogbookError) throw err;
     throw new LogbookError(`${file}: cannot read the writer lock (${(err as Error).message})`);
   } finally {
     closeSync(fd);
@@ -516,15 +521,12 @@ function createInTwoSteps(file: string, text: string): boolean {
     }
     throw cannotTake(file, err);
   }
-  let lost: boolean;
+  let written: { ino: bigint; nlink: bigint };
   try {
     try {
       writeSync(fd, text, null, "utf-8");
       fsyncSync(fd);
-      // Held between the two steps for longer than rule A's half second, this lock was a leftover
-      // to another writer, which removed it: the holder went into a file with no name. Not held,
-      // then; the caller reads the lock again and finds that writer's.
-      lost = fstatSync(fd, { bigint: true }).nlink === 0n;
+      written = fstatSync(fd, { bigint: true });
     } finally {
       closeSync(fd);
     }
@@ -534,7 +536,13 @@ function createInTwoSteps(file: string, text: string): boolean {
     removeIfPossible(file);
     throw cannotTake(file, err);
   }
-  return !lost;
+  // Held between the two steps for longer than rule A's half second, this lock was a leftover to
+  // another writer, which removed it: the holder went into a file with no name. Not held, then; the
+  // caller reads the lock again and finds that writer's, or none. On POSIX the file's links are
+  // down to none; Windows before libuv 1.49 (Node 20) keeps a removed file's name, its links at
+  // one, while a handle holds it, and frees it at the close. The name is read once closed.
+  if (written.nlink === 0n) return false;
+  return look(file)?.ino === written.ino;
 }
 
 /** What a take of the lock carries from one read to the next. */
@@ -1028,8 +1036,9 @@ function writeMetaDurably(root: string, meta: Meta): void {
 }
 
 /**
- * fsync a folder, so a name created or renamed in it is on disk too. Windows cannot open a folder
- * for this and refuses; there the files' own fsyncs are what SPEC §3 asks for, and the call is skipped.
+ * fsync a folder, so a name created or renamed in it is on disk too. Node opens a folder on every
+ * platform it runs on; a filesystem that will not open or flush one is passed over, since the files'
+ * own fsyncs are what SPEC §3 asks for.
  */
 function syncFolder(dir: string): void {
   let fd: number;
