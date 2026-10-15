@@ -135,13 +135,20 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
+/**
+ * A child is waited for synchronously, which the test's own timeout cannot end: one that has not
+ * ended within it is killed, and the test fails saying so, instead of holding the run for ever.
+ */
+const BOUNDED = { timeout: 110_000, killSignal: "SIGKILL" } as const;
+
 describe("repair tail of a tail of 120,000 short lines, the whole record past the head", () => {
   it(`the control: keeping every row past the head does not fit in ${CAP_MIB} MiB of old space`, () => {
     const child = spawnSync(
       process.execPath,
       [`--max-old-space-size=${CAP_MIB}`, join(work, "keep.mjs"), root],
-      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20 },
+      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20, ...BOUNDED },
     );
+    expect(child.error, "the child did not end in time").toBeUndefined();
     expect(child.status).not.toBe(0);
     expect(child.stderr).toMatch(/heap out of memory/);
   }, 120_000);
@@ -150,8 +157,9 @@ describe("repair tail of a tail of 120,000 short lines, the whole record past th
     const child = spawnSync(
       process.execPath,
       [`--max-old-space-size=${CAP_MIB}`, join(work, "repair.mjs"), root],
-      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20 },
+      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20, ...BOUNDED },
     );
+    expect(child.error, "the child did not end in time").toBeUndefined();
     expect(child.stderr).toBe("");
     expect(child.status).toBe(0);
     const report = JSON.parse(child.stdout) as {

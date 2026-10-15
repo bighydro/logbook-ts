@@ -221,8 +221,10 @@ describe("verify and add in a fresh process on 25,000 notes of about 2 KiB", () 
     const child = spawnSync(
       process.execPath,
       [`--max-old-space-size=${capMiB}`, join(work, "repair.mjs"), root],
-      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20 },
+      // Waited for synchronously, which the test's timeout cannot end: killed if it has not ended.
+      { cwd: work, encoding: "utf-8", maxBuffer: 1 << 20, timeout: 110_000, killSignal: "SIGKILL" },
     );
+    expect(child.error, "the child did not end in time").toBeUndefined();
     expect(child.stderr).toBe("");
     expect(child.status).toBe(0);
     const report = JSON.parse(child.stdout) as {

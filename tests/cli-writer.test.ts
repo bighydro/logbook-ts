@@ -39,7 +39,7 @@ function livingPid(): number {
       "-e",
       `const c = require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { detached: true, stdio: "ignore", windowsHide: true }); c.unref(); process.stdout.write(String(c.pid));`,
     ],
-    { encoding: "utf-8" },
+    { encoding: "utf-8", timeout: 10_000, killSignal: "SIGKILL" },
   );
   const pid = Number(holder.stdout);
   sleepers.push(pid);

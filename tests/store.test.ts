@@ -703,7 +703,11 @@ function livingPid(ms: number): number {
 const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, ${ms})"], { detached: true, stdio: "ignore", windowsHide: true });
 child.unref();
 process.stdout.write(String(child.pid));`;
-  const result = spawnSync(process.execPath, ["-e", script], { encoding: "utf-8" });
+  const result = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf-8",
+    timeout: 10_000,
+    killSignal: "SIGKILL",
+  });
   const pid = Number(result.stdout);
   sleepers.push(pid);
   return pid;
