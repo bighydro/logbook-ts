@@ -4,6 +4,9 @@ import type { Line } from "./types.js";
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
+/** What is said of the last row of a month file a crash cut inside the line being written (SPEC §3, truncation). */
+export const CUT_SHORT = "the file ends inside this line (cut short)";
+
 /**
  * Bytes read at a time from a month file while every file stands open — in the merge, and in the
  * second pass of the sorted read — each with up to this much read and not yet taken.
@@ -28,6 +31,11 @@ export interface Chain {
   count: number;
   head: string;
   /**
+   * The seq of the last line taken, whose hash is `head`: where the files end, 0 when they hold no
+   * line. `count` when the chain holds; when it does not (a second line of one seq, a gap) the two part.
+   */
+  last: number;
+  /**
    * Under a probe, the hash of the first line taken with the seq it asks about: GENESIS for 0,
    * undefined when no line has that seq. Meaningful only when `errors` is empty.
    */
@@ -46,20 +54,26 @@ export interface TailLine {
 /**
  * What a caller asks of the walk besides the chain (`repair tail`): the hash at one seq, and each
  * line past it, one at a time, in seq order. Nothing is gathered for it: memory stays one line per
- * month file.
+ * month file. A caller that takes the lines past it takes `begin` too, so it cannot count a line twice.
  */
-export interface ChainProbe {
-  /** The seq asked about, usually the one `logbook.json` names: a whole number, 0 for none. */
-  at: number;
-  /** Each line taken with a seq past `at`, in seq order, after its checks. */
-  tail?: (line: TailLine) => void;
-  /**
-   * A walk of the chain begins: once for the merge, and once more when a month file out of seq order
-   * sends the record to the sorted read, which takes the lines again from the first, so what `tail`
-   * was given before is to be dropped.
-   */
-  begin?: () => void;
-}
+export type ChainProbe =
+  | {
+      /** The seq asked about, usually the one `logbook.json` names: a whole number, 0 for none. */
+      at: number;
+      tail?: undefined;
+      begin?: undefined;
+    }
+  | {
+      at: number;
+      /** Each line taken with a seq past `at`, in seq order, after its checks. */
+      tail: (line: TailLine) => void;
+      /**
+       * A walk of the chain begins: once for the merge, and once more when a month file out of seq
+       * order sends the record to the sorted read, which takes the lines again from the first, so
+       * what `tail` was given before is to be dropped.
+       */
+      begin: () => void;
+    };
 
 /**
  * SPEC §3, the files' side: every line of every month file taken in seq order, wherever it was
@@ -173,10 +187,7 @@ class MonthReader {
       const parsed = parseLine(row.raw, where);
       if ("error" in parsed) {
         const cut = !row.newline && parsed.reason === "not-json";
-        this.problems.noLine(
-          this.index,
-          cut ? `${where}: the file ends inside this line (cut short)` : parsed.error,
-        );
+        this.problems.noLine(this.index, cut ? `${where}: ${CUT_SHORT}` : parsed.error);
         break;
       }
       const { line } = parsed;
@@ -198,6 +209,7 @@ class MonthReader {
 class Walk {
   count = 0;
   head = ZERO_HASH;
+  last = 0;
   /** Under a probe, the hash of the line at the seq it asks about (see Chain.headAt). */
   headAt: string | undefined;
   private expectedSeq = 1;
@@ -232,6 +244,7 @@ class Walk {
       );
     }
     this.head = String(line.hash);
+    this.last = line.seq;
     this.expectedSeq = line.seq + 1;
     this.count += 1;
     const probe = this.probe;
@@ -244,7 +257,7 @@ class Walk {
 
   /** The chain walked so far, with what the probe asked. */
   chain(errors: string[]): Chain {
-    const chain: Chain = { errors, count: this.count, head: this.head };
+    const chain: Chain = { errors, count: this.count, head: this.head, last: this.last };
     if (this.headAt !== undefined) chain.headAt = this.headAt;
     return chain;
   }

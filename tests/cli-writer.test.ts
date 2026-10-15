@@ -172,6 +172,49 @@ describe("logbook-ts add and repair tail on the files ahead of logbook.json (SPE
     });
   });
 
+  it("add on a lagging record whose tail does not verify refuses as the reference does, observed: one sentence on stderr naming repair tail, exit 2, nothing written — a month file cut inside its last line; a line past the head whose hash does not recompute", () => {
+    // The reference (openlogbook 0.6.1, run on the same records): its `add` looks at the files' end
+    // only, so a lag whose tail is wrong is refused in the lag's sentence, and a tail cut inside its
+    // last line in verify's cut-short sentence; each one line, exit 2, nothing written.
+    const torn = lagging();
+    cutInsideLastLine(torn.root, torn.month);
+    writeLines(
+      torn.root,
+      [
+        JSON.stringify(
+          { ...JSON.parse(metaText(torn.root)), seq: 32, head: EXPECTED.head },
+          null,
+          2,
+        ),
+      ],
+      "logbook.json",
+    );
+    const before = metaText(torn.root);
+    const ran = run(["add", torn.root, "two"]);
+    expect(ran.out).toBe("");
+    expect(ran.err).toBe(
+      `add: ${torn.month} line 1: the file ends inside this line (cut short); nothing was written: run \`logbook-ts repair tail\`\n`,
+    );
+    expect(ran.code).toBe(2);
+    expect(metaText(torn.root)).toBe(before);
+
+    const wrong = lagging();
+    const rows = readLines(wrong.root, wrong.month);
+    const line = JSON.parse(rows[0] as string) as { hash: string; payload: { text: string } };
+    writeLines(
+      wrong.root,
+      [JSON.stringify({ ...line, payload: { ...line.payload, text: "edited" } })],
+      wrong.month,
+    );
+    const again = run(["add", wrong.root, "two"]);
+    expect(again.out).toBe("");
+    expect(again.err).toBe(
+      `add: the files are ahead of logbook.json: they end at seq 33 head ${short(line.hash)}, logbook.json says seq 32 head ${short(EXPECTED.head)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\`\n`,
+    );
+    expect(again.code).toBe(2);
+    expect(readLines(wrong.root, wrong.month)).toHaveLength(1);
+  });
+
   it("repair tail under --no-wait while a living writer holds the lock: `repair: …; --no-wait, so not waiting`, exit 2, as the reference says it", () => {
     const { root } = lagging();
     const holder = spawnSync(

@@ -801,9 +801,9 @@ varied field by field (`tests/cross-impl.test.ts` repeats those runs). Everythin
 ## Found while adding the writer lock and the repair of the tail (openlogbook main at 7bcf728, 0.6.1, 2026-10-15; docs/commands.md "One writer at a time", docs/recovery.md "The files ahead of logbook.json", its docs/SPEC-QUESTIONS.md 83, its #294)
 
 The reference was run, never read: on copies of the conformance sample with locks planted by hand, under
-`strace`, and with `logbook.json` set back by hand. Two of the probes on malformed input (a pid too large
-for a C long in the lock, a `seq` that is a string in `logbook.json`) stopped it with a Python traceback;
-those inputs were not pursued and nothing here is drawn from the lines the tracebacks printed.
+`strace`, and with `logbook.json` set back by hand. Two probes of its `add` on malformed input (a pid too
+large for a C long in the lock, a `seq` that is a string in `logbook.json`) stopped it with a Python
+traceback; those inputs were not pursued and nothing here is drawn from the lines the tracebacks printed.
 
 91. **The writer lock is not in the spec.** docs/commands.md says a command that appends holds
     `state/writer.lock` in the record folder for its whole run, that a second writer waits (`another
@@ -856,16 +856,23 @@ those inputs were not pursued and nothing here is drawn from the lines the trace
       `--no-wait` refuses with that sentence (exit 2). The removal is a compare-and-remove under a second
       exclusive file (`state/writer.lock.reclaim`, this implementation's own, the same that guards the
       takeover of a dead holder's lock), the lock read again on one handle and its bytes, inode, size and
-      mtime compared right before the unlink; an empty reclaim file is held to the same half second.
+      mtime compared right before the unlink; `taking it over` is said once it is taken over. An empty
+      reclaim file is held to the same half second; one naming a living pid (a reclaimer stopped, or a
+      crashed one's pid given to another process) is waited for after half a second with `another
+      logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid
+      N); waiting`, or refused under `--no-wait`. A reclaim file a crash leaves stays, and keeps
+      `state/` from being removed, until a writer here clears it; the reference leaves it alone.
     - A lock naming this process's own pid is a leftover, as the reference reads it, only when its `since`
       is before this process started; one dated since then may be held by another thread of this process
       and is waited for. A `withWriterLock` inside another on the same record, in one thread, is refused
       (`LogbookError`) instead of waiting on itself.
 
-    What is left open between the two: a writer that makes its lock in two steps and is held between them
-    for more than half a second, then writes its holder in the instant between another writer's last read
-    and its unlink, runs beside that writer. No rule on the lock closes that, in either implementation;
-    the head re-check does.
+    What is left open: a writer that makes its lock in two steps and is held between them for more than
+    half a second loses it under rule A, in either implementation, as the reference's own rule has it.
+    This implementation's two-step fallback notices (the file it wrote its holder into has no name any
+    more) and waits on the writer that took the lock; the reference's writer, run so, goes on beside the
+    other, and only the head re-check stands between them. A writer that writes its holder in the
+    instant between another's last read and its unlink is not caught by any rule on the lock either.
 
     Suggest a paragraph in SPEC §3 beside *Write order*:
 
@@ -895,7 +902,10 @@ those inputs were not pursued and nothing here is drawn from the lines the trace
       SPEC §3); nothing was written: run `logbook repair tail` ``; with the files ending at the seq
       `logbook.json` names under another head, `` add: the files do not end where logbook.json says: they
       end at seq 32 head 58bfa9e704e3…, logbook.json says seq 32 head aaaaaaaaaaaa…; nothing was written:
-      run `logbook repair tail` ``.
+      run `logbook repair tail` ``; with a month file cut inside its last line, `` add:
+      logbook/2026/10.jsonl line 2: the file ends inside this line (cut short); nothing was written: run
+      `logbook repair tail` ``. A lag whose tail is wrong (a hash, a `prev`, a second line of one seq)
+      gets the first sentence: its `add` looks at where the files end and no further.
     - `repair tail --dry-run` exits 0 and writes nothing: `logbook.json says seq=32 head=58bfa9e704e3…; the
       files hold 1 line past it, each verified (envelope, seq, prev, hash):`, one row per line past the head
       (`  seq 33  logbook/2026/10.jsonl line 1  hash d807cbcf26fc…`, the first twenty, then `  … and 12 more
@@ -933,13 +943,15 @@ those inputs were not pursued and nothing here is drawn from the lines the trace
     - Its sentences name its own program, `` run `logbook-ts repair tail` `` and `` run `logbook-ts verify` ``,
       as its lock names `logbook-ts add`.
     - It refuses a `logbook.json` whose `seq` is not a whole number from 0 or whose `head` is not 64 hex
-      digits, which names no line to bring forward from; the reference, given a `seq` that is a string,
-      says there is nothing to repair.
-    - `add` refuses a record that does not verify for any other reason as it did before (exit 1); only the
-      two shapes above get the reference's sentences and exit 2 (`TailAhead`, a `HeadMoved`). The
-      reference's `add` looks at the last line of each month file only, so on a record whose files end
-      *before* `logbook.json` it appends a line past the gap; here that record is refused, as any record
-      that does not verify is.
+      digits, which names no line to bring forward from, before it takes the lock, so a folder that is no
+      record gets no `state/`; the reference, given a `seq` that is a string, says there is nothing to
+      repair, and given a head of three digits, its same-seq refusal.
+    - `add` refuses in the reference's one sentence and exit 2 (`TailAhead`, a `HeadMoved`) where the
+      reference's `add` does — a month file cut inside its last line; the files ending, at their last
+      line's `seq` and hash, past `logbook.json` or at its `seq` under another head — whatever else is
+      wrong with the record. Anything else that does not verify is refused as before, every problem
+      listed, exit 1, where the reference's `add`, looking no further, appends: to a record wrong in the
+      middle, and to one whose files end *before* `logbook.json`, past the gap.
 
     Suggest SPEC §3's *Write order* end: "A writer MUST NOT append while the files end past `logbook.json`,
     or at its `seq` under another head; bringing `logbook.json` forward over a tail is a repair, made only

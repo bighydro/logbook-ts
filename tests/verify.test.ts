@@ -398,7 +398,15 @@ describe("readChain's probe: the hash at one seq and the lines past it, holding 
     const root = record(placed(lines), last.seq, last.hash);
     let count = 0;
     const stats: VerifyStats = { peakHeld: 0 };
-    const chain = readChain(root, stats, { at: 0, tail: () => (count += 1) });
+    const chain = readChain(root, stats, {
+      at: 0,
+      begin: () => {
+        count = 0;
+      },
+      tail: () => {
+        count += 1;
+      },
+    });
     expect([chain.count, chain.head, chain.headAt]).toEqual([600, last.hash, ZERO_HASH]);
     expect(count).toBe(600);
     expect(stats.peakHeld).toBe(6);

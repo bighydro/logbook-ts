@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -41,6 +42,7 @@ import {
   readMetaFile,
   SAMPLE,
   SAMPLE_MONTH,
+  tempDir,
   writeBareRecord,
   writeDuplicateKey,
   writeLines,
@@ -968,6 +970,69 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
   });
 });
 
+describe("the writer lock at its edges", () => {
+  const reclaimOf = (root: string): string => join(root, "state", "writer.lock.reclaim");
+  const stale = (): string =>
+    `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`;
+
+  it("a reclaim file naming a living pid (a reclaimer stopped, or a crashed one's pid given to another process) is refused under --no-wait after half a second, not waited out in silence", () => {
+    const root = copySample();
+    plantLock(root, stale());
+    writeFileSync(reclaimOf(root), String(livingPid(3000)), "utf-8");
+    const started = Date.now();
+    expect(() => addNote(root, "not under --no-wait", { wait: false })).toThrow(WriterBusy);
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(readLines(root)).toHaveLength(32);
+  }, 20_000);
+
+  it("and waited for with one line saying so, as a lock's holder is, then the stale lock taken", () => {
+    const root = copySample();
+    plantLock(root, stale());
+    const pid = livingPid(1500);
+    writeFileSync(reclaimOf(root), String(pid), "utf-8");
+    const said: string[] = [];
+    expect(addNote(root, "after the reclaimer", { say: (l) => said.push(l) }).seq).toBe(33);
+    expect(said[0]).toBe(
+      `another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid ${pid}); waiting`,
+    );
+    expect(said[1]).toMatch(
+      /^a stale lock from add \(pid \d+, since 2026-10-13T06:00:00Z\) whose process is gone; taking it over$/,
+    );
+  }, 20_000);
+
+  it("`taking it over` is said once the lock is taken over, not when the take is then refused (a young, empty reclaim file under --no-wait)", () => {
+    const root = copySample();
+    plantLock(root, stale());
+    writeFileSync(reclaimOf(root), "", "utf-8");
+    utimesSync(reclaimOf(root), (Date.now() + 60_000) / 1000, (Date.now() + 60_000) / 1000);
+    const said: string[] = [];
+    expect(() =>
+      addNote(root, "refused after all", { wait: false, say: (l) => said.push(l) }),
+    ).toThrow(WriterBusy);
+    expect(said).toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "a second take in one thread through another spelling of the record (a symlink) is refused as a second take, not met as another writer's lock and waited on for ever",
+    () => {
+      const root = copySample();
+      const link = join(tempDir(), "via-link");
+      symlinkSync(root, link);
+      expect(() =>
+        withWriterLock(root, () => withWriterLock(link, () => 0, { wait: false })),
+      ).toThrow(/holds the lock on this record already/);
+      expect(existsSync(lockOf(root))).toBe(false);
+    },
+  );
+
+  it("a folder by the lock's name is refused with a LogbookError naming the file, not a raw EISDIR", () => {
+    const root = copySample();
+    mkdirSync(lockOf(root), { recursive: true });
+    expect(() => addNote(root, "over a folder")).toThrow(LogbookError);
+    expect(readLines(root)).toHaveLength(32);
+  });
+});
+
 describe("the files ahead of logbook.json (SPEC §3, write order): add refuses, repair tail brings it forward (decision B; the reference's #294)", () => {
   const THREE: Draft[] = ["one", "two", "three"].map((text, i) => ({
     at: `2026-04-0${i + 1}T10:00:00Z`,
@@ -1037,17 +1102,28 @@ describe("the files ahead of logbook.json (SPEC §3, write order): add refuses, 
     expect(readMetaFile(root)).toMatchObject({ seq: 2, head: "a".repeat(64) });
   });
 
-  it("addNote refuses as before, not in the lag's sentence, when logbook.json is ahead of the files, a tail is torn inside its last line, or a line past the head does not recompute", () => {
+  it("addNote refuses, as the reference's does, a lag whatever else is wrong with the tail in the lag's sentence, a month file cut inside its last line in verify's cut-short sentence, each naming repair tail; and logbook.json ahead of the files as a record that does not verify", () => {
     const ahead = writeRecord(THREE);
     writeMeta(ahead, { ...readMetaFile(ahead), seq: 5 });
-    expect(() => addNote(ahead, "no")).toThrow(
+    let thrown: unknown;
+    try {
+      addNote(ahead, "no");
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).not.toBeInstanceOf(TailAhead);
+    expect((thrown as Error).message).toMatch(
       /^refusing to append to a record that does not verify/,
     );
     expect(readLines(ahead, APRIL)).toHaveLength(3);
 
     const torn = writeRecord(THREE);
     cutInsideLastLine(torn, APRIL);
-    expect(() => addNote(torn, "no")).toThrow(/cut short/);
+    expect(() => addNote(torn, "no")).toThrow(
+      new TailAhead(
+        `${APRIL} line 3: the file ends inside this line (cut short); nothing was written: run \`logbook-ts repair tail\``,
+      ),
+    );
     expect(readMetaFile(torn).seq).toBe(2);
 
     const wrong = writeRecord(THREE);
@@ -1056,8 +1132,23 @@ describe("the files ahead of logbook.json (SPEC §3, write order): add refuses, 
     third.payload = { ...third.payload, text: "edited" };
     writeLines(wrong, [rows[0] as string, rows[1] as string, JSON.stringify(third)], APRIL);
     setBack(wrong, 2);
-    expect(() => addNote(wrong, "no")).toThrow(/does not recompute/);
+    const second = linesOf(wrong)[1] as Line;
+    expect(() => addNote(wrong, "no")).toThrow(
+      new TailAhead(
+        `the files are ahead of logbook.json: they end at seq 3 head ${short(third.hash)}, logbook.json says seq 2 head ${short(second.hash)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\``,
+      ),
+    );
     expect(readMetaFile(wrong).seq).toBe(2);
+    expect(readLines(wrong, APRIL)).toHaveLength(3);
+
+    // A second line of one seq at the end: the files end at that seq, the last line's, not at a count.
+    const forked = writeRecord(THREE);
+    const again = readLines(forked, APRIL);
+    writeLines(forked, [...again, again[2] as string], APRIL);
+    setBack(forked, 2);
+    expect(() => addNote(forked, "no")).toThrow(
+      /^the files are ahead of logbook\.json: they end at seq 3 head /,
+    );
   });
 
   it("repair tail --dry-run lists each line past the head by seq, file, row and hash, says what it would set, and writes nothing — as the reference prints it, without the index it keeps", () => {

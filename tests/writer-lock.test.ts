@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -737,4 +738,62 @@ describe("the guard behind the lock", () => {
     expect(result.head).toBe(intruder.hash);
     expect(existsSync(lockOf(root))).toBe(false);
   }, 30_000);
+});
+
+describe("rule A and the take at their edges", () => {
+  it("a writer taking the lock in two steps, slow between them past half a second, loses it under rule A, notices (the file it wrote its holder into has no name), and waits on the writer that took it", async () => {
+    const root = copySample();
+    const g1 = gatesFolder();
+    const g2 = gatesFolder();
+    const first = start(root, "first", ["--gates", g1.dir, "--two-step"]);
+    await until(() => g1.reached("window"), [first]);
+    // In its window for longer than half a second, by its mtime: a leftover to anyone else.
+    setMtime(lockOf(root), Date.now() - 10_000);
+    const second = start(root, "second", ["--gates", g2.dir, "--hold-append", "--no-wait"]);
+    await until(() => g2.reached("holding"), [first, second]);
+    // The second took the leftover over, holds the lock and has its line on disk; the inode the
+    // first is about to write its holder into has no name any more.
+    const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as { pid: number };
+    expect(holder.pid).toBe(second.pid);
+
+    g1.open("fill");
+    // Had it not noticed, it would go on with no lock and read the record the second is halfway
+    // through writing, and refuse it as a crash's, or write beside it.
+    await until(() => first.err().includes("is writing to this record"), [first, second]);
+    g2.open("release");
+    const [a, b] = await Promise.all([first.done, second.done]);
+    expect(b.code, b.err).toBe(0);
+    expect(seqOf(b)).toEqual([33]);
+    expect(a.code, a.err).toBe(0);
+    expect(seqOf(a)).toEqual([34]);
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 34 });
+  }, 60_000);
+
+  it.skipIf(process.platform === "win32")(
+    "state/ a dangling symlink: the take is refused with a LogbookError, not spun on without a sleep or a word",
+    async () => {
+      const root = copySample();
+      symlinkSync(join(root, "nowhere"), join(root, "state"));
+      const child = start(root, "into nowhere", ["--no-wait"]);
+      const exitedInTime = await until(() => child.exited(), [], 3000).then(
+        () => true,
+        () => false,
+      );
+      let cpuSeconds: number | undefined;
+      if (!exitedInTime) {
+        // mkdir says EEXIST (the link is there), the temp file's open ENOENT (its target is not):
+        // a take that read this as a lost race would spin on it. Linux shows the CPU time spent.
+        if (process.platform === "linux") {
+          const stat = readFileSync(`/proc/${child.pid}/stat`, "utf-8").split(" ");
+          cpuSeconds = (Number(stat[13]) + Number(stat[14])) / 100;
+        }
+        process.kill(child.pid, "SIGKILL");
+      }
+      expect({ exitedInTime, cpuSeconds }).toEqual({ exitedInTime: true, cpuSeconds: undefined });
+      const run = await child.done;
+      expect(run.code).toBe(1);
+      expect(run.err).toMatch(/^LogbookError: .*state/);
+    },
+    30_000,
+  );
 });

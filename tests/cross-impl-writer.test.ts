@@ -282,3 +282,231 @@ describe.skipIf(!ready)("the reference and logbook-ts on the writer lock (rule A
     process.kill(pid);
   }, 120_000);
 });
+
+/** A copy of `root` holding `state/writer.lock` with these bytes, and this mtime when given. */
+function planted(root: string, bytes: string, mtimeMs?: number): string {
+  mkdirSync(join(root, "state"), { recursive: true });
+  const lock = join(root, "state", "writer.lock");
+  writeFileSync(lock, bytes, "utf-8");
+  if (mtimeMs !== undefined) utimesSync(lock, mtimeMs / 1000, mtimeMs / 1000);
+  return lock;
+}
+
+/** A process that sets `file`'s mtime to now every 50 ms for `ms`, so the file is never half a second unchanged. */
+function toucher(file: string, ms: number): ReturnType<typeof spawn> {
+  return spawn(
+    process.execPath,
+    [
+      "-e",
+      `const fs = require("node:fs"); const [file, ms] = process.argv.slice(1); const end = Date.now() + Number(ms);
+       (function touch() { if (Date.now() > end) return; try { const now = Date.now() / 1000; fs.utimesSync(file, now, now); } catch {} setTimeout(touch, 50); })();`,
+      file,
+      String(ms),
+    ],
+    { stdio: "ignore" },
+  );
+}
+
+/** Row `row` (1-based) of a month file rewritten by `edit`, re-serialized by JSON.stringify. */
+function rewriteRow(root: string, rel: string, row: number, edit: (line: Line) => Line): void {
+  const file = join(root, rel);
+  const rows = readFileSync(file, "utf-8").split("\n").filter(Boolean);
+  rows[row - 1] = JSON.stringify(edit(JSON.parse(rows[row - 1] as string) as Line));
+  writeFileSync(file, `${rows.join("\n")}\n`, "utf-8");
+}
+
+const OCTOBER = join("logbook", "2026", "10.jsonl");
+const NO_HOLDER_YET =
+  "another logbook command is taking the lock on this record (state/writer.lock names no holder yet; if none is running, remove it)";
+
+/**
+ * Where the two are held to differ on purpose, both behaviours are pinned here, named as the
+ * difference they are, so a change on either side is seen: (a) the reference judges a lock that names
+ * no holder by one half-second poll from its first read and never by mtime; this implementation
+ * requires the half second of its own reading of one unchanged file and an mtime half a second past.
+ * (b) the reference's `repair tail` checks the lines past the head only, applies, and reports a fault
+ * before the head afterwards; this implementation verifies the whole chain first and refuses.
+ */
+describe.skipIf(!ready)("the reference and logbook-ts: rule A at its edges", () => {
+  it("an empty lock made this instant (mtime now) is taken by both after half a second without a word, under --no-wait too: the boundary of this implementation's mtime rule", () => {
+    const [theirs, mine] = twice(copySample());
+    for (const [run, root] of [
+      [() => reference(theirs, ["--no-wait", "add", "over a lock made now"]), theirs],
+      [() => ours(["add", mine, "over a lock made now", "--no-wait"]), mine],
+    ] as const) {
+      planted(root, "");
+      const started = Date.now();
+      const ran = run();
+      expect(ran.code, ran.err).toBe(0);
+      expect(ran.err).toBe("");
+      expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+      expect(existsSync(join(root, "state"))).toBe(false);
+    }
+  }, 120_000);
+
+  it("deliberate difference (a): an empty lock whose mtime is ahead of the clock — the reference takes it after half a second; this implementation waits for the mtime, and under --no-wait refuses after half a second with its own sentence, leaving the lock", () => {
+    const [theirs, mine] = twice(copySample());
+    planted(theirs, "", Date.now() + 3_600_000);
+    const r = reference(theirs, ["--no-wait", "add", "over a lock dated ahead"]);
+    expect(r.code, r.err).toBe(0);
+    expect(r.err).toBe("");
+    expect(existsSync(join(theirs, "state"))).toBe(false);
+
+    const lock = planted(mine, "", Date.now() + 3_600_000);
+    const started = Date.now();
+    const o = ours(["add", mine, "over a lock dated ahead", "--no-wait"]);
+    expect(o.code).toBe(2);
+    expect(o.out).toBe("");
+    expect(o.err).toBe(`add: ${NO_HOLDER_YET}; --no-wait, so not waiting\n`);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+    expect(readFileSync(lock, "utf-8")).toBe("");
+  }, 120_000);
+
+  it("deliberate difference (a): an empty lock touched during the half second — the reference removes it all the same; this implementation starts its half second over, and under --no-wait refuses", async () => {
+    const [theirs, mine] = twice(copySample());
+    const theirLock = planted(theirs, "", Date.now() - 10_000);
+    const t1 = toucher(theirLock, 2_000);
+    const r = reference(theirs, ["--no-wait", "add", "over a lock being touched"]);
+    expect(r.code, r.err).toBe(0);
+    expect(r.err).toBe("");
+    await new Promise((resolve) => t1.on("close", resolve));
+
+    const myLock = planted(mine, "", Date.now() - 10_000);
+    const t2 = toucher(myLock, 2_000);
+    const o = ours(["add", mine, "over a lock being touched", "--no-wait"]);
+    expect(o.code).toBe(2);
+    expect(o.err).toBe(`add: ${NO_HOLDER_YET}; --no-wait, so not waiting\n`);
+    await new Promise((resolve) => t2.on("close", resolve));
+    expect(readFileSync(myLock, "utf-8")).toBe("");
+  }, 120_000);
+
+  it("repair tail under an empty leftover lock: both take it after half a second without a word, the dry run too, and bring logbook.json to the same head", () => {
+    const { root } = lagging(1, 32);
+    const [theirs, mine] = twice(root);
+    for (const [run, record] of [
+      [() => reference(theirs, ["--no-wait", "repair", "tail", "--dry-run"]), theirs],
+      [() => ours(["repair", "tail", mine, "--dry-run", "--no-wait"]), mine],
+      [() => reference(theirs, ["--no-wait", "repair", "tail"]), theirs],
+      [() => ours(["repair", "tail", mine, "--no-wait"]), mine],
+    ] as const) {
+      planted(record, "", Date.now() - 10_000);
+      const started = Date.now();
+      const ran = run();
+      expect(ran.code, ran.err).toBe(0);
+      expect(ran.err).toBe("");
+      expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+      expect(existsSync(join(record, "state"))).toBe(false);
+    }
+    expect(readMetaFile(mine)).toEqual(readMetaFile(theirs));
+  }, 120_000);
+});
+
+describe.skipIf(!ready)("the reference and logbook-ts: decision B at its edges", () => {
+  it("deliberate difference (b): a line before the head that does not recompute, with a lag — the reference's dry run lists the tail (exit 0) and its repair sets logbook.json forward and then reports the record invalid (exit 1); this implementation refuses both, exit 2, changing nothing", () => {
+    const { root } = lagging(1, 32);
+    rewriteRow(root, join("logbook", "2026", "03.jsonl"), 10, (line) => ({
+      ...line,
+      payload: { ...line.payload, text: "edited" },
+    }));
+    const [theirs, mine] = twice(root);
+
+    const dry = reference(theirs, ["repair", "tail", "--dry-run"]);
+    expect(dry.code).toBe(0);
+    expect(dry.out).toMatch(
+      /^logbook\.json says seq=32 head=58bfa9e704e3…; the files hold 1 line past it/,
+    );
+    expect(metaText(theirs)).toBe(metaText(root));
+    const applied = reference(theirs, ["repair", "tail"]);
+    expect(applied.code).toBe(1);
+    expect(applied.out).toMatch(
+      /\nINVALID — 1 problem\(s\) after the repair; 33 lines read, head [0-9a-f]{64}:\n {2}line 10: hash does not recompute\nnot tried again: run `logbook verify` and look at the report\n$/,
+    );
+    expect(readMetaFile(theirs).seq).toBe(33);
+
+    for (const flags of [["--dry-run"], []]) {
+      const o = ours(["repair", "tail", mine, ...flags]);
+      expect(o.code).toBe(2);
+      expect(o.out).toBe("");
+      expect(o.err).toMatch(
+        /^repair tail: \S+ line 10: seq 10 — hash [0-9a-f]{64} does not recompute \(got [0-9a-f]{64}\); nothing was changed\n$/,
+      );
+      expect(metaText(mine)).toBe(metaText(root));
+    }
+  }, 120_000);
+
+  it("add on a lagging record whose tail does not verify — torn inside its last line, a hash that does not recompute, a prev that is not the line before, a second line of one seq — refuses with exit 2 and the reference's one sentence naming repair tail, writing nothing", () => {
+    const cases: Array<[string, (root: string) => void]> = [
+      [
+        "torn",
+        (root) => {
+          cutInsideLastLine(root, OCTOBER);
+          writeMeta(root, { ...readMetaFile(root), seq: 32, head: EXPECTED.head });
+        },
+      ],
+      [
+        "torn, logbook.json at the line before the cut",
+        (root) => {
+          cutInsideLastLine(root, OCTOBER);
+        },
+      ],
+      [
+        "hash",
+        (root) =>
+          rewriteRow(root, OCTOBER, 2, (line) => ({
+            ...line,
+            payload: { ...line.payload, text: "edited" },
+          })),
+      ],
+      [
+        "prev",
+        (root) => rewriteRow(root, OCTOBER, 2, (line) => ({ ...line, prev: "c".repeat(64) })),
+      ],
+      [
+        "seq",
+        (root) => {
+          const rows = readFileSync(join(root, OCTOBER), "utf-8").split("\n").filter(Boolean);
+          writeFileSync(join(root, OCTOBER), `${rows[0]}\n${rows[0]}\n`, "utf-8");
+        },
+      ],
+    ];
+    for (const [name, damage] of cases) {
+      const { root } = lagging(2, 32);
+      damage(root);
+      const [theirs, mine] = twice(root);
+      const r = reference(theirs, ["add", "two"]);
+      const o = ours(["add", mine, "two"]);
+      expect(r.code, name).toBe(2);
+      expect(r.err.split("\n").filter(Boolean), name).toHaveLength(1);
+      expect(r.err, name).toMatch(/nothing was written: run `logbook repair tail`\n$/);
+      expect(o.code, name).toBe(2);
+      expect(asReference(o.err), name).toBe(r.err);
+      expect(metaText(mine)).toBe(metaText(root));
+    }
+  }, 120_000);
+
+  it("deliberate difference (SPEC-QUESTIONS 92): a logbook.json whose head is not sixty-four hex digits — the reference's repair tail says its same-seq sentence and its add refuses with exit 2; this implementation's repair tail refuses in its own sentence (exit 2) and its add as a record that does not verify (exit 1)", () => {
+    const root = copySample();
+    writeMeta(root, { ...readMetaFile(root), head: "abc" });
+    const [theirs, mine] = twice(root);
+    const r = reference(theirs, ["repair", "tail"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toBe(
+      "repair tail: logbook.json says seq=32 head=abc…, the files end at seq=32 head=58bfa9e704e3…: no line is past the head and the head is not the files'; run `logbook verify`; nothing was changed\n",
+    );
+    const o = ours(["repair", "tail", mine]);
+    expect(o.code).toBe(2);
+    expect(o.err).toBe(
+      "repair tail: logbook.json: seq 32, head abc name no line of a chain (a whole number from 0, and 64 hex digits); nothing was changed\n",
+    );
+    const ra = reference(theirs, ["add", "two"]);
+    expect(ra.code).toBe(2);
+    expect(ra.err).toBe(
+      "add: the files do not end where logbook.json says: they end at seq 32 head 58bfa9e704e3…, logbook.json says seq 32 head abc…; nothing was written: run `logbook repair tail`\n",
+    );
+    const oa = ours(["add", mine, "two"]);
+    expect(oa.code).toBe(1);
+    expect(oa.err).toMatch(/^error: refusing to append to a record that does not verify:\n/);
+    expect(metaText(mine)).toBe(metaText(root));
+    expect(metaText(theirs)).toBe(metaText(root));
+  }, 120_000);
+});

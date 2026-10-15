@@ -1,13 +1,16 @@
 import { randomBytes } from "node:crypto";
 import {
   closeSync,
+  existsSync,
   fstatSync,
   fsyncSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
   readSync,
+  realpathSync,
   renameSync,
   rmdirSync,
   unlinkSync,
@@ -26,7 +29,7 @@ import {
   type VerifyResult,
 } from "./types.js";
 import { uuidV7 } from "./uuid.js";
-import { readChain, type TailLine, type VerifyStats } from "./verify.js";
+import { CUT_SHORT, readChain, type TailLine, type VerifyStats } from "./verify.js";
 
 export type { TailLine, VerifyStats } from "./verify.js";
 
@@ -48,10 +51,11 @@ export class HeadMoved extends LogbookError {
 }
 
 /**
- * The files end past `logbook.json`, or at its seq under another head: an append that crashed
- * between its line and `logbook.json` (SPEC §3, write order), or a record that only looks like one.
- * A writer refuses, writing nothing, and names `repair tail`; as the reference has it, it is a
- * HeadMoved to the CLI, one line and exit 2.
+ * The files end past `logbook.json`, or at its seq under another head, or a month file ends inside
+ * its last line: what a crash between a line and `logbook.json`, or inside the line, leaves (SPEC §3,
+ * write order and truncation), or a record that only looks like it. A writer refuses, writing
+ * nothing, in one sentence naming `repair tail`; as the reference has it, it is a HeadMoved to the
+ * CLI, one line and exit 2.
  */
 export class TailAhead extends HeadMoved {
   override readonly name: string = "TailAhead";
@@ -308,6 +312,9 @@ function look(file: string): Sighting | undefined {
       size: stat.size,
       mtimeNs: stat.mtimeNs,
     };
+  } catch (err) {
+    // A folder by the lock's name opens for reading and then refuses the read (EISDIR): said, not thrown raw.
+    throw new LogbookError(`${file}: cannot read the writer lock (${(err as Error).message})`);
   } finally {
     closeSync(fd);
   }
@@ -367,10 +374,45 @@ function unlinkQuietly(file: string): void {
   }
 }
 
-/** Remove `file` only while it is still the one `seen`: read again on one handle right before the unlink. */
-function removeIfSame(file: string, seen: Sighting): void {
+/**
+ * Remove `file` only while it is still the one `seen`: read again on one handle right before the
+ * unlink. Returns whether it was removed.
+ */
+function removeIfSame(file: string, seen: Sighting): boolean {
   const now = look(file);
-  if (now !== undefined && same(now, seen)) unlinkQuietly(file);
+  if (now === undefined || !same(now, seen)) return false;
+  unlinkQuietly(file);
+  return true;
+}
+
+/**
+ * `path` was refused as existing by a create, or as missing by an open: a symbolic link to nowhere
+ * is both at once, which no retry mends, so it is said instead of looped on.
+ */
+function refuseDangling(path: string): void {
+  let link = false;
+  try {
+    link = lstatSync(path).isSymbolicLink();
+  } catch {
+    return;
+  }
+  if (!link || existsSync(path)) return;
+  throw new LogbookError(
+    `${path}: cannot take the writer lock (it is a link to nowhere; remove it)`,
+  );
+}
+
+/**
+ * The lock's real path, one key for every spelling of the record (through a symlink, in another
+ * case on a case-folding filesystem): what `held` is kept by, so that a second take in the thread
+ * that holds the lock is refused by whatever path it names the record.
+ */
+function lockKey(dir: string): string {
+  try {
+    return join(realpathSync.native(dir), LOCK_FILE);
+  } catch {
+    return resolve(dir, LOCK_FILE);
+  }
 }
 
 /** Remove a file of this process's own that no one else names, if it can be removed now. */
@@ -419,6 +461,7 @@ function createExclusively(file: string, text: string): boolean {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       makeStateDir(dir);
+      refuseDangling(dir);
       return false;
     }
     throw cannotTake(file, err);
@@ -439,9 +482,13 @@ function createExclusively(file: string, text: string): boolean {
     return true;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "EEXIST") return false;
+    if (code === "EEXIST") {
+      refuseDangling(file);
+      return false;
+    }
     if (code === "ENOENT") {
       makeStateDir(dir);
+      refuseDangling(dir);
       return false;
     }
     return createInTwoSteps(file, text);
@@ -457,9 +504,13 @@ function createInTwoSteps(file: string, text: string): boolean {
     fd = patientOnWindows(() => openSync(file, "wx"));
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "EEXIST") return false;
+    if (code === "EEXIST") {
+      refuseDangling(file);
+      return false;
+    }
     if (code === "ENOENT") {
       makeStateDir(dirname(file));
+      refuseDangling(dirname(file));
       return false;
     }
     throw cannotTake(file, err);
@@ -467,6 +518,10 @@ function createInTwoSteps(file: string, text: string): boolean {
   try {
     writeSync(fd, text, null, "utf-8");
     fsyncSync(fd);
+    // Held between the two steps for longer than rule A's half second, this lock was a leftover to
+    // another writer, which removed it: the holder went into a file with no name. Not held, then;
+    // the caller reads the lock again and finds that writer's.
+    if (fstatSync(fd, { bigint: true }).nlink === 0n) return false;
   } finally {
     closeSync(fd);
   }
@@ -480,6 +535,8 @@ interface Take {
   /** Rule A for `writer.lock`, and for the reclaim file. */
   lock: NoHolder;
   reclaim: NoHolder;
+  /** When this writer first found the reclaim file held by a living process, while it still is. */
+  reclaimHeld: number | undefined;
 }
 
 /**
@@ -490,17 +547,34 @@ interface Take {
  */
 function takeReclaim(dir: string, take: Take): boolean {
   const file = join(dir, RECLAIM_FILE);
-  if (createExclusively(file, String(process.pid))) return true;
+  if (createExclusively(file, String(process.pid))) {
+    take.reclaimHeld = undefined;
+    return true;
+  }
   const seen = look(file);
   if (seen === undefined) return false;
   if (/^[1-9][0-9]*$/.test(seen.text)) {
     take.reclaim.reset();
     const pid = Number(seen.text);
     const mine = pid === process.pid && Number(seen.mtimeNs / 1_000_000n) >= STARTED_SECOND;
-    if (mine || (pid !== process.pid && alive(pid))) sleep(POLL_MS);
-    else removeIfSame(file, seen);
+    if (mine || (pid !== process.pid && alive(pid))) {
+      // A reclaim takes a moment. One held for half a second is a reclaimer that is stopped, or a
+      // leftover whose pid another process was given: waited for with a word, as a lock's holder
+      // is, or refused under `wait: false` — never polled in silence for as long as that pid lives.
+      take.reclaimHeld ??= performance.now();
+      if (performance.now() - take.reclaimHeld >= GRACE_MS) {
+        const who = `another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid ${pid})`;
+        if (!take.wait) throw new WriterBusy(who);
+        take.once(`${who}; waiting`);
+      }
+      sleep(POLL_MS);
+      return false;
+    }
+    take.reclaimHeld = undefined;
+    removeIfSame(file, seen);
     return false;
   }
+  take.reclaimHeld = undefined;
   if (take.reclaim.leftover(seen, take.wait, take.once)) removeIfSame(file, seen);
   else sleep(POLL_MS);
   return false;
@@ -511,13 +585,14 @@ function takeReclaim(dir: string, take: Take): boolean {
  * names none: under the reclaim file, so that two writers that both judged it cannot remove,
  * between them, the lock a third writer took the moment the first had cleared the old one; and read
  * again on one handle right before the unlink, so a lock replaced or written since it was judged is
- * left alone. The caller reads the lock again afterwards, whatever happened.
+ * left alone. Returns whether the lock `seen` was removed; the caller reads the lock again
+ * afterwards, whatever happened.
  */
-function reclaim(dir: string, seen: Sighting, take: Take): void {
-  if (!takeReclaim(dir, take)) return;
+function reclaim(dir: string, seen: Sighting, take: Take): boolean {
+  if (!takeReclaim(dir, take)) return false;
   const guard = join(dir, RECLAIM_FILE);
   try {
-    removeIfSame(join(dir, LOCK_FILE), seen);
+    return removeIfSame(join(dir, LOCK_FILE), seen);
   } finally {
     if (look(guard)?.text === String(process.pid)) unlinkQuietly(guard);
   }
@@ -541,6 +616,7 @@ export function takeWriterLock(root: string, options: WriterLockOptions = {}): (
   const dir = join(root, STATE_DIR);
   const file = join(dir, LOCK_FILE);
   makeStateDir(dir);
+  const key = lockKey(dir);
   const mine = JSON.stringify({ pid: process.pid, command, since: rfc3339(new Date()) });
   const said = new Set<string>();
   const take: Take = {
@@ -552,6 +628,7 @@ export function takeWriterLock(root: string, options: WriterLockOptions = {}): (
     },
     lock: new NoHolder(NO_HOLDER_LOCK),
     reclaim: new NoHolder(NO_HOLDER_RECLAIM),
+    reclaimHeld: undefined,
   };
   for (;;) {
     // Read first, so a writer waiting out a long hold polls by reading, not by making temp files.
@@ -559,9 +636,11 @@ export function takeWriterLock(root: string, options: WriterLockOptions = {}): (
     if (seen === undefined) {
       take.lock.reset();
       if (createExclusively(file, mine)) break;
+      // Made meanwhile by another writer: read again, after a poll, never in a spin.
+      sleep(POLL_MS);
       continue;
     }
-    if (seen.text === held.get(resolve(file))) {
+    if (seen.text === held.get(key)) {
       throw new LogbookError(
         `${file}: this writer holds the lock on this record already; a second take would wait on itself`,
       );
@@ -580,14 +659,17 @@ export function takeWriterLock(root: string, options: WriterLockOptions = {}): (
       sleep(POLL_MS);
       continue;
     }
-    take.once(
-      `a stale lock from ${field(holder, "command")} (pid ${pyStr(holder.pid)}, since ${field(holder, "since")}) whose process is gone; taking it over`,
-    );
-    reclaim(dir, seen, take);
+    // Said once it is taken over, not before: a take refused after all (the reclaim file, under
+    // `wait: false`) would otherwise have said it took what it left.
+    if (reclaim(dir, seen, take)) {
+      take.once(
+        `a stale lock from ${field(holder, "command")} (pid ${pyStr(holder.pid)}, since ${field(holder, "since")}) whose process is gone; taking it over`,
+      );
+    }
   }
-  held.set(resolve(file), mine);
+  held.set(key, mine);
   return () => {
-    held.delete(resolve(file));
+    held.delete(key);
     // Only the lock this writer holds: one another writer holds by then is left to it, as the
     // reference leaves it.
     if (look(file)?.text === mine) unlinkQuietly(file);
@@ -651,11 +733,17 @@ function appendNote(root: string, text: string, options: AddOptions): Line {
     throw new LogbookError("logbook.json: timezone is missing");
   }
   const chain = readChain(root);
-  const behind = metaErrors(meta, chain.count, chain.head);
-  if (chain.errors.length === 0 && behind.length > 0) {
-    const lag = tailAhead(meta, chain.count, chain.head);
-    if (lag !== undefined) throw new TailAhead(lag);
+  // The shapes a crash leaves are refused in the reference's one sentence each, naming repair tail,
+  // whatever else is wrong with the record (its `add` looks at where the files end, no further): a
+  // month file cut inside its last line, then the files ending past logbook.json or at its seq under
+  // another head. Anything else that does not verify is refused with every problem listed.
+  const cut = chain.errors.find((error) => error.endsWith(`: ${CUT_SHORT}`));
+  if (cut !== undefined) {
+    throw new TailAhead(`${cut}; nothing was written: run \`logbook-ts repair tail\``);
   }
+  const lag = tailAhead(meta, chain.last, chain.head);
+  if (lag !== undefined) throw new TailAhead(lag);
+  const behind = metaErrors(meta, chain.count, chain.head);
   const errors = [...chain.errors, ...behind];
   if (errors.length > 0) {
     throw new LogbookError(
@@ -691,7 +779,8 @@ function appendNote(root: string, text: string, options: AddOptions): Line {
   }
 
   appendLine(root, stamp, `${canonicalize(line)}\n`);
-  writeMetaDurably(root, { ...meta, seq: line.seq, head: line.hash });
+  // From the read under the lock, so a key another program changed meanwhile is kept.
+  writeMetaDurably(root, { ...again, seq: line.seq, head: line.hash });
   return line;
 }
 
@@ -712,17 +801,18 @@ function namesAHead(meta: Meta): boolean {
 }
 
 /**
- * The reference's sentence for a record whose files, which verify, end past `logbook.json`, or at
- * its seq under another head; undefined for any other disagreement (files that end before it), which
- * is refused as a record that does not verify. Its words, but for the program it names.
+ * The reference's sentence for a record whose files end — at the seq of their last line, `last`,
+ * and its hash — past `logbook.json`, or at its seq under another head; undefined when they end where
+ * it says, or before it (no crash leaves that), and when it names no seq and head. Its words, but for
+ * the program it names.
  */
-function tailAhead(meta: Meta, count: number, head: string): string | undefined {
+function tailAhead(meta: Meta, last: number, head: string): string | undefined {
   if (!namesAHead(meta)) return undefined;
-  if (count > meta.seq) {
-    return `the files are ahead of logbook.json: they end at seq ${count} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\``;
+  if (last > meta.seq) {
+    return `the files are ahead of logbook.json: they end at seq ${last} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)} (a crash between a line and logbook.json, SPEC §3); nothing was written: run \`logbook-ts repair tail\``;
   }
-  if (count === meta.seq && head !== meta.head) {
-    return `the files do not end where logbook.json says: they end at seq ${count} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)}; nothing was written: run \`logbook-ts repair tail\``;
+  if (last === meta.seq && head !== meta.head) {
+    return `the files do not end where logbook.json says: they end at seq ${last} head ${short(head)}, logbook.json says seq ${meta.seq} head ${short(meta.head)}; nothing was written: run \`logbook-ts repair tail\``;
   }
   return undefined;
 }
@@ -766,12 +856,15 @@ export interface RepairTail {
  * file is touched.
  */
 export function repairTail(root: string, options: RepairTailOptions = {}): RepairTail {
+  // Refused before the lock is taken, as addNote refuses: a folder that is no record, or one whose
+  // logbook.json names nothing to bring forward from, gets no state/ folder; read again under the lock.
+  repairable(readMeta(root));
   const lock = lockOptions({ command: "logbook-ts repair tail", ...options });
   return withWriterLock(root, () => repairUnderLock(root, options.dryRun === true), lock);
 }
 
-function repairUnderLock(root: string, dryRun: boolean): RepairTail {
-  const meta = readMeta(root);
+/** Refuse a record this implementation cannot read, or a logbook.json that names no seq and head. */
+function repairable(meta: Meta): void {
   const refusal = formatRefusal(meta);
   if (refusal) throw new RepairRefused(`${refusal}; nothing was changed`);
   if (!namesAHead(meta)) {
@@ -779,6 +872,11 @@ function repairUnderLock(root: string, dryRun: boolean): RepairTail {
       `logbook.json: seq ${String(meta.seq)}, head ${String(meta.head)} name no line of a chain (a whole number from 0, and 64 hex digits); nothing was changed`,
     );
   }
+}
+
+function repairUnderLock(root: string, dryRun: boolean): RepairTail {
+  const meta = readMeta(root);
+  repairable(meta);
   const from = { seq: meta.seq, head: meta.head };
   let shown: TailLine[] = [];
   let count = 0;
@@ -828,7 +926,7 @@ function repairUnderLock(root: string, dryRun: boolean): RepairTail {
       `the record's head moved while the tail was being checked: logbook.json named seq ${meta.seq}, head ${meta.head}, and names seq ${again.seq}, head ${again.head} now; nothing was changed`,
     );
   }
-  writeMetaDurably(root, { ...meta, seq: to.seq, head: to.head });
+  writeMetaDurably(root, { ...again, seq: to.seq, head: to.head });
   return { dryRun, from, to, count, shown, written: true, verified: verifyLogbook(root) };
 }
 
