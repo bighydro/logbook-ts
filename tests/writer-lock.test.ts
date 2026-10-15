@@ -78,6 +78,7 @@ let appendFd = -1;
 let scanFd = -1;
 let lockFd = -1;
 let takenFd = -1;
+let takenPath = "";
 fs.openSync = (path, flags, mode) => {
   const fd = real.openSync(path, flags, mode);
   if (String(path).endsWith(".jsonl") && flags === "a") appendFd = fd;
@@ -85,6 +86,7 @@ fs.openSync = (path, flags, mode) => {
   if (String(path).endsWith("writer.lock") && flags === "wx") {
     lockFd = fd;
     takenFd = fd;
+    takenPath = String(path);
   }
   return fd;
 };
@@ -129,11 +131,18 @@ if (flags.includes("--two-step")) {
 // --links-kept: the lock made by the exclusive create has one link while this child holds it open,
 // removed by another writer or not, as Windows before libuv 1.49 (Node 20) reports a file removed
 // while a handle holds it: its name stays, delete-pending, until the handle is closed.
+// With --ino-reused as well, its inode number is the one the file now at the lock's name has, as
+// when another writer removed it and its own lock was given the freed number.
 if (flags.includes("--links-kept")) {
-  const { fstatSync } = fs;
+  const { fstatSync, statSync } = fs;
   fs.fstatSync = (fd, options) => {
     const stat = fstatSync(fd, options);
-    if (fd === takenFd) stat.nlink = typeof stat.nlink === "bigint" ? 1n : 1;
+    if (fd === takenFd) {
+      stat.nlink = typeof stat.nlink === "bigint" ? 1n : 1;
+      if (flags.includes("--ino-reused") && fs.existsSync(takenPath)) {
+        stat.ino = statSync(takenPath, options).ino;
+      }
+    }
     return stat;
   };
 }
@@ -794,19 +803,24 @@ describe("the guard behind the lock", () => {
 });
 
 describe("rule A and the take at their edges", () => {
-  for (const kept of [false, true]) {
+  for (const [faults, how] of [
+    [[], ""],
+    [
+      ["--links-kept"],
+      ", though its links are reported as Windows before libuv 1.49 reports them, one while it is held open: the name, read once the file is closed, is another's",
+    ],
+    [
+      ["--links-kept", "--ino-reused"],
+      ", though its links are one and the file now at the name has its inode number, freed and given again: that file names another holder",
+    ],
+  ] as const) {
     it.runIf(POSIX_DELETE)(
-      `a writer taking the lock in two steps, slow between them past half a second, loses it under rule A, notices (the file it wrote its holder into has no name${kept ? ", though its links are reported as Windows before libuv 1.49 reports them, one while it is held open: the name, read once the file is closed, is another's" : ""}), and waits on the writer that took it`,
+      `a writer taking the lock in two steps, slow between them past half a second, loses it under rule A, notices (the file it wrote its holder into has no name${how}), and waits on the writer that took it`,
       async () => {
         const root = copySample();
         const g1 = gatesFolder();
         const g2 = gatesFolder();
-        const first = start(root, "first", [
-          "--gates",
-          g1.dir,
-          "--two-step",
-          ...(kept ? ["--links-kept"] : []),
-        ]);
+        const first = start(root, "first", ["--gates", g1.dir, "--two-step", ...faults]);
         await until(() => g1.reached("window"), [first]);
         // In its window for longer than half a second, by its mtime: a leftover to anyone else.
         setMtime(lockOf(root), Date.now() - 10_000);

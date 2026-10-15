@@ -540,9 +540,12 @@ function createInTwoSteps(file: string, text: string): boolean {
   // another writer, which removed it: the holder went into a file with no name. Not held, then; the
   // caller reads the lock again and finds that writer's, or none. On POSIX the file's links are
   // down to none; Windows before libuv 1.49 (Node 20) keeps a removed file's name, its links at
-  // one, while a handle holds it, and frees it at the close. The name is read once closed.
+  // one, while a handle holds it, and frees it at the close. The name is read once closed, and is
+  // this writer's only while it is the same file holding this holder: a freed inode number is
+  // soon given again, to the other writer's lock as soon as any.
   if (written.nlink === 0n) return false;
-  return look(file)?.ino === written.ino;
+  const now = look(file);
+  return now !== undefined && now.ino === written.ino && now.text === text;
 }
 
 /** What a take of the lock carries from one read to the next. */
