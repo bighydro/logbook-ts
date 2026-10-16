@@ -7,13 +7,23 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (openlogbook, main at 3092b60, 2026-10-08) does, matched against the
+the reference implementation (openlogbook at 7bcf728, 2026-10-15, the commit [`REFERENCE`](./REFERENCE) pins) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
-its source, and checked by a cross-implementation test. One exception, made on the owner's instruction
-for the catch-up of 2026-10-13: the validation sentences of the settings and policy files and of
-`signed-day/v1`'s dispositions were matched to the reference's source (openlogbook 0.6.1, and PR 252),
-so a record one implementation refuses the other refuses in the same words; the [Parity](#parity)
-table says what that covers.
+its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
+instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
+and of `signed-day/v1`'s dispositions were matched to the reference's source (openlogbook 0.6.1, and PR
+252); for that of 2026-10-15, the validators, tiers and readers of RFC 0037's three profiles and the
+read-only half of `logbook status` were ported from the reference's `logbook/contrib/entities.py` and
+`entity_status.py` and their tests, so a line one implementation refuses the other refuses in the same
+words; and for the same catch-up, the planner of PR #21 read the reference's `logbook/rows.py` (the rows
+`show` prints), `logbook/day.py` (the Day) and `logbook/core/speakers.py` (a transcript's voices), for the
+transcript's voices of RFC 0038 §2 in `show` and the Day, because the brief that session gave its planner
+allowed it to grep the reference's reader source for transcripts; the rule of this repository did not, and the
+owner accepted it afterwards (2026-10-16) rather than have the part redone blind. Everything
+taken from that reading was checked by running the reference, every expected value in `tests/speakers.test.ts`
+is the reference's output, and each point the reading settled is written down for the spec to answer
+(SPEC-QUESTIONS 102–107). Nothing else of the reference's source has been read. The [Parity](#parity) table
+says what each covers.
 
 Zero runtime dependencies. RFC 8785 canonical JSON, SHA-256 chaining and UUIDv7 are implemented by hand on
 Node's built-ins.
@@ -94,7 +104,8 @@ SPEC §6, the conformance rule, and the readers.
 | Command | Does |
 |---|---|
 | `logbook-ts verify <root>` | Reads every `logbook/<YYYY>/<MM>.jsonl`, orders the lines by `seq` (files partition by the month of `at`, not by chain order), checks that each `seq` is the previous plus one, each `prev` is the previous `hash`, each `hash` recomputes, and `logbook.json` names the last line. Prints `valid — N lines, head <hex>` and exits 0, or `invalid — N errors; M lines read, head <hex>` and the errors on stderr and exits 1: the seq and head of the lines read, so a record whose month file a crash cut inside a line (SPEC §3, truncation) reports the last whole line and its hash, never 0 and GENESIS while the first line is whole, and names the cut line `<file> line N: the file ends inside this line (cut short)`. A line that is not one is reported by file and line number and its file is read no further; a last line whole but for its newline is a line. A line whose JSON text gives a member name twice in one object, at any depth, is not one (SPEC §2), however the name is spelled: `<file> line N: duplicate key 'kind'`, as the reference names it. Reads `logbook/0.2` and `logbook/0.3`, which hash by one rule (SPEC §3.1): a sealed line's `payload_enc` is outside the hash and is never opened here. Refuses `logbook/0.1`. The month files are merged in `seq` order as the reference merges them, one line held from each and no file left open between reads, so memory is one line per month file whatever the length of the record, and so is `add`'s, which verifies first; a month file out of `seq` order, which SPEC §3 allows, is read again sorted, keeping only where each line lies. |
-| `logbook-ts add <root> "<text>"` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. Then replaces `logbook.json` atomically (temp file, rename). Refuses to append to a record that does not verify, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
+| `logbook-ts add <root> "<text>" [--no-wait]` | Appends one `note/v1` line: UUIDv7 id, `at` and `recorded_at` now in RFC 3339 UTC, `tz` from `logbook.json`, tier 2, source `manual`. One writer at a time, as the reference: the whole run holds `state/writer.lock` in the record folder (the holder's `pid`, `command` and `since`, the file the reference's writers hold and honour, written to a temp file and hard-linked into place so that it never exists empty); a second writer prints `another logbook command is writing to this record (<command>, since <time>); waiting` and waits, or with `--no-wait` refuses and exits 2; a lock whose process is gone is taken over with one line saying so. A lock that names no holder (the reference creates the file and then writes it) is a writer between the two while it changes, and is waited for; once the same file has named no holder for half a second it is a leftover of a crash and is removed without a word, whatever its mtime (rule A, the reference's rule; SPEC-QUESTIONS 91). The write order of SPEC §3: the line is appended and fsynced to its month file, then `logbook.json` is written to a temp file, fsynced and renamed into place; `logbook.json` is read again right before the write and the append refused (exit 2, nothing written) when the head moved under the lock. While the files end past `logbook.json` (a crash between the two writes), or a month file ends inside a line, it refuses with the reference's one sentence, exit 2, writing nothing: run `repair tail`. Refuses to append to a record that does not verify otherwise, and to a `logbook/0.3` record that names `recipients`, since it cannot seal. |
+| `logbook-ts repair tail <root> [--dry-run] [--no-wait]` | The files end past `logbook.json` after a crash between a line and it (SPEC §3, write order): verifies the whole chain, then sets `logbook.json` to the last line's `seq` and head, under the writer lock, and prints the lines past the head, what it set and `verify`'s verdict, as the reference's `logbook repair tail` prints them; `--dry-run` lists and writes nothing. A record that is not that crash — a fault in the files, the files ending before `logbook.json` or at its `seq` under another head — is refused, `repair tail: …; nothing was changed`, exit 2. No month file is touched. |
 | `logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]` | Prints one local day of the record as the reference does: the day, its hero photos, then one row per line sorted by `at` — local time, kind, source and a one-line summary — then the day's notes file. Only reads. See below. |
 | `logbook-ts show <root> [--since YYYY-MM-DD] [--until YYYY-MM-DD] …` | The same for every day of the range that has a line, oldest first, streamed; a missing bound is the record's first or last day. `--profile` keeps the lines of one payload schema; `--json` prints each day as one JSON object. |
 | `logbook-ts day <root> [YYYY-MM-DD] [--json]` | The day read back whole, as the reference's `logbook day` prints it: the nights either side, the country, the timeline of stays, stops, moves, gaps, runs aboard an asset and flights, with what attached to each and who was there, what was placed nowhere, the health line, the sources. Today in the record's zone when no day is given. Only reads. See below. |
@@ -104,6 +115,7 @@ SPEC §6, the conformance rule, and the readers.
 | `logbook-ts trips <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | The trips of the window, as the reference's `logbook trips` prints them: every run of nights away from home or in transit, with its nights (aboard an asset when they were), its route, the flights in and out, the named places and who was there. The whole record when no window is given, clipped to the days the track covers. Only reads. See below. |
 | `logbook-ts rollup countries <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | Days per country per year from the overnight stay, in transit and unknown apart, with the method. Only reads. See below. |
 | `logbook-ts rollup nights <root> [--year YYYY \| --since YYYY-MM-DD --until YYYY-MM-DD] [--json]` | Per year: the nights at home, away and in transit, the nights aboard each asset, and the longest run of nights not at home. Only reads. See below. |
+| `logbook-ts status list <root> <kind> [--json]` | Under `LOGBOOK_TS_FLAGS=rfc0037`: every canonical org, idea, place or asset with its current `status/v1` line, as the reference's `logbook status list` prints it: the day it took effect, who proposed it and the reason, `until` for a place let go or an asset sold, `stale`, and the dispositions the dream may not propose yet. A person or a goal is refused in the reference's words. Only reads. See *Draft RFCs behind a flag*. |
 | `logbook-ts people <root> [--year YYYY] [--json]` | Everyone the record names, never the owner, as the reference's `logbook people` prints it: the channels they are heard on, the days and nights together, the last real contact, the places shared. The whole record, or one year. Only reads. See below. |
 | `logbook-ts days <root> [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]` | A window of days one line each, as the reference's `logbook days` prints it: the night after and the country, the kilometres moved, the flights, the stays and what attached, the people confirmed present, the health line, and the usual sources silent that day. Both bounds default to the days the track covers. Only reads. See below. |
 
@@ -122,7 +134,8 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
 matches: **openlogbook 0.6.1** (bighydro/logbook, tag v0.6.1), plus RFC 0034's signed-day amendments
-1–3 and the `write` keys of its PR 252 (branch `feat/mcp-write-tools`), as of 2026-10-13. *Read* means
+1–3 and the `write` keys of its PR 252 (branch `feat/mcp-write-tools`), as of 2026-10-13, and the draft
+RFCs 0036–0038 and the Day as they stand on its main at 7bcf728 (2026-10-15). *Read* means
 the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
 as the reference does; *verify* means the chain (SPEC §3, every profile hashes alike) and, where the
 reference validates a shape, the same validation in the same words; *write* means a command here
@@ -135,7 +148,7 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 | `location/v1` (0001) | yes | chain | — | a `subject` is an asset's run |
 | `photo/v1` (0002) | yes | chain | — | |
 | `retraction/v1` (0003) | yes | chain | — | hides what it names in every reader |
-| `transcript/v1` (0004) | yes | chain | — | |
+| `transcript/v1` (0004, amended 2026-10-14: `speakers`, `diarization`, RFC 0038 §2) | yes; the voices under the `rfc0038` flag: `show` and the Day name them as the reference does (`Samtale · you 3 min · Ola Nordmann 3 min`, `speakers` under `day --json`), a line a standing transcript supersedes is `superseded by #N` in `show`, and the Day leaves out a transcript another of the same day supersedes; a transcript without the fields reads as before, flag on or off | chain | — | `src/speakers.ts`; the reference has no validator for the two fields (its JSON Schema is checked by its tests only), so none is here (SPEC-QUESTIONS 95) |
 | `resolution/v1` (0006) | yes | chain | — | names, aliases, the owner |
 | `message/v1` (0008) | yes | chain | — | |
 | `event/v1` (0009) | yes | chain | — | folded across sources, `all_day` |
@@ -154,9 +167,12 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 | `weather/v1` (0026) | `null` only | chain | — | SPEC-QUESTIONS 69d |
 | `story/v1` (0028), `received/v1` (0025) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
 | `signed-day/v1` (0034, amendments 1–3) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2 and 3 are the writer's (`--confirm none`, `--at`, the MCP door) and leave the line as it is |
-| `goal/v1`, `review/v1` (0036) | draft (RFC 0036): `standingGoals`, `standingGoal`, `standingReviews` (a review counts for the goals that reword the one it names), `openGoals`; `show` prints a goal's text and a review's `key=value` row as the reference does, flag or not | draft (RFC 0036): `goalProblems`, `reviewProblems` (the field tables; tier 2 and `source` `manual`, MUST), `reviewRecordProblems` (the goal is a goal line not retracted, `at` not before its `from` nor five minutes after `recorded_at`), `reviewKey` `(goal, period, at)`; a goal has no key. The reference checks neither profile yet, so the sentences are this implementation's (SPEC-QUESTIONS 88) | — | the Day's `reviews` row is not read yet; the writers (`goal add`, `goal review`, amendment 1) are the reference's |
+| `goal/v1`, `review/v1` (0036) | draft (RFC 0036): `standingGoals`, `standingGoal`, `standingReviews` (a review counts for the goals that reword the one it names), `openGoals`; under the flag `show` prints a goal as `<text>  (year, from 2026-01-01)` and a review as `let go · month · <the goal's current text>` as the reference does since its #275, ` · superseded by #N` on a goal a later goal rewords; with the flag off, the text and the `key=value` row as before | draft (RFC 0036): `goalProblems`, `reviewProblems` (the field tables; tier 2 and `source` `manual`, MUST), `reviewRecordProblems` (the goal is a goal line not retracted, `at` not before its `from` nor five minutes after `recorded_at`), `reviewKey` `(goal, period, at)`; a goal has no key. The reference checks neither profile yet, so the sentences are this implementation's (SPEC-QUESTIONS 88) | — | the Day's `reviews` row is not read yet; the writers (`goal add`, `goal review`, amendment 1) are the reference's |
 | `draft/v1` (0036, and amendment 1's `person`, `window`, `read_policy` as PR 269 proposes them) | draft (RFC 0036): `readDraft`, a draft as the reference's Day reads it (each segment supported or not and why, `malformed`), `standingDrafts`; `show`'s row (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`) under the flag | draft (RFC 0036): `draftProblems`, the five fields the reference's reader checks in its words (`read_head`, `read_count`, `language`, `segments` with the segment rule, `supersedes`), and `unit`, `subject`, `source` `model:<name>`, `window`, `read_policy` in this implementation's (SPEC-QUESTIONS 89); `draftTierProblems`, never below a line it cites; `draftKey` | — | the Day's draft block is not shown yet; nothing here writes a draft |
-| `chapter/v1` (0036) | draft (RFC 0036): `standingChapters`, `chapterOf` (the standing chapter open on a day, and the clash of rule 4); `show`'s row, the chapter's name, under the flag | draft (RFC 0036): `chapterProblems`, `chapterKey` `(name, from)` (a closing line that supersedes the open one is not a duplicate), `chapterClashes`; sentences this implementation's | — | the Day's header does not name the chapter yet |
+| `chapter/v1` (0036) | draft (RFC 0036): `standingChapters`, `chapterOf` (the standing chapter open on a day, and the clash of rule 4); `show`'s row, `<name>  <from> – <to>`, and the day's chapter in its heading (`unsigned · chapter Ashore, fixing things`, `, clashes with …`), under the flag | draft (RFC 0036): `chapterProblems`, `chapterKey` `(name, from)` (a closing line that supersedes the open one is not a duplicate), `chapterClashes`; sentences this implementation's | — | the Day's header does not name the chapter yet, nor its `chapter`, `reviews`, `goals` and `chapters` keys (SPEC-QUESTIONS 94) |
+| `entity/v1` (0037) | draft (RFC 0037): `standing`, `canonical` (every entity the lines name; a `resolution/v1` of type `company` read as an org, by RFC 0006's walk as the reference runs it), `bindings`, `registry` and `known` (the entries of `places.json` and `assets.json`, `until` as each holds it), `lookup`, the dedupe keys (`keyOf`, `registeredDomain`); `show` prints the line as the reference does, the generic `key=value` row, flag or not, and the Day counts it among the sources only, as the reference does | draft (RFC 0037), in the reference's words, ported from its source on the owner's instruction: `entityProblems`, and `tierProblems` (tier 2 for every kind, never citing a tier-3 line); `entityLineProblems` holds a whole line to what the reference's writers check | — | the reference's code differs from the RFC's text in places (SPEC-QUESTIONS 98); nothing here writes an entity |
+| `entity-review/v1` (0037), and `people-review/v1` (0035), read as one of type person | draft (RFC 0037): `reviews`, the standing noes, `reviewHolds`; `show`'s generic row | draft (RFC 0037): `entityReviewProblems`; its tier the highest it cites, never under 2 (`reviewTier`) | — | `review KIND` is the reference's |
+| `status/v1` (0037) | draft (RFC 0037): `statuses` (the last standing line is the current status), `muted`, `stale`, `policy/entities.json` (`readEntitySettings`); `status list <root> <kind> [--json]` under the `rfc0037` flag, as the reference prints it; `show`'s generic row | draft (RFC 0037): `statusProblems` (the kind's dispositions, a reason where one MUST be given, no money on the line, `proposed_by`, `proposal`, `since`); the tier rules, an org's status tier 3 and every other kind's tier 2, never citing a tier-3 line; and, this implementation's own sentences, `orgReasonProblems`: an org's reason stays on its tier-3 line and is never a tier-2 `note/v1` (RFC 0037 §10.5), and no status note is above tier 2 | — | the writer, `logbook status` (and the registry entry it closes with `until`), is the reference's; `status <kind> <entity> <disposition>` is refused here |
 
 | Settings and policy file | Read | Validated as the reference validates it | Written |
 |---|---|---|---|
@@ -197,8 +213,12 @@ Final. With it on:
   other than midnight is refused too (`… does not yet put a line on a day by it …`): no reader here
   moves a line to the day before yet, and the RFC forbids grouping as if the key were absent. `verify`,
   `add` and the list of sources never group by day and never look;
-- `show` prints a `draft/v1` line and a `chapter/v1` line as the reference does (`draft of day
-  2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`; the chapter's name);
+- `show` prints a `draft/v1`, a `goal/v1`, a `review/v1` and a `chapter/v1` line as the reference does
+  (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`; `Sail to Lofoten …
+  (year, from 2026-01-01, until 2026-12-31)`; `let go · month · Sail to Lofoten …`; `Ashore, fixing
+  things  2026-08-10 – 2026-11-29`), a goal or a chapter a later line of its kind replaces with
+  ` · superseded by #N`, and names the day's chapter in its heading (`2026-08-31  unsigned · chapter
+  Ashore, fixing things`);
 - `signed_within_days` on an entry of `policy/crossing.json` is read and checked, so a bad value is
   refused naming the file and the entry.
 
@@ -209,6 +229,45 @@ RFC is a draft. `tests/rfc0036-examples.ts` holds the RFC's example lines; `test
 is a record of them with the reference's `show` output beside it, and `tests/cross-impl.test.ts` holds
 the two implementations to the same rows, the same `day_start` sentences and the same reading of a
 day's draft, malformed ones included. What the reference does not decide yet is in SPEC-QUESTIONS 86–90.
+
+**`rfc0037`** (RFC 0037, *Entities: orgs, ideas, places and assets reviewed like people*, draft of
+2026-10-13, its questions decided 2026-10-14; the reference's #291). Off until the RFC is Final. With it
+on, `status list <root> <kind> [--json]` lists every canonical entity of the kind with its current
+status as the reference does (`  Fjordkiosk AS      passed since 2026-10-02 (dream proposed passed)`,
+then `reason: …` under it), reading `policy/entities.json` for `mute_days` and `stale_days`, and a line's
+day under `day_start` (RFC 0036) as the reference's listing always reads it, whether `rfc0036` is on or not
+(a value that is not a clock is refused in its words). Nothing else changes: the reference's `show` prints the
+three profiles' lines as the generic `key=value` row and its Day counts them among the day's sources
+and nothing more, and so do these. The
+profiles' functions (`src/entities.ts`) read a line wherever a caller holds one, flag or not: the
+validators and the tier rules give the reference's sentences, ported from its source on the owner's
+instruction, and `tests/cross-impl-entities.test.ts` holds the two to the same answers on 128 payload
+variants, 30 tier variants, 89 word variants, `status list` on synthetic records, and every line of
+`tests/fixtures/rfc0037-0038-sample`, which the reference's own writers wrote: an org's status at tier 3
+with its reason on the line and no note, an idea's, a place's and an asset's at tier 2 with the reason
+also a note labelled `status`. Where the reference's code and the RFC's text differ, this follows the
+code and says so (SPEC-QUESTIONS 98–99).
+
+**`rfc0038`** (RFC 0038, *Speakers*, draft, §2 as the reference builds it since 562a741, #301, and RFC
+0004's dated amendment of 2026-10-14). Off until the RFC is Final. With it on:
+
+- `show` and the Day name a transcript's voices, its optional `speakers` and `diarization`, as the
+  reference prints them: `Samtale · you 3 min · Ola Nordmann 3 min` after the title, the people and the
+  length, the writer's turns left out beside them; the same after a transcript attached to a row of the
+  Day or unplaced, and under `day --json` a `speakers` list, `{label, person, name, seconds, basis,
+  consent, owner}` each, only on a transcript with voices. A voice is `you` when the source says it is
+  the owner's microphone (`from_me: true`), else the name the source displayed, else its label; nothing
+  binds a label to a person yet, so `person` is null, as in the reference. A voice the reader cannot read
+  (a label that is not 1 to 64 characters without `#` or a line break, an entry that is not an object)
+  is passed by; a line with none it can read reads as a line without `speakers`;
+- a recording heard again (RFC 0038 §2.8): a line a standing transcript supersedes is `superseded by
+  #N` in `show`, whatever its kind, and the Day leaves out a transcript another transcript of the same
+  day supersedes, its line still counted among the day's sources.
+
+A transcript without the two fields reads exactly as before, flag on or off: every vendored `show` and
+`day` fixture prints byte for byte as captured with the flag on (`tests/speakers.test.ts`).
+`tests/fixtures/rfc0037-0038-sample` is a record the reference wrote with its own writers, its `show`
+and `day` output beside it on every day, and `tests/cross-impl.test.ts` holds both implementations to it.
 
 ## Reading a day
 
@@ -231,9 +290,9 @@ The summary depends on the kind; names come from the record's own `resolution/v1
 | `message` | `Ola Nordmann: text` in a direct chat, `Ola Nordmann in Sailing club: text` in a group; the owner's own are `me → Kari: text` and `me in Sailing club: text`; a message without text is `[image]`, `[media]`. |
 | `event` | `title · by organizer · with attendees`; two or more sources carrying one entry (the same start and end, and the same title — case, accents and whitespace aside — or the same flight in the title) print once, as `×2 sources`. |
 | `note` | the first non-blank line, then `… (+N lines)`. |
-| `flight` | `XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot`; a line a later flight line supersedes is `superseded by #N`. |
+| `flight` | `XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot`; a line a later flight line supersedes, whatever its kind, is `superseded by #N`. |
 | `call` | `← Ola Nordmann, 7 min, cellular`, `→ Kari Moe, no answer, facetime-audio`, `→ withheld, 30 s, whatsapp`. |
-| `transcript` | `title — participants; 12 turns, 35 min`. |
+| `transcript` | `title — participants; 12 turns, 35 min` (`transcript` for no title; the Day says `a recording`), a length under a minute in seconds (`2 s`), half to even; under the `rfc0038` flag its voices after it (`Samtale · you 3 min · Ola Nordmann 3 min`, the turns left out beside them), and a line a standing transcript supersedes is `superseded by #N`. |
 | `mail` | `✉ subject — from → to, cc (n attachments)`; the owner's own mail is from `me`. |
 | `voice-memo` | `title (m:ss)`, then `, not stored` when the record does not hold the audio or `, audio missing` when there is none. |
 | `highlight` | `“quote” — title · note`; a bookmark is `bookmark — title @ location`. |
@@ -376,16 +435,24 @@ mail threads, calls and keepers named, messages and photos counted — and **who
 timed calendar entry held at the stay, a transcript's participant the record resolves, a note that says
 `with <name>`; proposed by a face the photo library tagged; never the owner (`owner_id` and `owner_emails`
 in `logbook.json`, the resolution lines naming those, `policy/owner.json`). The **flights** are the
-`flight/v1` lines standing. What fell inside no stay or move is **unplaced**. The **health** line is the
-night's sleep (the union of the asleep stages per device, the longest device), the day's steps (the larger
-device per quarter hour) and resting heart rate (the day's mean), corrections honoured. The **sources** are
+`flight/v1` lines standing. What fell inside no stay or move is **unplaced**. Under the night before, the
+**Night line**, as the reference reads it since its #288: `night  slept 23:10–06:40 · 7 h 20 min ·
+training 45 min`, the asleep stages (`asleep`, `core`, `deep`, `rem`) that start from the day before to
+the day's end, per device chained while no gap is over two hours, each chain a night of the day its last
+stage ends on; the longest asleep, a tie to the device first by name; minutes half to even, `< 1 min` for
+none; the training, the union of the day's workouts, only beside a night; `night` under `--json`, a key
+only on a day a night ends on. The **health** line is the day's steps (the larger device per quarter
+hour) and resting heart rate (the day's mean), corrections honoured, and no row when the day has
+neither; its JSON keeps the night's sleep (`sleep_h`, the union of the asleep stages ending on the day
+per device, the longest device) and the heart rate variability, in ms. The **sources** are
 every source with a line standing on the day, how many, and its newest. The header says after the weekday
 whether the owner **signed** the day (`2026-03-01  Sunday · signed 2026-03-08 20:30`, else `· unsigned`;
 RFC 0034, *The signed day* above). Airports and zones come from the
 reference's own tables (OurAirports and zone.tab, public domain; `src/tables.ts`, generated by
 `scripts/make-tables.mjs`), so both implementations name the same airport, city and country.
 
-`--json` prints the Day as the reference does: one object with `day`, `weekday`, `tz`, `nights`, `country`,
+`--json` prints the Day as the reference does, laid out as it lays it out (two spaces, its keys in its order):
+one object with `day`, `weekday`, `tz`, `nights`, `country`,
 `all_day`, `timeline` (every row with `within_day`, `attached`, `with` and the ids of its lines), `flights`,
 `unplaced`, `health`, `sources` and `signed` (null, or the signature: `at`, `at_local`, `line`, `seq`,
 `confirmed`, `lines`, `page_sha256`, `page_matches`, `note`, `supersedes`). The reference's `readiness`
@@ -636,7 +703,9 @@ import {
 } from "logbook-ts";
 
 const result = verifyLogbook("/path/to/root"); // { valid, lines, head, errors }
-const line = addNote("/path/to/root", "a note"); // the Line that was written
+const line = addNote("/path/to/root", "a note"); // the Line that was written, under state/writer.lock
+// { wait: false } refuses with WriterBusy while another writer holds the lock; { say } takes the notices;
+// TailAhead while the files end past logbook.json, and then repairTail("/path/to/root") brings it forward
 const day = showDay("/path/to/root", { day: "2026-03-14", timezone: "Europe/Oslo" }); // { text, timezone, rows, detail }
 for (const shown of showDays("/path/to/root", { since: "2026-03-01", profiles: ["note"] })) {
   shown.detail.rows; // what --json prints: [{ time, kind, source, summary, lines }, …], a day at a time
@@ -683,9 +752,33 @@ implementation, clone it and point the test at the clone; `uv run` installs the 
 and the test writes the reference's demo record into a temp folder to read and count it with both:
 
 ```bash
-git clone https://github.com/bighydro/logbook /tmp/logbook-ref
+git init /tmp/logbook-ref
+git -C /tmp/logbook-ref fetch --depth 1 https://github.com/bighydro/logbook "$(cat REFERENCE)"
+git -C /tmp/logbook-ref checkout -q FETCH_HEAD
 LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl.test.ts
 ```
+
+The reference is pinned: [`REFERENCE`](./REFERENCE) holds the one commit of bighydro/logbook that this
+implementation agrees with, and CI's cross-implementation job fetches exactly that commit, not the
+reference's moving main, so a PR is red only for what it changes. A catch-up PR, one that follows the
+reference forward, moves `REFERENCE` to the new commit and re-captures the expected files with the
+capture scripts below, never by hand. `.github/workflows/drift.yml` runs the same cross-implementation
+tests against the reference's main, daily and by hand, never on a PR or a push: its run shows how far
+main has moved past `REFERENCE`, and what the next catch-up has to do.
+
+`tests/cross-impl-writer.test.ts` holds the writer to the reference the same way: the lock's sentences, an
+empty lock a crash left, the refusal of an append past `logbook.json` and `repair tail`, on copies of one
+record (`LOGBOOK_REF=/tmp/logbook-ref pnpm vitest run tests/cross-impl-writer.test.ts`).
+
+`tests/writer-lock.test.ts` drives real processes on one record: it bundles `src/` once with tsup into a
+temp folder and spawns `node` on it, each child injecting its fault (a held append, a pause after the record
+is read, a lock taken in the reference's two steps and stopped or killed between them, a stop before a
+reclaim, Windows' refusal of a file another process holds open, a crash at the rename of `logbook.json`)
+by patching `node:fs` before the bundle loads, so the lock, the wait, `--no-wait`, rule A, the write order,
+the refusal after a crash and `repair tail` are checked from outside the library. A child stops at a gate,
+a file it waits for in a folder the test owns, and goes on when the test makes it; where rule A's half
+second is the subject the empty lock is touched by the test every 50 ms (a lock still being made) or left as it is (a leftover): no test waits a fixed
+time, so the steps come in the same order on a slow runner as on a fast one.
 
 `tests/fixtures/capture-expected-show.mjs`, `capture-expected-day.mjs`, `capture-expected-trips.mjs` and
 `capture-expected-readers.mjs` re-capture a fixture's expected output from the reference;
@@ -701,7 +794,7 @@ and append to it with V8's old space capped at half the record's size, then prin
 CI runs the suite on ubuntu, macOS and Windows with Node 20 and 22; a job clones the spec repo at its
 tag and runs SPEC §6 against the fixture as published there; another checks that the vendored fixture
 is still the one on the spec repo's main and that `verify` prints the head published there; and a
-fourth runs the cross-implementation diff against the reference at main, on the fixtures, on the
+fourth runs the cross-implementation diff against the reference at the commit `REFERENCE` names, on the fixtures, on the
 conformance sample and on the reference's demo record, so a divergence in `trips`, `rollup countries` or
 `rollup nights` fails the build.
 

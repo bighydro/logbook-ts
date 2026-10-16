@@ -1,5 +1,6 @@
 2026-04-08  Wednesday · unsigned
   night before  60.3900,5.3200 near Berth, 0.8 km · away
+  night         slept 00:00–07:00 · 7 h
   night after   aboard Solvind · 60.3000,5.2000 · away
   country       NO (nearest airport BGO)
   all day       Boat week
@@ -13,6 +14,5 @@
       note         Anchored with Ola Nordmann. Grilled.
       with         Ola Nordmann (note, photo)
 
-  health        sleep 7.0 h
   sources       sim-phone 288 lines, last 23:55 · ais 101 lines, last 23:00 · apple-health 1 line, last 00:00 · immich 1 line, last 15:00 · manual 1 line, last 14:00 · sim-calendar 1 line, last 00:00
   readiness     mail none · message none · meeting none · location present · photo present · calendar present

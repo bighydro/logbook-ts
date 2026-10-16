@@ -1,0 +1,2 @@
+2026-09-20  unsigned
+  21:02  entity     manual         entity={'id': '01a13fb4-838a-7aa8-8593-f373aef4b7fc', 'registry': 'logbook', 'type': 'idea'}, extra={'pitch': 'a kiosk on the ferry quay that sells what the ferry forgot'}, keys={'idea': 'page:notion:1f2e3d4c-0000-0000-0000-000000000031'}, label=the fjord kiosk, method=owner, refs=[{'kind': 'title', 'value': 'fjord kiosk'}, {'kind': 'repo', 'value': 'git.example.org/nordmann-verft/kiosk'}, {'kind': 'page', 'value': 'notion:1f2e3d4c-0000-0000-0000-000000000031'}]

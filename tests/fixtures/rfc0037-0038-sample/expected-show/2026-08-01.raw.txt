@@ -1,0 +1,5 @@
+2026-08-01  unsigned
+  10:00  resolution manual         entity={'id': '019cadd3-6bc0-7dcd-9133-000000000201', 'registry': 'logbook', 'type': 'company'}, label=Nordmann Verft AS, method=owner, ref={'kind': 'domain', 'value': 'nordmann-verft.example.org'}
+  10:00  resolution manual         entity={'id': '019cadd3-6bc0-7dcd-9133-000000000111', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=owner, ref={'kind': 'email', 'value': 'ola@nordmann-verft.example.org'}
+  10:00  resolution manual         entity={'id': '019cadd3-6bc0-7dcd-9133-000000000111', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=owner, ref={'kind': 'phone', 'value': '+447700900101'}
+  10:00  resolution manual         entity={'id': '019cadd3-6bc0-7dcd-9133-000000000112', 'registry': 'logbook', 'type': 'person'}, label=Kari Nordmann, method=owner, ref={'kind': 'email', 'value': 'kari@nordmann.example.org'}

@@ -1,0 +1,18 @@
+{
+  "assets": [
+    {
+      "id": "solvind",
+      "kind": "yacht",
+      "name": "Solvind",
+      "mmsi": "970000001",
+      "until": "2026-10-04"
+    },
+    {
+      "id": "lerka",
+      "kind": "aircraft",
+      "name": "Lerka",
+      "registration": "ZZABC",
+      "until": "2026-10-04"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+2026-09-02  unsigned
+  12:00  mail       mail           ✉ Q3 numbers, part 2 — ola@nordmann-verft.example.org → ines@example.org
+  17:00  message    whatsapp       +447700900101 in Nordmann Verft: launch slip

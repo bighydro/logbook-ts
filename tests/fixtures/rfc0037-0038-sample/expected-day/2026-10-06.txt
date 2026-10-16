@@ -1,0 +1,24 @@
+2026-10-06  Tuesday · unsigned
+  night before  in transit
+  night after   59.9139,10.7522 near Båtplassen, 1.3 km · away
+  country       NO (nearest airport OSL)
+
+  18:00–23:00  stay   59.9139,10.7522 near Båtplassen, 1.3 km · 5 h · 4 transcripts, 1 note
+      transcript   Middag · S1 31 min · S2 42 s
+      transcript   Idé
+      transcript   Notatet hørt · you 30 s
+      transcript   Hørt feil · S1 31 min · S2 42 s
+      note         Dinner was long; Ola told the story of the engine.
+      with         Ola Nordmann (transcript)
+
+  unplaced      09:15  transcript Samtale · you 3 min · Ola Nordmann 3 min
+  unplaced      10:00  transcript Rom · S1 0 s · S2 60 s · S3 1 min · S4 120 min · Kari Nordmann · you
+  unplaced      10:30  transcript Kanter ·  S1  · S2 · S3
+  unplaced      11:00  transcript Bare tekst
+  unplaced      11:30  transcript Ingen stemmer
+  unplaced      12:00  transcript Med folk · S1 12 s
+  unplaced      12:30  transcript Kort
+
+  health        no lines
+  sources       dawarich 61 lines, last 23:00 · transcription 10 lines, last 22:00 · granola 2 lines, last 19:40 · manual 2 lines, last 23:59
+  readiness     mail none · message none · meeting present · location present · photo none · calendar none

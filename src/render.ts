@@ -2,6 +2,7 @@ import { draftRow } from "./drafts.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import { signedDayRow } from "./signing.js";
+import { lengthText, voicesOf, voicesSuffix } from "./speakers.js";
 import type { JsonValue, Line, Payload } from "./types.js";
 
 /** What a row's summary needs besides the line itself. */
@@ -11,14 +12,35 @@ export interface RenderContext {
   raw: boolean;
   /** Local `HH:MM` of an RFC 3339 instant in the day's zone; undefined when it does not parse. */
   clock: (at: string) => string | undefined;
-  /** For a `flight/v1` line another flight line supersedes: that line's seq. */
+  /** For a line a flight line supersedes, whatever its kind: that flight line's seq. */
   supersededFlights: Map<string, number>;
-  /** RFC 0036's rows, `draft` and `chapter`, as the reference prints them (the `rfc0036` flag). */
+  /** RFC 0036's rows, `draft`, `goal`, `review` and `chapter`, as the reference prints them (the `rfc0036` flag). */
   rfc0036?: boolean;
+  /** A transcript's voices, and a line a transcript replaces marked, as the reference prints them (the `rfc0038` flag). */
+  rfc0038?: boolean;
+  /** For a line a standing transcript line supersedes, whatever its kind: that line's seq. */
+  supersededByTranscript?: Map<string, number>;
+  /** For a goal or chapter line a later line of its kind replaces: that line's seq. */
+  replacedBy?: (line: Line) => number | undefined;
+  /** A goal's current text (the last line rewording it), undefined when no standing goal has the id. */
+  goalText?: (goalId: string) => string | undefined;
+  /** ` · chapter <name>` for the day's heading under the rfc0036 flag; absent with the flag off. */
+  chapterOf?: ((day: string) => string) | undefined;
 }
 
 /** The one-line summary of a line, as the reference implementation spells it for each profile. */
 export function summarize(line: Line, ctx: RenderContext): string {
+  // A line a flight line replaces, whatever its kind, is the reference's `superseded by #N`; so,
+  // under the rfc0038 flag, is a line a standing transcript replaces (a recording heard again).
+  const byFlight = ctx.supersededFlights.get(line.id);
+  const byTranscript = ctx.rfc0038 === true ? ctx.supersededByTranscript?.get(line.id) : undefined;
+  const by =
+    byFlight === undefined
+      ? byTranscript
+      : byTranscript === undefined
+        ? byFlight
+        : Math.max(byFlight, byTranscript);
+  if (by !== undefined) return `superseded by #${by}`;
   const p = payloadOf(line);
   switch (line.kind) {
     case "message":
@@ -28,7 +50,7 @@ export function summarize(line: Line, ctx: RenderContext): string {
     case "note":
       return note(p, ctx);
     case "flight":
-      return flight(line, p, ctx);
+      return flight(p, ctx);
     case "call":
       return call(p, ctx);
     case "transcript":
@@ -49,11 +71,39 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return signedDayRow(p);
     case "draft":
       return ctx.rfc0036 === true ? draftRow(p) : fallback(line.kind, p);
+    case "goal":
+      return ctx.rfc0036 === true ? replaced(goalRow(p), line, ctx) : fallback(line.kind, p);
+    case "review":
+      return ctx.rfc0036 === true ? reviewRow(p, ctx) : fallback(line.kind, p);
     case "chapter":
-      return fallback(line.kind, p, ctx.rfc0036 === true);
+      return ctx.rfc0036 === true ? replaced(chapterRow(p), line, ctx) : fallback(line.kind, p);
     default:
       return fallback(line.kind, p);
   }
+}
+
+/** ` · superseded by #N` after a row a later line of its kind replaces. */
+function replaced(row: string, line: Line, ctx: RenderContext): string {
+  const by = ctx.replacedBy?.(line);
+  return by === undefined ? row : `${row} · superseded by #${by}`;
+}
+
+/** A goal (RFC 0036), as the reference prints it: `<text>  (<horizon>, from <day>[, until <day>])`. */
+function goalRow(p: Payload): string {
+  const until = truthy(p.until) ? `, until ${pyStr(p.until)}` : "";
+  return `${pyStr(p.text)}  (${pyStr(p.horizon)}, from ${pyStr(p.from)}${until})`;
+}
+
+/** A review (RFC 0036): `<disposition> · <period> · <the goal's current text>`, or `goal <id>` for a goal not in the record. */
+function reviewRow(p: Payload, ctx: RenderContext): string {
+  const goal = typeof p.goal === "string" ? ctx.goalText?.(p.goal) : undefined;
+  return `${pyStr(p.disposition)} · ${pyStr(p.period)} · ${goal ?? `goal ${pyStr(p.goal)}`}`;
+}
+
+/** A chapter (RFC 0036): `<name>  <from> – <to>`, nothing after the dash while it is open. */
+function chapterRow(p: Payload): string {
+  const to = truthy(p.to) ? pyStr(p.to) : "";
+  return `${pyStr(p.name)}  ${pyStr(p.from)} – ${to}`.trimEnd();
 }
 
 /** Lines printed under a row: the body of a mail line with `--raw`, four spaces in. */
@@ -65,7 +115,8 @@ export function underneath(line: Line, ctx: RenderContext): string[] {
 
 /** A run of location points, from one source and of one subject (SPEC §3.2, RFC 0001 rule 3). */
 export function points(count: number, subject: string | undefined): string {
-  const n = `${count} point${count === 1 ? "" : "s"}`;
+  // The thousands grouped, as the reference prints a count: `1,001 points`.
+  const n = `${count.toLocaleString("en-US")} point${count === 1 ? "" : "s"}`;
   return subject === undefined ? n : `${subject}: ${n}`;
 }
 
@@ -88,6 +139,14 @@ export function keeperPhoto(p: Payload): string {
     if (truthy(value)) return pyStr(value);
   }
   return "?";
+}
+
+/**
+ * A transcript's title as the reference names it: Python's `str()` of the title when it is truthy,
+ * else `fallback` (`transcript` in `show`, `a recording` in the Day).
+ */
+export function transcriptTitle(p: Payload, fallback: string): string {
+  return truthy(p.title) ? pyStr(p.title) : fallback;
 }
 
 /** Python's truth of a JSON value: null, false, 0, "", [] and {} are false. */
@@ -204,9 +263,7 @@ function note(p: Payload, ctx: RenderContext): string {
   return more > 0 ? `${first} … (+${plural(more, "line")})` : first;
 }
 
-function flight(line: Line, p: Payload, ctx: RenderContext): string {
-  const by = ctx.supersededFlights.get(line.id);
-  if (by !== undefined) return `superseded by #${by}`;
+function flight(p: Payload, ctx: RenderContext): string {
   const code = (o: JsonValue | undefined) => text(obj(o)?.iata) ?? text(obj(o)?.icao) ?? "";
   const diverted = obj(p.diverted_to) ? ` (landed ${code(p.diverted_to)})` : "";
   const parts = [
@@ -242,7 +299,7 @@ function call(p: Payload, ctx: RenderContext): string {
 }
 
 function transcript(p: Payload, ctx: RenderContext): string {
-  let out = text(p.title) ?? "transcript";
+  let out = transcriptTitle(p, "transcript");
   if (Array.isArray(p.participants)) {
     const names: string[] = [];
     for (const item of p.participants) {
@@ -259,13 +316,32 @@ function transcript(p: Payload, ctx: RenderContext): string {
     }
     if (names.length) out += ` — ${names.join(", ")}`;
   }
+  // Under the rfc0038 flag, the voices after everything else (RFC 0038 §2), and the writer's turns
+  // left out beside them, as the reference prints them.
+  const voices = ctx.rfc0038 === true ? voicesOf(p) : [];
   const extra = obj(p.extra);
   const tail: string[] = [];
-  const turns = num(extra?.turns);
-  if (turns !== undefined) tail.push(plural(turns, "turn"));
-  const length = num(extra?.duration_s);
-  if (length !== undefined) tail.push(`${roundHalfEven(length / 60)} min`);
-  return tail.length ? `${out}; ${tail.join(", ")}` : out;
+  const turns = pyInt(extra?.turns);
+  if (turns !== undefined && voices.length === 0) tail.push(plural(turns, "turn"));
+  const length = pyNumber(extra?.duration_s);
+  if (length !== undefined && length >= 0) tail.push(lengthText(length));
+  return `${tail.length ? `${out}; ${tail.join(", ")}` : out}${voicesSuffix(voices)}`;
+}
+
+/** A JSON value Python reads as an `int`: a whole number, or a boolean (`True` is 1). */
+function pyInt(value: JsonValue | undefined): number | undefined {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
+/**
+ * A JSON value Python reads as an `int` or a `float`: any number, or a boolean. One too large for a
+ * double (JSON.parse's Infinity) is none here, where the reference raises.
+ */
+function pyNumber(value: JsonValue | undefined): number | undefined {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const n = num(value);
+  return n !== undefined && Number.isFinite(n) ? n : undefined;
 }
 
 function mail(p: Payload, ctx: RenderContext): string {

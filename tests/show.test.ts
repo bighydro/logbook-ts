@@ -1,3 +1,4 @@
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
@@ -12,6 +13,7 @@ import {
   readLines,
   SAMPLE,
   writeLines,
+  writeRecord,
 } from "./helpers.js";
 
 afterEach(cleanup);
@@ -137,6 +139,206 @@ describe("logbook-ts show prints a day exactly as the reference implementation d
       });
     }
   }
+});
+
+describe("a transcript's length and turns, as the reference spells them", () => {
+  // Run on the reference (main at 7bcf728) with the same lines: a length under a minute is in
+  // seconds, a minute or more in minutes, each rounded half to even as Python's `{:.0f}` rounds; a
+  // negative length or one that is not a number is left out; a boolean is the number Python reads
+  // it as. The turns are a whole number or nothing.
+  const cases: Array<[unknown, unknown, string]> = [
+    [-5, undefined, ""],
+    [0, undefined, "; 0 s"],
+    [0.4, undefined, "; 0 s"],
+    [59.5, undefined, "; 60 s"],
+    [60, undefined, "; 1 min"],
+    [89.9, undefined, "; 1 min"],
+    [90, undefined, "; 2 min"],
+    [150, undefined, "; 2 min"],
+    [3600, undefined, "; 60 min"],
+    ["120", undefined, ""],
+    [true, undefined, "; 1 s"],
+    [undefined, 0, "; 0 turns"],
+    [undefined, 1, "; 1 turn"],
+    [undefined, true, "; 1 turn"],
+    [undefined, "3", ""],
+    [undefined, -1, "; -1 turns"],
+    [undefined, 2.5, ""],
+    [30, 4, "; 4 turns, 30 s"],
+    [2 ** 63, undefined, "; 153722867280912928 min"],
+  ];
+  it("reads a length beyond a double as none, where the reference raises", () => {
+    // A JSON integer of 401 digits: the reference's show raises OverflowError on it; here the row
+    // is printed without a length (SPEC-QUESTIONS 95g).
+    const root = writeRecord([
+      {
+        at: "2026-10-06T07:00:00Z",
+        source: "granola",
+        kind: "transcript",
+        payload: {
+          schema: "transcript/v1",
+          raw_id: "r",
+          title: "T",
+          participants: [],
+          extra: { turns: 2 },
+        },
+      },
+    ]);
+    const file = join(root, "logbook", "2026", "10.jsonl");
+    const text = readFileSync(file, "utf-8").replace(
+      '"turns":2',
+      `"duration_s":1${"0".repeat(400)},"turns":2`,
+    );
+    writeFileSync(file, text, "utf-8");
+    expect(showDay(root, { day: "2026-10-06" }).text.split("\n")[1]).toBe(
+      "  09:00  transcript granola        T; 2 turns",
+    );
+  });
+
+  it("prints each as the reference printed it", () => {
+    const root = writeRecord(
+      cases.map(([duration, turns], n) => {
+        const extra: Record<string, unknown> = {};
+        if (duration !== undefined) extra.duration_s = duration;
+        if (turns !== undefined) extra.turns = turns;
+        return {
+          at: `2026-10-06T07:${String(n).padStart(2, "0")}:00Z`,
+          source: "granola",
+          kind: "transcript",
+          payload: {
+            schema: "transcript/v1",
+            raw_id: `r${n}`,
+            title: `T${n}`,
+            participants: [],
+            extra,
+          },
+        };
+      }),
+    );
+    const rows = showDay(root, { day: "2026-10-06" }).text.split("\n").slice(1, -1);
+    expect(rows).toEqual(
+      cases.map(
+        ([, , tail], n) =>
+          `  09:${String(n).padStart(2, "0")}  transcript granola        T${n}${tail}`,
+      ),
+    );
+  });
+});
+
+describe("a transcript with no title, as the reference's show names it", () => {
+  // Run on the reference (main at 7bcf728): `transcript` for no title, an empty or a null one;
+  // Python's str() of a title that is not a string.
+  it("says transcript, or the title as Python spells it", () => {
+    const t = (n: number, title: Record<string, unknown>) => ({
+      at: `2026-10-06T07:0${n}:00Z`,
+      source: "granola",
+      kind: "transcript",
+      payload: { schema: "transcript/v1", raw_id: `t${n}`, participants: [], ...title },
+    });
+    const root = writeRecord([
+      t(0, {}),
+      t(1, { title: "" }),
+      t(2, { title: null }),
+      t(3, { title: 5 }),
+    ]);
+    expect(showDay(root, { day: "2026-10-06" }).text.split("\n").slice(1, -1)).toEqual([
+      "  09:00  transcript granola        transcript",
+      "  09:01  transcript granola        transcript",
+      "  09:02  transcript granola        transcript",
+      "  09:03  transcript granola        5",
+    ]);
+  });
+});
+
+describe("a run of a thousand points or more, as the reference prints it", () => {
+  // The checker's probe of the reference (main at 7bcf728): 1,001 points of one tracker in one run.
+  it("groups the thousands", () => {
+    const drafts: Parameters<typeof writeRecord>[0] = [];
+    for (let i = 0; i < 1001; i++) {
+      drafts.push({
+        at: new Date(Date.UTC(2026, 8, 1, 0, i)).toISOString().replace(".000Z", "Z"),
+        source: "dawarich",
+        kind: "location",
+        tier: 1 as const,
+        payload: {
+          schema: "location/v1",
+          lat: 59.9139,
+          lon: 10.7522,
+          accuracy_m: 10,
+          raw_id: `p${i}`,
+        },
+      });
+    }
+    expect(showDay(writeRecord(drafts), { day: "2026-09-01" }).text).toBe(
+      "2026-09-01  unsigned\n  02:00–18:40  location   dawarich       1,001 points\n",
+    );
+  });
+});
+
+describe("a line a flight line supersedes, as the reference marks it", () => {
+  // Run on the reference (main at 7bcf728, and at 09e2967 before RFC 0038 too): whatever the kind of
+  // the line a flight line supersedes, its row is `superseded by #N`; a line another kind
+  // supersedes is printed as it is.
+  it("marks a note and a transcript a flight supersedes, and leaves a note a note supersedes", () => {
+    const id = (seq: number): string => `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`;
+    const flight = (n: number, supersedes: string) => ({
+      at: `2026-10-08T06:0${n}:00Z`,
+      source: "flighty",
+      kind: "flight",
+      payload: {
+        schema: "flight/v1",
+        raw_id: `f${n}`,
+        date: "2026-10-08",
+        carrier: "XY",
+        number: `56${n}`,
+        from: "OSL",
+        to: "BGO",
+        evidence: "declared",
+        supersedes,
+      },
+    });
+    const root = writeRecord([
+      {
+        at: "2026-10-08T06:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "a note" },
+      },
+      flight(1, id(1)),
+      {
+        at: "2026-10-08T06:02:00Z",
+        source: "granola",
+        kind: "transcript",
+        payload: { schema: "transcript/v1", raw_id: "t1", title: "T1", participants: [] },
+      },
+      flight(3, id(3)),
+      {
+        at: "2026-10-08T06:04:00Z",
+        source: "cal",
+        kind: "event",
+        payload: {
+          schema: "event/v1",
+          raw_id: "e1",
+          title: "Event",
+          start: "2026-10-08T06:04:00Z",
+        },
+      },
+      {
+        at: "2026-10-08T06:05:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "a note superseding the event", supersedes: id(5) },
+      },
+    ]);
+    expect(showDay(root, { day: "2026-10-08" }).text.split("\n").slice(1, -1)).toEqual([
+      "  08:00  note       manual         superseded by #2",
+      "  08:01  flight     flighty        XY 561  →, declared",
+      "  08:02  transcript granola        superseded by #4",
+      "  08:03  flight     flighty        XY 563  →, declared",
+      "  08:04  event      cal            Event",
+      "  08:05  note       manual         a note superseding the event",
+    ]);
+  });
 });
 
 describe("logbook-ts show, beyond the reference", () => {

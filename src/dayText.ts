@@ -8,11 +8,13 @@ import {
   type DayNight,
   type DaySpend,
   type FlightEntry,
+  type NightLine,
   type SegmentEntry,
   type TimelineEntry,
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
 import { mark, signedStateText } from "./signing.js";
+import { voicesSuffix } from "./speakers.js";
 
 const DASH = "–";
 const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - [...s].length));
@@ -35,8 +37,9 @@ export function distanceText(metres: number): string {
   return km < 100 ? `${km.toFixed(1)} km` : `${roundHalfEven(km)} km`;
 }
 
+/** A count and its word, the thousands grouped as the reference's Day prints them: `1,001 lines`. */
 const plural = (n: number, word: string, words = `${word}s`): string =>
-  `${n} ${n === 1 ? word : words}`;
+  `${n.toLocaleString("en-US")} ${n === 1 ? word : words}`;
 
 /** `1 event, 1 mail thread, 2 messages`: what a row carries, counted. */
 function attachedCounts(a: Attached): string[] {
@@ -79,6 +82,7 @@ export function renderDay(day: Day): string {
   const lines: string[] = [`${day.day}  ${day.weekday} · ${signedStateText(day.signed)}`];
   const marks = day.signed?.dispositions;
   lines.push(header("night before", nightText(day.nights.before)));
+  if (day.night !== undefined) lines.push(header("night", sleptText(day.night, tz)));
   lines.push(header("night after", nightText(day.nights.after)));
   lines.push(header("country", countryText(day)));
   if (day.all_day.length) {
@@ -102,7 +106,13 @@ export function renderDay(day: Day): string {
       );
     }
     for (const t of a.transcripts)
-      lines.push(under(indent, "transcript", `${mark(marks, t.line)}${t.title}`));
+      lines.push(
+        under(
+          indent,
+          "transcript",
+          `${mark(marks, t.line)}${t.title}${voicesSuffix(t.speakers ?? [])}`,
+        ),
+      );
     for (const n of a.notes) lines.push(under(indent, "note", `${mark(marks, n.line)}${n.text}`));
     for (const m of a.mail) {
       const text = `${m.subject} (${plural(m.messages, "message")})`;
@@ -142,13 +152,19 @@ export function renderDay(day: Day): string {
   if (day.unplaced.length) {
     lines.push("");
     for (const u of day.unplaced) {
-      const text = `${mark(marks, u.line)}${u.title}${sourcesText(u)}`;
+      const text = `${mark(marks, u.line)}${u.title}${voicesSuffix(u.speakers ?? [])}${sourcesText(u)}`;
       lines.push(header("unplaced", `${span(u.at, u.end)}  ${pad(u.kind, 6)} ${text}`));
     }
   }
 
   lines.push("");
-  lines.push(header("health", healthText(day.health) ?? "no lines"));
+  // The sleep is said once, on the Night line: the health row is the steps and the resting heart
+  // rate, and a day whose health lines say neither has no row (the JSON keeps `sleep_h`).
+  if (day.health === null) lines.push(header("health", "no lines"));
+  else {
+    const health = healthText({ ...day.health, sleep_h: null });
+    if (health !== undefined) lines.push(header("health", health));
+  }
   if (day.spend !== null) lines.push(header("spend", spendText(day.spend)));
   lines.push(
     header(
@@ -246,6 +262,21 @@ function spendText(spend: DaySpend): string {
 }
 
 /** `sleep 6.6 h · 8,115 steps · resting 53 bpm`; the heart-rate variability is in the JSON only. */
+/**
+ * The Night line, `slept 23:10–06:40 · 7 h 20 min · training 45 min`: the first and the last minute
+ * asleep on the record's clock, how long asleep, and the day's training when it has some; a length
+ * under half a minute is `< 1 min`.
+ */
+export function sleptText(night: NightLine, tz: string): string {
+  const length = (seconds: number): string =>
+    roundHalfEven(seconds / 60) === 0 ? "< 1 min" : durationText(seconds);
+  const from = localOf(Date.parse(night.start), tz).clock;
+  const to = localOf(Date.parse(night.end), tz).clock;
+  let out = `slept ${from}${DASH}${to} · ${length(night.asleep_s)}`;
+  if (night.training !== null) out += ` · training ${length(night.training.minutes * 60)}`;
+  return out;
+}
+
 export function healthText(health: DayHealth | null): string | undefined {
   if (health === null) return undefined;
   const parts: string[] = [];

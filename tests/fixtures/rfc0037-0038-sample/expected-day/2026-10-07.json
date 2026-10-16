@@ -1,0 +1,155 @@
+{
+  "day": "2026-10-07",
+  "weekday": "Wednesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-10-06",
+      "where": "59.9139,10.7522 near Båtplassen, 1.3 km",
+      "home": false,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20261006T1600Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.913893,
+        "lon": 10.752153
+      },
+      "lines": [
+        "01a13fb4-840d-7141-b642-e6249df72a1b",
+        "01a13fb4-8411-7e51-9eee-4b4d67938086"
+      ]
+    },
+    "after": {
+      "day": "2026-10-07",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "transcript",
+      "at": "2026-10-07T06:00:00Z",
+      "end": null,
+      "title": "Idé, hørt igjen",
+      "line": "01a13fb4-841f-7770-b358-7e0eadd2d81d",
+      "speakers": [
+        {
+          "label": "S1",
+          "person": null,
+          "name": null,
+          "seconds": 95.0,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        }
+      ]
+    }
+  ],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "transcription",
+      "lines": 1,
+      "first": "2026-10-07T06:00:00Z",
+      "newest": "2026-10-07T06:00:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-09-10",
+      "until": "2026-10-07",
+      "logged_days": 18
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": true,
+        "lines": 1,
+        "sources": [
+          "transcription"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

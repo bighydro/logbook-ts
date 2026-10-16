@@ -1,0 +1,1 @@
+{"at":"2026-10-12T20:18:00Z","end":null,"tz":"Europe/Oslo","source":"manual","kind":"entity-review","tier":2,"payload":{"schema":"entity-review/v1","verdict":"different","ref":{"kind":"centre","value":"59.902100,10.741200"},"entity":{"type":"place"},"label":"Boathouse","method":"owner","logbook_head":"8f1c000000000000000000000000000000000000000000000000000000000000"}}

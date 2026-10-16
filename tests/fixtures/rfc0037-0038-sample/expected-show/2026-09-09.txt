@@ -1,0 +1,2 @@
+2026-09-09  unsigned
+  19:00  transaction copilot        amount=-45, currency=NOK, merchant=FJORDKIOSK AS, provider=copilot, raw_id=copilot:9

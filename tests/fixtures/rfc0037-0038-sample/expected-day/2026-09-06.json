@@ -1,0 +1,140 @@
+{
+  "day": "2026-09-06",
+  "weekday": "Sunday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-09-05",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-09-06",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "mail",
+      "at": "2026-09-06T12:00:00Z",
+      "end": null,
+      "title": "Opening",
+      "line": "01a13fb4-8381-7b8e-962b-6939684e178e"
+    }
+  ],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "mail",
+      "lines": 1,
+      "first": "2026-09-06T12:00:00Z",
+      "newest": "2026-09-06T12:00:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-08-10",
+      "until": "2026-09-06",
+      "logged_days": 6
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": true,
+        "lines": 1,
+        "sources": [
+          "mail"
+        ],
+        "usual": [
+          "mail"
+        ],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

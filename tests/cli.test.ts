@@ -1,8 +1,12 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { main } from "../src/cli.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { type MainOptions, main } from "../src/cli.js";
 import { localOf } from "../src/clock.js";
+import { statusListing, statusListingJson, statusListingText } from "../src/entities.js";
+import { FLAGS_ENV } from "../src/flags.js";
 import { verifyLogbook } from "../src/store.js";
+import { entitiesRecord } from "./entities-record.js";
 import {
   cleanup,
   copyFixture,
@@ -20,17 +24,24 @@ import {
 
 afterEach(cleanup);
 
-function run(argv: string[]): { code: number; out: string; err: string } {
+function run(
+  argv: string[],
+  options: MainOptions = {},
+): { code: number; out: string; err: string } {
   let out = "";
   let err = "";
-  const code = main(argv, {
-    stdout: (s) => {
-      out += s;
+  const code = main(
+    argv,
+    {
+      stdout: (s) => {
+        out += s;
+      },
+      stderr: (s) => {
+        err += s;
+      },
     },
-    stderr: (s) => {
-      err += s;
-    },
-  });
+    options,
+  );
   return { code, out, err };
 }
 
@@ -155,6 +166,23 @@ describe("logbook-ts day", () => {
       expect(json.code).toBe(0);
       expect(json.out.endsWith("\n")).toBe(true);
       expect(JSON.parse(json.out)).toEqual(expected.json);
+    }
+  });
+
+  it("lays the JSON out as the reference does: two spaces, its keys in its order", () => {
+    // The vendored files are the reference's bytes; without its `readiness` block (not read here,
+    // SPEC-QUESTIONS 79) and spelled by JSON.stringify, which writes a whole float `30.0` as `30`
+    // (SPEC-QUESTIONS 100), they are ours byte for byte.
+    vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
+    try {
+      for (const name of ["day-sample", "demo-sample", "rfc0037-0038-sample"]) {
+        for (const expected of expectedDays(join(FIXTURES, name))) {
+          const json = run(["day", join(FIXTURES, name), expected.day, "--json"]);
+          expect(json.out, expected.day).toBe(`${JSON.stringify(expected.json, null, 2)}\n`);
+        }
+      }
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 
@@ -339,9 +367,139 @@ describe("logbook-ts people", () => {
   });
 });
 
+describe("logbook-ts status list (RFC 0037, draft, behind the rfc0037 flag)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const NOW = new Date("2026-10-15T10:00:00Z");
+  const TODAY = "2026-10-15";
+  const at = (argv: string[]) => run(argv, { now: NOW });
+
+  /** Every month file of the record, read whole, to check that nothing was written. */
+  const monthFiles = (root: string): string[] => {
+    const out: string[] = [];
+    for (const year of readdirSync(join(root, "logbook")).sort()) {
+      for (const month of readdirSync(join(root, "logbook", year)).sort()) {
+        out.push(readFileSync(join(root, "logbook", year, month), "utf-8"));
+      }
+    }
+    return out;
+  };
+
+  it("refuses with one sentence naming the flag when it is off, and exits 2", () => {
+    vi.stubEnv(FLAGS_ENV, "");
+    const root = entitiesRecord();
+    for (const argv of [
+      ["status", "list", root, "org"],
+      ["status", "org", "Nordmann Verft", "hold"],
+    ]) {
+      const { code, out, err } = at(argv);
+      expect(code, argv.join(" ")).toBe(2);
+      expect(out).toBe("");
+      expect(err).toBe(
+        "status: status list reads RFC 0037 (draft), which is off until it is final; set LOGBOOK_TS_FLAGS=rfc0037 to turn it on\n",
+      );
+    }
+    expect(at(["status"]).code).toBe(2);
+    expect(at(["status"]).err).toMatch(/^usage:/);
+  });
+
+  it("prints the listing of each kind as the reference does, and the same as JSON, today by the clock given", () => {
+    vi.stubEnv(FLAGS_ENV, "rfc0037");
+    const root = entitiesRecord();
+    const before = monthFiles(root);
+    for (const kind of ["org", "idea", "place", "asset"]) {
+      const listing = statusListing(root, kind, TODAY);
+      const text = at(["status", "list", root, kind]);
+      expect({ kind, code: text.code, err: text.err }).toEqual({ kind, code: 0, err: "" });
+      expect(text.out).toBe(statusListingText(listing));
+      expect(text.out).toContain(`· ${TODAY}\n`);
+      const json = at(["status", "list", root, "--json", kind]);
+      expect(json.code).toBe(0);
+      expect(json.out).toBe(`${JSON.stringify(statusListingJson(listing), null, 2)}\n`);
+    }
+    expect(at(["status", "list", root, "org"]).out).toContain(
+      "  Nordmann Verft AS  hold since 2026-10-01 (dream proposed let-go) · not proposed: let-go to 2027-11-04\n",
+    );
+    expect(monthFiles(root)).toEqual(before);
+  });
+
+  it("refuses a kind that takes no status, and more than a kind, in the reference's words; exits 2", () => {
+    vi.stubEnv(FLAGS_ENV, "rfc0037");
+    const root = entitiesRecord();
+    for (const [argv, sentence] of [
+      [
+        ["status", "list", root, "person"],
+        "a person has no status (RFC 0037): people are reviewed, never disposed of",
+      ],
+      [
+        ["status", "list", root, "goal"],
+        "a goal is reviewed by review/v1 (RFC 0036), not given a status",
+      ],
+      [
+        ["status", "list", root, "thing"],
+        "a status is for an org, idea, place, asset; not for 'thing'",
+      ],
+      [
+        ["status", "list", root, "org", "--reason", "x"],
+        "`status list KIND` takes a kind and nothing else",
+      ],
+      [["status", "list", root, "org", "idea"], "`status list KIND` takes a kind and nothing else"],
+      [["status", "list", root], "`status list KIND` takes a kind and nothing else"],
+      [["status", "list", root, "--json"], "`status list KIND` takes a kind and nothing else"],
+      [
+        ["status", "org", "Nordmann Verft", "hold"],
+        "this implementation does not write status lines (the reference's `logbook status KIND ENTITY DISPOSITION` does); it reads them: `status list <root> KIND`",
+      ],
+      [
+        ["status", root, "org", "Nordmann Verft", "hold"],
+        "this implementation does not write status lines (the reference's `logbook status KIND ENTITY DISPOSITION` does); it reads them: `status list <root> KIND`",
+      ],
+    ] as const) {
+      const { code, out, err } = at([...argv]);
+      expect({ argv, code, out, err }).toEqual({
+        argv,
+        code: 2,
+        out: "",
+        err: `status: ${sentence}\n`,
+      });
+    }
+    expect(at(["status", "list"]).err).toMatch(/^usage:/);
+  });
+
+  it("refuses a settings file that is not one, naming it, and a record it does not carry", () => {
+    vi.stubEnv(FLAGS_ENV, "rfc0037");
+    const root = entitiesRecord();
+    writeLines(root, ["[]"], join("policy", "entities.json"));
+    const refused = at(["status", "list", root, "org"]);
+    expect(refused.code).toBe(2);
+    expect(refused.err).toBe(
+      `status: ${join(root, "policy", "entities.json")} must be an object\n`,
+    );
+    const meta = JSON.parse(readLines(root, "logbook.json").join("")) as Record<string, unknown>;
+    writeLines(root, [JSON.stringify({ ...meta, format: "logbook/0.1" })], "logbook.json");
+    const { code, err } = at(["status", "list", root, "org"]);
+    expect(code).toBe(1);
+    expect(err).toMatch(/logbook\/0\.1/);
+  });
+});
+
 describe("logbook-ts usage", () => {
   it("prints usage and exits 2 without a command, with an unknown command, or with missing args", () => {
-    for (const argv of [[], ["frobnicate"], ["verify"], ["add"], ["add", SAMPLE]]) {
+    for (const argv of [
+      [],
+      ["frobnicate"],
+      ["verify"],
+      ["add"],
+      ["add", SAMPLE],
+      // A copy: were --no-wait ever read as the note, it would be appended to it, not to the fixture.
+      ["add", copySample(), "--no-wait"],
+      ["repair"],
+      ["repair", "tail"],
+      ["repair", "fork", SAMPLE],
+      ["repair", "tail", SAMPLE, "--apply"],
+      ["repair", "tail", SAMPLE, SAMPLE],
+    ]) {
       const { code, err } = run(argv);
       expect(code).toBe(2);
       expect(err).toMatch(/usage/i);

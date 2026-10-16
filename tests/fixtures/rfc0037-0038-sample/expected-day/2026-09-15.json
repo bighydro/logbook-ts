@@ -1,0 +1,166 @@
+{
+  "day": "2026-09-15",
+  "weekday": "Tuesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-09-14",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-09-15",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "01a13fb4-8382-751e-aecb-2fa2fd168d89",
+      "kind": "flight",
+      "start": "2026-09-15T07:00:00Z",
+      "end": "2026-09-15T08:00:00Z",
+      "start_local": "2026-09-15T09:00:00+02:00",
+      "end_local": "2026-09-15T10:00:00+02:00",
+      "carrier": "XY",
+      "number": "561",
+      "from": null,
+      "to": null,
+      "evidence": "tracked",
+      "role": "passenger",
+      "aircraft": {
+        "registration": "ZZ-ABC"
+      },
+      "line": "01a13fb4-8382-751e-aecb-2fa2fd168d89"
+    }
+  ],
+  "flights": [
+    {
+      "id": "01a13fb4-8382-751e-aecb-2fa2fd168d89",
+      "kind": "flight",
+      "start": "2026-09-15T07:00:00Z",
+      "end": "2026-09-15T08:00:00Z",
+      "start_local": "2026-09-15T09:00:00+02:00",
+      "end_local": "2026-09-15T10:00:00+02:00",
+      "carrier": "XY",
+      "number": "561",
+      "from": null,
+      "to": null,
+      "evidence": "tracked",
+      "role": "passenger",
+      "aircraft": {
+        "registration": "ZZ-ABC"
+      },
+      "line": "01a13fb4-8382-751e-aecb-2fa2fd168d89"
+    }
+  ],
+  "unplaced": [],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "flighty",
+      "lines": 1,
+      "first": "2026-09-15T07:00:00Z",
+      "newest": "2026-09-15T07:00:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-08-19",
+      "until": "2026-09-15",
+      "logged_days": 14
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

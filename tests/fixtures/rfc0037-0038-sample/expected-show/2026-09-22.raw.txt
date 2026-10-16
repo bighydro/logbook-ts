@@ -1,0 +1,4 @@
+2026-09-22  unsigned
+  10:00  entity     manual         entity={'id': 'solvind', 'registry': 'logbook', 'type': 'asset'}, keys={'asset': 'mmsi:970000001'}, label=Solvind, method=owner, refs=[{'kind': 'mmsi', 'value': '970000001'}]
+  10:05  entity     manual         entity={'id': 'Hytta', 'registry': 'logbook', 'type': 'place'}, keys={'place': 'place:hytta'}, label=Hytta, method=owner, refs=[{'kind': 'place', 'value': 'Hytta'}]
+  10:10  entity     manual         entity={'id': '019cadd3-6bc0-7dcd-9133-000000000111', 'registry': 'logbook', 'type': 'person'}, label=Ola Nordmann, method=owner

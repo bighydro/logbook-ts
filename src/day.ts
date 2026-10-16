@@ -11,9 +11,10 @@ import {
   weekdayOf,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
+import { isOn, RFC0038 } from "./flags.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
-import { keeperPhoto, payloadOf } from "./render.js";
+import { keeperPhoto, payloadOf, transcriptTitle } from "./render.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import {
   type Asset,
@@ -27,6 +28,7 @@ import {
 } from "./settings.js";
 import { type Judgements, readJudgements } from "./show.js";
 import { SIGNED_DAY_KIND, type SignedState, signedState, standingSignatures } from "./signing.js";
+import { type SpeakerJson, speakersJson } from "./speakers.js";
 import {
   deriveSegments,
   judged,
@@ -102,7 +104,8 @@ export interface AttachedCall {
 /** What fell inside a row of the day. */
 export interface Attached {
   events: AttachedEvent[];
-  transcripts: Array<{ title: string; line: string }>;
+  /** Each with its voices under `speakers` when it has some (RFC 0038 §2, the rfc0038 flag). */
+  transcripts: Array<{ title: string; line: string; speakers?: SpeakerJson[] }>;
   notes: Array<{ text: string; line: string }>;
   mail: AttachedMail[];
   calls: AttachedCall[];
@@ -194,6 +197,30 @@ export interface UnplacedEntry {
   line: string;
   sources?: string[];
   lines?: string[];
+  /** A transcript's voices, when it has some (RFC 0038 §2, the rfc0038 flag). */
+  speakers?: SpeakerJson[];
+}
+
+/**
+ * The Night line (the reference's docs/day.md since 0aeacdb): when the owner slept, from the
+ * `health-sample/v1` sleep stages. A night is one device's asleep stages with no gap over two hours
+ * between them, on the day its last stage ends; of the nights that end on the day, the longest.
+ */
+export interface NightLine {
+  /** The first and the last instant asleep, RFC 3339 UTC. */
+  start: string;
+  end: string;
+  /** The same on the record's clock, with its offset. */
+  start_local: string;
+  end_local: string;
+  /** The union of the night's asleep stages, never in bed or awake. */
+  asleep_s: number;
+  /** The device the stages came from, null when they name none. */
+  device: string | null;
+  /** The stages, by start. */
+  lines: string[];
+  /** The union of the workouts that start on the day, in whole minutes; null when there are none. */
+  training: { minutes: number; lines: string[] } | null;
 }
 
 export interface DayHealth {
@@ -258,6 +285,8 @@ export interface Day {
    * matched yet (SPEC-QUESTIONS 69).
    */
   received: never[];
+  /** The Night line: present only on a day a night ends on, as the reference's `--json` has it. */
+  night?: NightLine;
   /** The day's standing signature (RFC 0034 rule 6), or null when the day is unsigned. */
   signed: SignedState | null;
 }
@@ -285,6 +314,8 @@ interface Context extends PeopleContext {
   dayEndMs: number;
   supersededFlights: Map<string, number>;
   settings: StaySettings;
+  /** RFC 0038 §2 under its flag: a transcript's voices, and a transcript heard again standing alone. */
+  rfc0038: boolean;
 }
 
 const SOURCE_RANK: Record<string, number> = { calendar: 0, transcript: 1, note: 2, photo: 3 };
@@ -447,6 +478,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     places,
     settings,
     owner,
+    rfc0038: isOn(RFC0038),
   };
 
   // The day's own lines: everything whose `at` is on the day, retractions aside.
@@ -471,7 +503,11 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   // container today, whole.
   const rows = given ?? deriveRows(reader, entries);
   const dayRows = rows.filter((r) => r.startMs < dayEndMs && r.endMs > dayStartMs);
-  const { timeline, unplaced } = buildTimeline(dayRows, flights, dayStanding, ctx);
+  // Under the rfc0038 flag, a transcript another transcript of the day supersedes (a recording
+  // heard again, RFC 0038 §2.8) is not listed beside it, as the reference reads it; its line still
+  // counts among the day's sources.
+  const listed = ctx.rfc0038 ? withoutHeardAgain(dayStanding) : dayStanding;
+  const { timeline, unplaced } = buildTimeline(dayRows, flights, listed, ctx);
 
   const nightBefore = nightOf(before, rows, ctx);
   const nightAfter = nightOf(day, rows, ctx);
@@ -480,6 +516,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   // instant, then seq); whether it still digests to what the standing signature says.
   const page = dayLines.filter((e) => e.line.kind !== SIGNED_DAY_KIND).map((e) => e.line);
   const signed = signedState(reader.signatures.get(day), timezone, page, day);
+  const night = nightLine(entries.filter(standing), ctx);
 
   return {
     day,
@@ -496,8 +533,9 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     spend: spend(dayStanding),
     weather: null,
     sources: sources(dayStanding),
-    received: [],
+    ...(night === undefined ? {} : { night }),
     signed,
+    received: [],
   };
 }
 
@@ -931,10 +969,16 @@ function buildTimeline(
       if (!holds(row, e.ms, e.endMs)) continue;
       where += 1;
       switch (kind) {
-        case "transcript":
-          row.attached.transcripts.push({ title: text(p.title) ?? "transcript", line: e.line.id });
+        case "transcript": {
+          const speakers = ctx.rfc0038 ? speakersJson(p) : undefined;
+          row.attached.transcripts.push({
+            title: transcriptTitle(p, UNTITLED),
+            line: e.line.id,
+            ...(speakers === undefined ? {} : { speakers }),
+          });
           row.transcripts.push(e);
           break;
+        }
         case "note":
           row.attached.notes.push({ text: noteText(text(p.text) ?? ""), line: e.line.id });
           row.notes.push(e);
@@ -976,18 +1020,20 @@ function buildTimeline(
         case "call": {
           const label =
             kind === "transcript"
-              ? (text(p.title) ?? "transcript")
+              ? transcriptTitle(p, UNTITLED)
               : kind === "note"
                 ? noteText(text(p.text) ?? "")
                 : kind === "mail"
                   ? (text(p.subject) ?? "(no subject)")
                   : (asRef(p.counterparty)?.value ?? "withheld");
+          const speakers = kind === "transcript" && ctx.rfc0038 ? speakersJson(p) : undefined;
           unplaced.push({
             kind,
             at: e.line.at,
             end: typeof e.line.end === "string" ? e.line.end : null,
             title: label,
             line: e.line.id,
+            ...(speakers === undefined ? {} : { speakers }),
           });
           break;
         }
@@ -1131,6 +1177,26 @@ function personOf(
   return { id: null, name: fallback };
 }
 
+/**
+ * The one person a participant's name names, as the reference reads it: the person whose label it
+ * is, case aside, else the one whose label's first word it is; nobody when none or several, or the
+ * owner.
+ */
+function personByName(name: string, ctx: PeopleContext): Someone | undefined {
+  const wanted = name.trim().toLowerCase();
+  const first = wanted.split(/\s+/)[0] ?? "";
+  const people = [...ctx.resolver.people()];
+  const exact = people.filter(([, label]) => label.trim().toLowerCase() === wanted);
+  const byFirst = people.filter(
+    ([, label]) => (label.trim().split(/\s+/)[0] ?? "").toLowerCase() === first,
+  );
+  const hit = exact.length > 0 ? exact : byFirst;
+  if (hit.length !== 1) return undefined;
+  const [id, label] = hit[0] as [string, string];
+  if (ctx.owner.ids.has(id) || ctx.owner.names.has(label.toLowerCase())) return undefined;
+  return { id, name: label };
+}
+
 /** The attendees of a calendar entry, in its order: the people the record names, else by their display name. */
 function attendees(e: Entry, ctx: PeopleContext): Someone[] {
   const list = payloadOf(e.line).attendees;
@@ -1224,7 +1290,7 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
   }
   for (const t of p.transcripts) {
     const payload = payloadOf(t.line);
-    const title = text(payload.title) ?? "transcript";
+    const title = transcriptTitle(payload, UNTITLED);
     if (!Array.isArray(payload.participants)) continue;
     for (const item of payload.participants) {
       const o = obj(item);
@@ -1242,8 +1308,10 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
         who = personOf(ref, undefined, ctx);
         if (who !== undefined) break;
       }
+      // By name only someone the record's resolution lines make a person, as the reference reads
+      // it: a name or an address the record does not know names nobody.
       if (who === undefined && name !== undefined && !NOBODY.test(name.trim()))
-        who = personOf(undefined, name, ctx);
+        who = personByName(name, ctx);
       if (who === undefined) continue;
       found.push({
         person: who.id,
@@ -1545,7 +1613,10 @@ function health(entries: Entry[], ctx: Context): DayHealth | null {
     byDevice.set(device, list);
   }
   let sleep: { seconds: number; lines: Entry[] } | undefined;
-  for (const list of byDevice.values()) {
+  // On a tie the device first in the record (its first stage by seq) keeps the night, as the
+  // reference's does.
+  const firstSeq = (list: Entry[]): number => Math.min(...list.map((e) => e.line.seq));
+  for (const list of [...byDevice.values()].sort((a, b) => firstSeq(a) - firstSeq(b))) {
     const spans = list.map((e) => [e.ms, e.endMs] as [number, number]).sort((a, b) => a[0] - b[0]);
     let seconds = 0;
     let cursor = -Infinity;
@@ -1585,7 +1656,7 @@ function health(entries: Entry[], ctx: Context): DayHealth | null {
     );
   };
   const resting = meanOf("resting_hr", (v, unit) => (unit === "count/s" ? v * 60 : v));
-  const hrv = meanOf("hrv", (v) => v);
+  const hrv = meanOf("hrv", (v, unit) => (unit === "s" ? v * 1000 : v));
 
   // The lines each number came from: the night's stages, the winning quarter hours, the readings.
   const lines: string[] = [];
@@ -1602,6 +1673,136 @@ function health(entries: Entry[], ctx: Context): DayHealth | null {
     lines,
   };
 }
+
+/** The day's lines but the transcripts another transcript of the day supersedes. */
+function withoutHeardAgain(lines: Entry[]): Entry[] {
+  const replaced = new Set<string>();
+  for (const e of lines) {
+    const earlier = payloadOf(e.line).supersedes;
+    if (e.line.kind === "transcript" && typeof earlier === "string") replaced.add(earlier);
+  }
+  return lines.filter((e) => e.line.kind !== "transcript" || !replaced.has(e.line.id));
+}
+
+/** What the reference's Day calls a transcript with no title. */
+const UNTITLED = "a recording";
+
+/** Two asleep stages further apart than this are two nights. */
+const NIGHT_GAP_MS = 2 * 3600 * 1000;
+
+/** The `health-sample/v1` lines of `type`, standing, with a correction that supersedes a line in its place. */
+function samplesOf(entries: Entry[], type: string): Entry[] {
+  const samples = entries.filter(
+    (e) => e.line.kind === "health" && payloadOf(e.line).schema === "health-sample/v1",
+  );
+  const corrected = new Set<string>();
+  for (const e of samples) {
+    const s = payloadOf(e.line).supersedes;
+    if (typeof s === "string") corrected.add(s);
+  }
+  return samples.filter((e) => !corrected.has(e.line.id) && payloadOf(e.line).type === type);
+}
+
+/**
+ * A sample's span as the Night reads it: from `at` to `end`, an instant when it has no `end`, and
+ * none when its `end` is before its `at`.
+ */
+function spanOf(e: Entry): [number, number] | undefined {
+  const end = e.line.end;
+  if (end === null || end === undefined) return [e.ms, e.ms];
+  const endMs = typeof end === "string" ? Date.parse(end) : Number.NaN;
+  if (Number.isNaN(endMs) || endMs < e.ms) return undefined;
+  return [e.ms, endMs];
+}
+
+/** The seconds a set of spans covers, each moment once. */
+function unionSeconds(spans: Array<[number, number]>): number {
+  let ms = 0;
+  let cursor = -Infinity;
+  for (const [s, e] of [...spans].sort((a, b) => a[0] - b[0])) {
+    const start = Math.max(s, cursor);
+    if (e > start) ms += e - start;
+    cursor = Math.max(cursor, e);
+  }
+  return ms / 1000;
+}
+
+/**
+ * The Night line of the day, as the reference reads it: the asleep stages that start from the day
+ * before to the day's end, per device chained while no gap between them is over two hours, each
+ * chain a night on the day its last stage ends (a stage that ends at midnight ends on the day that
+ * begins then); of the nights that end on the day, the longest asleep, a tie going to the device
+ * first by name, then to the earlier night. With it, the day's training: the union of the workouts
+ * that start on the day. Undefined on a day no night ends on.
+ */
+function nightLine(entries: Entry[], ctx: Context): NightLine | undefined {
+  const fromMs = localToMs(addDays(ctx.day, -1), "00:00", ctx.timezone);
+  const byDevice = new Map<string, Array<{ e: Entry; span: [number, number] }>>();
+  for (const e of samplesOf(entries, "sleep")) {
+    const stage = payloadOf(e.line).stage;
+    if (typeof stage !== "string" || !ASLEEP.has(stage)) continue;
+    if (e.ms < fromMs || e.ms >= ctx.dayEndMs) continue;
+    const span = spanOf(e);
+    if (span === undefined) continue;
+    const device = payloadOf(e.line).device;
+    const key = typeof device === "string" ? device : "";
+    const list = byDevice.get(key) ?? [];
+    list.push({ e, span });
+    byDevice.set(key, list);
+  }
+  let best: { stages: Array<{ e: Entry; span: [number, number] }>; seconds: number } | undefined;
+  for (const key of [...byDevice.keys()].sort(byCodePoint)) {
+    const stages = (byDevice.get(key) ?? []).sort(
+      (a, b) => a.span[0] - b.span[0] || a.e.line.seq - b.e.line.seq,
+    );
+    let chain: typeof stages = [];
+    let chainEnd = -Infinity;
+    const close = (): void => {
+      if (chain.length === 0) return;
+      if (localOf(chainEnd, ctx.timezone).day === ctx.day) {
+        const seconds = unionSeconds(chain.map((x) => x.span));
+        if (best === undefined || seconds > best.seconds) best = { stages: chain, seconds };
+      }
+    };
+    for (const stage of stages) {
+      if (chain.length > 0 && stage.span[0] - chainEnd > NIGHT_GAP_MS) {
+        close();
+        chain = [];
+        chainEnd = -Infinity;
+      }
+      chain.push(stage);
+      chainEnd = Math.max(chainEnd, stage.span[1]);
+    }
+    close();
+  }
+  if (best === undefined) return undefined;
+  const startMs = Math.min(...best.stages.map((x) => x.span[0]));
+  const endMs = Math.max(...best.stages.map((x) => x.span[1]));
+  const device = payloadOf((best.stages[0] as { e: Entry }).e.line).device;
+
+  const workouts = samplesOf(entries, "workout")
+    .filter((e) => e.day === ctx.day)
+    .map((e) => ({ e, span: spanOf(e) }))
+    .filter((x): x is { e: Entry; span: [number, number] } => x.span !== undefined)
+    .sort((a, b) => a.span[0] - b.span[0] || a.e.line.seq - b.e.line.seq);
+  return {
+    start: utcIso(startMs),
+    end: utcIso(endMs),
+    start_local: localIso(startMs, ctx.timezone),
+    end_local: localIso(endMs, ctx.timezone),
+    asleep_s: best.seconds,
+    device: typeof device === "string" ? device : null,
+    lines: best.stages.map((x) => x.e.line.id),
+    training: workouts.length
+      ? {
+          minutes: roundHalfEven(unionSeconds(workouts.map((x) => x.span)) / 60),
+          lines: workouts.map((x) => x.e.line.id),
+        }
+      : null,
+  };
+}
+
+const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
 /**

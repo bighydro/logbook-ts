@@ -1,2 +1,2 @@
 2026-01-04  unsigned
-  11:15  goal       manual         Sail the boat to Lofoten and back in one summer, without a single night in a marina I didn't choose.
+  11:15  goal       manual         Sail the boat to Lofoten and back in one summer, without a single night in a marina I didn't choose.  (year, from 2026-01-01) · superseded by #2

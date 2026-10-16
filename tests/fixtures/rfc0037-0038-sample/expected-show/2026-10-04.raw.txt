@@ -1,0 +1,4 @@
+2026-10-04  unsigned
+  23:59  status     manual         entity={'id': 'solvind', 'registry': 'logbook', 'type': 'asset'}, label=Solvind, logbook_head=8a33ba981238ff9a8b40c2cb54764d4517be002b26d8a30a6ced6cb99785e1e8, proposed_by=owner, status=sold
+  23:59  status     manual         entity={'id': 'lerka', 'registry': 'logbook', 'type': 'asset'}, label=Lerka, logbook_head=12e8feba52f648941ce5d9bbf2dc8254380e73cbd5ef5a62a5ebeaa4d5661f8d, proposed_by=owner, reason=the lease ended, status=let-go
+  23:59  note       manual         the lease ended

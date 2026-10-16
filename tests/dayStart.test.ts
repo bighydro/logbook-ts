@@ -235,7 +235,7 @@ describe("the CLI refuses as the reference does: `<command>: <sentence>`, exit 2
     const { code, err } = run(["show", root, "--day", "2026-03-02"]);
     expect(code).toBe(1);
     expect(err).toBe(
-      "error: LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036\n",
+      "error: LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036, rfc0037, rfc0038\n",
     );
   });
 });

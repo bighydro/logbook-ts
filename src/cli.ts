@@ -4,6 +4,14 @@ import { readDay } from "./day.js";
 import { DayStartError } from "./dayStart.js";
 import { type DaysOptions, readDayRows, renderDayRow } from "./days.js";
 import { renderDay } from "./dayText.js";
+import {
+  EntityError,
+  StatusError,
+  statusListing,
+  statusListingJson,
+  statusListingText,
+} from "./entities.js";
+import { FLAGS_ENV, isOn, RFC0037 } from "./flags.js";
 import { renderNights, rollupNights } from "./nights.js";
 import { readPeople, renderPeople } from "./people.js";
 import type { WindowOptions } from "./reading.js";
@@ -11,7 +19,18 @@ import { readAssets } from "./settings.js";
 import { isDay, type ShowRangeOptions, type ShowResult, showDay, showRange } from "./show.js";
 import { BadRange, gapsText, listSources, sourceGaps, sourcesText } from "./sources.js";
 import { collectStats, statsText } from "./stats.js";
-import { addNote, LogbookError, readMeta, verifyLogbook } from "./store.js";
+import {
+  addNote,
+  HeadMoved,
+  LogbookError,
+  RepairRefused,
+  readMeta,
+  repairTail,
+  repairTailText,
+  TailAhead,
+  verifyLogbook,
+  WriterBusy,
+} from "./store.js";
 import { readTrips, renderTrips } from "./trips.js";
 
 export interface Io {
@@ -22,7 +41,18 @@ export interface Io {
 export const USAGE = `usage:
   logbook-ts verify <root>            check the chain; print "valid — N lines, head <hex>", or the
                                       errors after "invalid — N errors; M lines read, head <hex>"
-  logbook-ts add <root> "<text>"      append one note (note/v1, tier 2, source manual)
+  logbook-ts add <root> "<text>" [--no-wait]
+                                      append one note (note/v1, tier 2, source manual) under the
+                                      record's writer lock, state/writer.lock; waits for another
+                                      writer unless --no-wait, which refuses and exits 2; refuses
+                                      and exits 2 while the files end past logbook.json (a crash
+                                      between a line and logbook.json): run repair tail
+  logbook-ts repair tail <root> [--dry-run] [--no-wait]
+                                      the files end past logbook.json after a crash (SPEC §3, write
+                                      order): verify the whole chain and bring logbook.json forward
+                                      to the last line, under the writer lock; --dry-run lists the
+                                      lines past the head and writes nothing; a record that is not
+                                      that crash is refused, exit 2, nothing changed
   logbook-ts show <root> --day YYYY-MM-DD [--tz <zone>] [--raw] [--profile <schema>] [--json]
                                       print the day as the reference does: local time, kind, source,
                                       summary, then the day's notes file (--tz defaults to
@@ -79,12 +109,22 @@ export const USAGE = `usage:
                                       400 m of one), away and in transit, the nights aboard each
                                       asset, and the longest run of nights not at home; --json as
                                       one object, every number with its lines
+  logbook-ts status list <root> <kind> [--json]
+                                      every canonical org, idea, place or asset with its current
+                                      status/v1 line, as the reference's \`logbook status list\`
+                                      prints it: the day it took effect, who proposed it and why,
+                                      until for a place let go or an asset sold, stale, and the
+                                      dispositions the dream may not propose; --json as one object.
+                                      RFC 0037 is a draft: only with LOGBOOK_TS_FLAGS=rfc0037. Nothing
+                                      here writes a status line; the reference's \`logbook status\` does
 
 <root> is the folder that holds logbook.json and logbook/<YYYY>/<MM>.jsonl.
 
 LOGBOOK_TS_FLAGS=rfc0036 turns on RFC 0036 (draft, off until it is final): every command that groups
-lines by day refuses a day_start in logbook.json that is not midnight, and show prints draft/v1 and
-chapter/v1 lines as the reference does.
+lines by day refuses a day_start in logbook.json that is not midnight, and show prints draft/v1,
+goal/v1, review/v1 and chapter/v1 lines as the reference does. LOGBOOK_TS_FLAGS=rfc0037 turns on RFC
+0037 (draft): status list. LOGBOOK_TS_FLAGS=rfc0038 turns on RFC 0038 §2 (draft): show and day name a
+transcript's voices, and a recording heard again replaces the first. Names combine: rfc0037,rfc0038.
 `;
 
 export interface MainOptions {
@@ -117,10 +157,20 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         return 1;
       }
       case "add": {
-        if (root === undefined || rest.length === 0) return usage(io);
-        const line = addNote(root, rest.join(" "));
-        io.stdout(`added seq ${line.seq} ${line.id} at ${line.at}, head ${line.hash}\n`);
-        return 0;
+        // `--no-wait` anywhere after the command, as the reference's goes anywhere before its verb.
+        const given = argv.slice(1);
+        const [addRoot, ...words] = given.filter((word) => word !== "--no-wait");
+        if (addRoot === undefined || words.length === 0) return usage(io);
+        try {
+          const line = addNote(addRoot, words.join(" "), {
+            wait: !given.includes("--no-wait"),
+            say: (notice) => io.stderr(`${notice}\n`),
+          });
+          io.stdout(`added seq ${line.seq} ${line.id} at ${line.at}, head ${line.hash}\n`);
+          return 0;
+        } catch (err) {
+          return refusedWriter("add", err, io);
+        }
       }
       case "show": {
         if (root === undefined) return usage(io);
@@ -156,6 +206,31 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         io.stdout(json ? `${JSON.stringify(trips)}\n` : renderTrips(trips, readAssets(root)));
         return 0;
       }
+      case "repair": {
+        // `repair tail <root>`, its flags anywhere after the command.
+        const given = argv.slice(1);
+        const flagsGiven = given.filter((word) => word.startsWith("--"));
+        const [what, repairRoot, ...more] = given.filter((word) => !word.startsWith("--"));
+        if (what !== "tail" || repairRoot === undefined || more.length > 0) return usage(io);
+        if (flagsGiven.some((flag) => flag !== "--dry-run" && flag !== "--no-wait"))
+          return usage(io);
+        try {
+          const report = repairTail(repairRoot, {
+            dryRun: flagsGiven.includes("--dry-run"),
+            wait: !flagsGiven.includes("--no-wait"),
+            say: (notice) => io.stderr(`${notice}\n`),
+          });
+          io.stdout(repairTailText(report));
+          return report.verified === undefined || report.verified.valid ? 0 : 1;
+        } catch (err) {
+          // The reference: `repair tail: …; nothing was changed`, and the lock's refusal as `repair: …`.
+          if (err instanceof RepairRefused) {
+            io.stderr(`repair tail: ${err.message}\n`);
+            return 2;
+          }
+          return refusedWriter("repair", err, io);
+        }
+      }
       case "rollup": {
         const [rollupRoot, ...flagsGiven] = rest;
         if ((root !== "countries" && root !== "nights") || rollupRoot === undefined)
@@ -182,7 +257,8 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
           else return usage(io);
         }
         const read = readDay(root, { day: day ?? today(root) });
-        io.stdout(json ? `${JSON.stringify(read)}\n` : renderDay(read));
+        // Laid out as the reference's `day --json` is: two spaces, the keys in its order.
+        io.stdout(json ? `${JSON.stringify(read, null, 2)}\n` : renderDay(read));
         return 0;
       }
       case "people": {
@@ -246,6 +322,43 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         io.stdout(flags.json ? `${JSON.stringify(report, null, 2)}\n` : gapsText(report));
         return report.flagged.length ? 1 : 0;
       }
+      case "status": {
+        // `status list <root> <kind> [--json]`: RFC 0037 is a draft, read only under its flag.
+        // Anything else under `status` is the reference's writer, which this implementation has not.
+        if (root === undefined) return usage(io);
+        if (!isOn(RFC0037)) {
+          io.stderr(
+            `status: status list reads RFC 0037 (draft), which is off until it is final; set ${FLAGS_ENV}=${RFC0037} to turn it on\n`,
+          );
+          return 2;
+        }
+        if (root !== "list") {
+          io.stderr(
+            "status: this implementation does not write status lines (the reference's `logbook status KIND ENTITY DISPOSITION` does); it reads them: `status list <root> KIND`\n",
+          );
+          return 2;
+        }
+        const [listRoot, ...args] = rest;
+        if (listRoot === undefined) return usage(io);
+        let kind: string | undefined;
+        let json = false;
+        for (const arg of args) {
+          if (arg === "--json" && !json) json = true;
+          else if (kind === undefined && !arg.startsWith("--")) kind = arg;
+          else kind = "";
+        }
+        if (kind === undefined || kind === "") {
+          io.stderr("status: `status list KIND` takes a kind and nothing else\n");
+          return 2;
+        }
+        const listing = statusListing(listRoot, kind, undefined, options.now);
+        io.stdout(
+          json
+            ? `${JSON.stringify(statusListingJson(listing), null, 2)}\n`
+            : statusListingText(listing),
+        );
+        return 0;
+      }
       default:
         return usage(io);
     }
@@ -256,12 +369,35 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
       io.stderr(`${command}: ${err.message}\n`);
       return 2;
     }
+    // RFC 0037: a kind that takes no status, a settings file that is not one, as the reference
+    // refuses them: the command, the sentence, exit 2.
+    if (err instanceof StatusError || err instanceof EntityError) {
+      io.stderr(`${command}: ${err.message}\n`);
+      return 2;
+    }
     if (err instanceof LogbookError) {
       io.stderr(`error: ${err.message}\n`);
       return 1;
     }
     throw err;
   }
+}
+
+/**
+ * A writer's refusals, as the reference prints them: another writer under `--no-wait`, a head that
+ * moved under the lock, and the shapes a crash leaves (TailAhead), each one line naming the command,
+ * exit 2. Anything else is thrown on.
+ */
+function refusedWriter(command: string, err: unknown, io: Io): number {
+  if (err instanceof WriterBusy) {
+    io.stderr(`${command}: ${err.message}; --no-wait, so not waiting\n`);
+    return 2;
+  }
+  if (err instanceof HeadMoved || err instanceof TailAhead) {
+    io.stderr(`${command}: ${err.message}\n`);
+    return 2;
+  }
+  throw err;
 }
 
 type ShowFlags = ShowRangeOptions & { day?: string; json?: boolean };

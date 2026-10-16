@@ -1,0 +1,175 @@
+{
+  "day": "2026-09-05",
+  "weekday": "Saturday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-09-04",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-09-05",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "mail",
+      "at": "2026-09-05T09:00:00Z",
+      "end": null,
+      "title": "Sunday",
+      "line": "01a13fb4-8381-791c-946a-9543cce4fe3d"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-09-05T09:30:00Z",
+      "end": null,
+      "title": "Re: Sunday",
+      "line": "01a13fb4-8381-7f7c-83de-e495959c2df5"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-09-05T13:00:00Z",
+      "end": null,
+      "title": "Hello",
+      "line": "01a13fb4-8381-75b7-93e5-00d43a79ce5b"
+    },
+    {
+      "kind": "event",
+      "at": "2026-09-05T20:00:00Z",
+      "end": null,
+      "title": "The fjord kiosk",
+      "line": "01a13fb4-8382-7a40-93e5-abdb23dd43fa",
+      "sources": [
+        "notion"
+      ],
+      "lines": [
+        "01a13fb4-8382-7a40-93e5-abdb23dd43fa"
+      ]
+    }
+  ],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "mail",
+      "lines": 3,
+      "first": "2026-09-05T09:00:00Z",
+      "newest": "2026-09-05T13:00:00Z"
+    },
+    {
+      "source": "notion",
+      "lines": 1,
+      "first": "2026-09-05T20:00:00Z",
+      "newest": "2026-09-05T20:00:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-08-09",
+      "until": "2026-09-05",
+      "logged_days": 5
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": true,
+        "lines": 3,
+        "sources": [
+          "mail"
+        ],
+        "usual": [
+          "mail"
+        ],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": true,
+        "lines": 1,
+        "sources": [
+          "notion"
+        ],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

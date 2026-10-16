@@ -1,0 +1,5 @@
+2026-09-05  unsigned
+  11:00  mail       mail           ✉ Sunday — Kari Nordmann → Ines Nordmann
+  11:30  mail       mail           ✉ Re: Sunday — Per Nordmann → Ines Nordmann
+  15:00  mail       mail           ✉ Hello — Liv Berg → Ines Nordmann
+  22:00  event      notion         The fjord kiosk

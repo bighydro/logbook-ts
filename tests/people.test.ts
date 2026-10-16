@@ -90,7 +90,10 @@ describe("what people knows of each person", () => {
       via: "call",
     });
     expect(person("Nils Haug")?.last_real_contact).toBeNull();
-  });
+    // The seed-1 demo record read whole four times: about four and a half seconds alone, more than
+    // five on a Windows runner busy with the test files that run children beside it. What is named
+    // is the measure here, not the time.
+  }, 20_000);
 
   it("orders people by days together, then by the latest contact, then by name", () => {
     expect(all().people.map((p) => p.name)).toEqual([
@@ -140,5 +143,107 @@ describe("what people knows of each person", () => {
     // 52 messages with Ola: his and the owner's replies in their direct chat, both counted to him.
     const ola = person("Ola Nordmann");
     expect(ola?.channels.messages?.lines).toBe(52);
+  });
+});
+
+describe("three things the reference's people does that no fixture showed", () => {
+  // Each found running the reference (main at 7bcf728, and at 09e2967 before RFC 0038 alike) on the
+  // same lines in a record of its own; the expected text is its output.
+  const id = (seq: number): string => `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`;
+  const ola = {
+    at: "2026-06-01T08:00:00Z",
+    source: "manual",
+    kind: "resolution",
+    payload: {
+      schema: "resolution/v1",
+      ref: { kind: "email", value: "ola@example.org" },
+      entity: { type: "person", id: "019cadd3-6bc0-7dcd-9133-000000000002", registry: "logbook" },
+      label: "Ola Nordmann",
+      method: "owner",
+    },
+  };
+  const transcript = (at: string, raw: string, more: Record<string, unknown> = {}) => ({
+    at,
+    source: "granola",
+    kind: "transcript",
+    payload: {
+      schema: "transcript/v1",
+      raw_id: raw,
+      title: raw,
+      participants: [{ name: "Ola Nordmann", email: "ola@example.org" }],
+      ...more,
+    },
+  });
+  const retraction = (at: string, seq: number) => ({
+    at,
+    source: "manual",
+    kind: "retraction",
+    payload: { schema: "retraction/v1", supersedes: id(seq), seq, reason: "no" },
+  });
+
+  it("counts no transcript a line names in `supersedes`, even one a retracted line names", () => {
+    const root = writeRecord([
+      ola, // 1
+      transcript("2026-06-02T08:00:00Z", "a"), // 2
+      transcript("2026-06-02T08:00:00Z", "a2", { supersedes: id(2) }), // 3
+      transcript("2026-06-03T08:00:00Z", "b"), // 4
+      transcript("2026-06-04T08:00:00Z", "b2", { supersedes: id(4) }), // 5
+      transcript("2026-06-05T08:00:00Z", "c"), // 6
+      transcript("2026-06-05T08:01:00Z", "c2", { supersedes: id(6) }), // 7
+      retraction("2026-06-05T09:00:00Z", 7), // 8
+      {
+        at: "2026-06-06T08:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "with Ola Nordmann" },
+      }, // 9
+      transcript("2026-06-06T08:01:00Z", "n2", { supersedes: id(9) }), // 10
+    ]);
+    const people = readPeople(root, {});
+    expect(renderPeople(people, {})).toBe(
+      "1 person · 2026-06-01 – 2026-06-06 · tier 2\n  Ola Nordmann  transcripts 3\n",
+    );
+  });
+
+  it("ends a window over the whole record on the last line, a retraction included", () => {
+    const root = writeRecord([
+      ola,
+      transcript("2026-06-02T08:00:00Z", "a"),
+      {
+        at: "2026-06-03T08:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "x" },
+      },
+      retraction("2026-06-20T08:00:00Z", 3),
+    ]);
+    expect(renderPeople(readPeople(root, {}), {}).split("\n")[0]).toBe(
+      "1 person · 2026-06-01 – 2026-06-20 · tier 2",
+    );
+  });
+
+  it("takes no transcript a line supersedes as evidence of a day together", () => {
+    // The dinner heard again in tests/fixtures/rfc0037-0038-sample: the reference names the line
+    // that supersedes the first as the last real contact and the one line of the day together.
+    const root = join(FIXTURES, "rfc0037-0038-sample");
+    const ola = readPeople(root, {}).people.find((p) => p.name === "Ola Nordmann");
+    expect(ola?.last_real_contact).toEqual({
+      day: "2026-10-06",
+      via: "meeting",
+      line: "01a13fb4-841e-700f-b408-b0fc79a3cf10",
+    });
+    expect(ola?.lines).toEqual(["01a13fb4-841e-700f-b408-b0fc79a3cf10"]);
+  });
+
+  it("says `person` for one and `people` for none", () => {
+    const root = writeRecord([
+      {
+        at: "2026-06-02T08:00:00Z",
+        source: "manual",
+        kind: "note",
+        payload: { schema: "note/v1", text: "x" },
+      },
+    ]);
+    expect(renderPeople(readPeople(root, {}), {})).toBe("0 people · 2026-06-02 – 2026-06-02\n");
   });
 });

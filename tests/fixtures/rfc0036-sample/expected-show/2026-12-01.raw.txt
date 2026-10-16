@@ -1,2 +1,2 @@
 2026-12-01  unsigned
-  20:00  chapter    manual         Ashore, fixing things
+  20:00  chapter    manual         Ashore, fixing things  2026-08-10 – 2026-11-29

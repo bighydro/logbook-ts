@@ -1,0 +1,12 @@
+2026-09-04  Friday · unsigned
+  night before  in transit
+  night after   in transit
+  country       unknown
+
+  timeline      nothing logged
+
+  unplaced      14:00  mail   Opening
+
+  health        no lines
+  sources       mail 1 line, last 14:00
+  readiness     mail present · message none · meeting none · location none · photo none · calendar none

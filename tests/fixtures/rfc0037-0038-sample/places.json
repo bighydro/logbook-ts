@@ -1,0 +1,18 @@
+{
+  "Hytta": {
+    "lat": 59.9,
+    "lon": 10.75,
+    "radius_m": 120,
+    "kind": "other",
+    "tags": [
+      "family"
+    ]
+  },
+  "Båtplassen": {
+    "lat": 59.91,
+    "lon": 10.73,
+    "radius_m": 80,
+    "kind": "asset-berth",
+    "until": "2026-10-03"
+  }
+}

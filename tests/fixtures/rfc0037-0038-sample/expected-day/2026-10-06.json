@@ -1,0 +1,462 @@
+{
+  "day": "2026-10-06",
+  "weekday": "Tuesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-10-05",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-10-06",
+      "where": "59.9139,10.7522 near Båtplassen, 1.3 km",
+      "home": false,
+      "aboard": null,
+      "in_transit": false,
+      "stay": "stay:owner:20261006T1600Z@59.9139,10.7522",
+      "position": {
+        "lat": 59.913893,
+        "lon": 10.752153
+      },
+      "lines": [
+        "01a13fb4-840d-7141-b642-e6249df72a1b",
+        "01a13fb4-8411-7e51-9eee-4b4d67938086"
+      ]
+    }
+  },
+  "country": {
+    "code": "NO",
+    "method": "airport",
+    "by": "OSL",
+    "from": "night"
+  },
+  "all_day": [],
+  "timeline": [
+    {
+      "id": "stay:owner:20261006T1600Z@59.9139,10.7522",
+      "kind": "stay",
+      "start": "2026-10-06T16:00:00Z",
+      "end": "2026-10-06T21:00:00Z",
+      "start_local": "2026-10-06T18:00:00+02:00",
+      "end_local": "2026-10-06T23:00:00+02:00",
+      "within_day": {
+        "start": "2026-10-06T16:00:00Z",
+        "end": "2026-10-06T21:00:00Z",
+        "duration_s": 18000
+      },
+      "duration_s": 18000,
+      "where": "59.9139,10.7522 near Båtplassen, 1.3 km",
+      "place": null,
+      "lat": 59.913893,
+      "lon": 10.752153,
+      "aboard": null,
+      "mode": null,
+      "distance_m": null,
+      "airports": [],
+      "points": 61,
+      "promoted": false,
+      "gap": false,
+      "lines": {
+        "first": "01a13fb4-840d-7141-b642-e6249df72a1b",
+        "last": "01a13fb4-8411-7e51-9eee-4b4d67938086"
+      },
+      "attached": {
+        "events": [],
+        "transcripts": [
+          {
+            "title": "Middag",
+            "line": "01a13fb4-841e-700f-b408-b0fc79a3cf10",
+            "speakers": [
+              {
+                "label": "S1",
+                "person": null,
+                "name": null,
+                "seconds": 1862.4,
+                "basis": null,
+                "consent": null,
+                "owner": false
+              },
+              {
+                "label": "S2",
+                "person": null,
+                "name": null,
+                "seconds": 41.5,
+                "basis": null,
+                "consent": null,
+                "owner": false
+              }
+            ]
+          },
+          {
+            "title": "Idé",
+            "line": "01a13fb4-8412-7459-9b5b-e6884b642541"
+          },
+          {
+            "title": "Notatet hørt",
+            "line": "01a13fb4-841e-7b97-a8d1-fd70941913cf",
+            "speakers": [
+              {
+                "label": "mic",
+                "person": null,
+                "name": null,
+                "seconds": 30.0,
+                "basis": "channel",
+                "consent": null,
+                "owner": true
+              }
+            ]
+          },
+          {
+            "title": "Hørt feil",
+            "line": "01a13fb4-8424-7367-b6cf-1a4b4316dfca",
+            "speakers": [
+              {
+                "label": "S1",
+                "person": null,
+                "name": null,
+                "seconds": 1862.4,
+                "basis": null,
+                "consent": null,
+                "owner": false
+              },
+              {
+                "label": "S2",
+                "person": null,
+                "name": null,
+                "seconds": 41.5,
+                "basis": null,
+                "consent": null,
+                "owner": false
+              }
+            ]
+          }
+        ],
+        "notes": [
+          {
+            "text": "Dinner was long; Ola told the story of the engine.",
+            "line": "01a13fb4-8412-7a5c-8fe6-5b08c01c2d87"
+          }
+        ],
+        "mail": [],
+        "calls": [],
+        "messages": {
+          "count": 0,
+          "lines": []
+        },
+        "photos": {
+          "count": 0,
+          "lines": []
+        },
+        "keepers": []
+      },
+      "with": {
+        "confirmed": [
+          {
+            "person": "019cadd3-6bc0-7dcd-9133-000000000111",
+            "name": "Ola Nordmann",
+            "status": "confirmed",
+            "confidence": 0.9,
+            "sources": [
+              "transcript"
+            ],
+            "reasons": [
+              "spoke in Middag"
+            ],
+            "lines": [
+              "01a13fb4-841e-700f-b408-b0fc79a3cf10"
+            ]
+          }
+        ],
+        "proposed": []
+      }
+    }
+  ],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T07:15:00Z",
+      "end": null,
+      "title": "Samtale",
+      "line": "01a13fb4-8411-7170-9db4-b2ad2169b3e9",
+      "speakers": [
+        {
+          "label": "mic",
+          "person": null,
+          "name": null,
+          "seconds": 201.7,
+          "basis": "channel",
+          "consent": null,
+          "owner": true
+        },
+        {
+          "label": "system",
+          "person": null,
+          "name": "Ola Nordmann",
+          "seconds": 188.3,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        }
+      ]
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T08:00:00Z",
+      "end": null,
+      "title": "Rom",
+      "line": "01a13fb4-8411-716d-ab54-02e1950011c1",
+      "speakers": [
+        {
+          "label": "S1",
+          "person": null,
+          "name": null,
+          "seconds": 0.0,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "S2",
+          "person": null,
+          "name": null,
+          "seconds": 59.5,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "S3",
+          "person": null,
+          "name": null,
+          "seconds": 89.9,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "S4",
+          "person": null,
+          "name": null,
+          "seconds": 7230.0,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "Speaker 5",
+          "person": null,
+          "name": "Kari Nordmann",
+          "seconds": null,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "mic.2",
+          "person": null,
+          "name": "Ines",
+          "seconds": null,
+          "basis": "channel",
+          "consent": null,
+          "owner": true
+        }
+      ]
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T08:30:00Z",
+      "end": null,
+      "title": "Kanter",
+      "line": "01a13fb4-8412-734a-8b45-12a2b1079ab5",
+      "speakers": [
+        {
+          "label": " S1 ",
+          "person": null,
+          "name": null,
+          "seconds": null,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "S2",
+          "person": null,
+          "name": null,
+          "seconds": null,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        },
+        {
+          "label": "S3",
+          "person": null,
+          "name": null,
+          "seconds": null,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        }
+      ]
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T09:00:00Z",
+      "end": null,
+      "title": "Bare tekst",
+      "line": "01a13fb4-8412-7cc5-8b68-3663116c57d8"
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T09:30:00Z",
+      "end": null,
+      "title": "Ingen stemmer",
+      "line": "01a13fb4-8412-724e-8c50-9402a3d7f7f6"
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T10:00:00Z",
+      "end": null,
+      "title": "Med folk",
+      "line": "01a13fb4-8412-70cb-a906-38d395086fdb",
+      "speakers": [
+        {
+          "label": "S1",
+          "person": null,
+          "name": null,
+          "seconds": 12.0,
+          "basis": null,
+          "consent": null,
+          "owner": false
+        }
+      ]
+    },
+    {
+      "kind": "transcript",
+      "at": "2026-10-06T10:30:00Z",
+      "end": null,
+      "title": "Kort",
+      "line": "01a13fb4-8412-79d6-b922-fa898e32dc84"
+    }
+  ],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "dawarich",
+      "lines": 61,
+      "first": "2026-10-06T16:00:00Z",
+      "newest": "2026-10-06T21:00:00Z"
+    },
+    {
+      "source": "transcription",
+      "lines": 10,
+      "first": "2026-10-06T07:15:00Z",
+      "newest": "2026-10-06T20:00:00Z"
+    },
+    {
+      "source": "granola",
+      "lines": 2,
+      "first": "2026-10-06T17:40:00Z",
+      "newest": "2026-10-06T17:40:00Z"
+    },
+    {
+      "source": "manual",
+      "lines": 2,
+      "first": "2026-10-06T19:30:00Z",
+      "newest": "2026-10-06T21:59:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-09-09",
+      "until": "2026-10-06",
+      "logged_days": 18
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": true,
+        "lines": 13,
+        "sources": [
+          "granola",
+          "transcription"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": true,
+        "lines": 61,
+        "sources": [
+          "dawarich"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

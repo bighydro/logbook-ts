@@ -482,6 +482,27 @@
       "newest": "2026-06-15T14:00:00Z"
     }
   ],
+  "night": {
+    "start": "2026-06-14T22:39:00Z",
+    "end": "2026-06-15T04:52:00Z",
+    "start_local": "2026-06-15T00:39:00+02:00",
+    "end_local": "2026-06-15T06:52:00+02:00",
+    "asleep_s": 22260,
+    "device": "Watch",
+    "lines": [
+      "019ec849-cba0-71b5-9dff-85e20554fcd2",
+      "019ec867-17a0-73af-8735-a18908eded4c",
+      "019ec875-bda0-7de0-9c01-a1a54f721354",
+      "019ec8a8-1840-7d83-8f5a-f4a13883645e",
+      "019ec8b7-a8a0-7996-bcf3-a40bdc31adc4",
+      "019ec8ce-8c00-7c1f-b7d1-cb5a374197cd",
+      "019ec90e-a240-72a1-9e4d-7318956af827",
+      "019ec933-4140-7d15-a55a-987c6a049054",
+      "019ec948-4fe0-7d94-b77f-ed8bdd6f87b2",
+      "019ec984-bca0-7e40-95ad-ade589e3f339"
+    ],
+    "training": null
+  },
   "signed": null,
   "readiness": {
     "window": {

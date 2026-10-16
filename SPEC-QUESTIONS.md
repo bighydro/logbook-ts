@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, and at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -30,6 +30,8 @@ The Python source was not read; an *Answered* paragraph quotes what the referenc
 11. **Ordering ties and `seq` gaps.** §3 says "every line's `seq` is the previous plus one". If two lines share a `seq`, the sort order between them is unspecified and so is which error to report. This implementation reports both the duplicate and the broken chain after it.
 
 12. **Crash between the two writes of `add`.** `add` appends a line and then rewrites `logbook.json`. A crash in between leaves a record whose last line is fine but whose `logbook.json` is one behind, which §3 calls invalid. Does the spec want writers to append the line first (so the record is never missing data) or update the head first? This implementation appends first and rewrites `logbook.json` through a temp file and rename; the recovery (`logbook.json` catches up) is trivial but not specified.
+
+    *Answered (SPEC §3, "Write order").* The line first, "flushed and fsynced", then `logbook.json` "written to a temporary file and renamed into place", then any index; "a crash therefore leaves the files ahead of `logbook.json`, never behind", and "until `logbook.json` is brought forward, `verify` reports such a record invalid". This implementation now does exactly that, fsync included. Who brings `logbook.json` forward, and on what check, is still not written: here, as in the reference since its #294, every writer refuses and `repair tail` brings it forward after verifying the chain (92).
 
 13. **Conformance README item 3 versus SPEC §6.** `conformance/README.md` adds a third condition (editing any byte, or deleting any line, must fail) that SPEC §6 does not list. Both are tested here; suggest folding item 3 into §6.
 
@@ -795,3 +797,406 @@ varied field by field (`tests/cross-impl.test.ts` repeats those runs). Everythin
     f. The header a held-back day crosses is "the day, and whether and when it was signed". Does a day
        held back by RFC 0034's default (unsigned, no `--unsigned`, no `signed_within_days`) cross its
        header too? (Here: `dayGate` says it may; the command decides.)
+
+## Found while adding the writer lock and the repair of the tail (openlogbook main at 7bcf728, 0.6.1, 2026-10-15; docs/commands.md "One writer at a time", docs/recovery.md "The files ahead of logbook.json", its docs/SPEC-QUESTIONS.md 83, its #294)
+
+The reference was run, never read: on copies of the conformance sample with locks planted by hand, under
+`strace`, and with `logbook.json` set back by hand. Two probes of its `add` on malformed input (a pid too
+large for a C long in the lock, a `seq` that is a string in `logbook.json`) stopped it with a Python
+traceback; those inputs were not pursued and nothing here is drawn from the lines the tracebacks printed.
+
+91. **The writer lock is not in the spec.** docs/commands.md says a command that appends holds
+    `state/writer.lock` in the record folder for its whole run, that a second writer waits (`another
+    logbook command is writing to this record (<command>, since <time>); waiting`) or with `--no-wait`
+    refuses with exit 2, that a lock whose process is gone is taken over with one line saying so, that
+    readers never take it, and that the guard behind the courtesy is a writer reading `logbook.json` again
+    before every batch and writing nothing when the head has moved. SPEC.md says none of it, and a second
+    implementation on the same folder has to honour the same file or the courtesy is one-sided.
+
+    What running the reference shows. It writes `{"pid": 618, "command": "add", "since":
+    "2026-10-13T13:25:40Z"}` (`"repair tail"` for that command) and removes `state/` when nothing else is
+    in it. It makes the lock in two steps, `open("state/writer.lock", O_CREAT|O_EXCL)` and then the
+    write, so for a moment the lock is there and names no holder. Finding a lock, it reads it, and every
+    half second reads it again:
+    - A JSON object names a holder, whatever is in it. A holder whose pid is a living process is waited
+      for, however old its `since` (a lock dated 1999 still is: there is no age threshold), or refused
+      under `--no-wait`. One whose pid is gone, is not a number (`"x"`, `"123"`, `1.5`, `[1]`, null,
+      missing), is 0 or negative, or is the writer's own pid (a crashed writer's pid given again, as in a
+      container; run as pid 1 in a pid namespace) is taken over: `a stale lock from add (pid 1, since …)
+      whose process is gone; taking it over`. A field that is missing prints as `?`, JSON null as
+      `None`, anything else as Python's `str()`: `{}` is `a stale lock from ? (pid None, since ?) …`,
+      `{"pid": [1], "command": ["a"], "since": {"x": 1}}` is `a stale lock from ['a'] (pid [1], since
+      {'x': 1}) …`. `true` is the int 1 to Python, so `{"pid": true}` is waited for while pid 1 lives.
+    - A lock that names no holder (empty, cut short as `{"pid": 12`, not JSON, spaces, `null`, `[1]`) is
+      read again after one sleep of half a second (`clock_nanosleep`, monotonic). If it names a holder by
+      then, that holder is honoured as above; if it still names none, it is removed without a word and
+      the writer takes the lock, under `--no-wait` too (exit 0, the line written). The half second runs
+      from the writer's first read: the lock's mtime and inode are not looked at — an empty lock dated an
+      hour back, one dated an hour ahead, one touched during the half second and one replaced by a new
+      empty file during it are all removed after the same half second.
+
+    This implementation writes and reads the same file (`command` is `logbook-ts add` or `logbook-ts
+    repair tail`, so the reference's message names the other program) and prints the same sentences, and
+    differs in three places:
+    - It makes its own lock in one step: the holder written and fsynced to a temp file in `state/`, then
+      hard-linked to `writer.lock`. `link`, like `O_EXCL`, fails when the name exists, so the two
+      implementations still exclude each other, and no reader finds this one's lock empty; a rename would
+      replace a lock that is there. Where the filesystem cannot link it falls back to the reference's two
+      steps.
+    - An empty lock (rule A; the owner's decision of 16 October, which replaces that of 15 October): the
+      reference's rule alone. A lock that names no holder is a leftover of a crash once the same file —
+      its bytes, inode, size and mtime, read on one handle — has named no holder on every read for half a
+      second; it is removed then without a word and taken, under `--no-wait` too. Its mtime is never read
+      as its age. The decision of 15 October had asked for both, the reference's half second and an mtime
+      half a second past; it was dropped because an empty leftover dated ahead of the clock (another
+      machine's clock, on a shared folder) then held every writer here until that clock was passed, while
+      the reference took it at once, and an mtime says nothing a writer can trust about who made the file
+      or when. What is left of the difference: a lock replaced or touched during the half second starts
+      it over here, where the reference removes it all the same after its one sleep, since a file that
+      changes is someone writing it. While the half second keeps starting over the writer says, once,
+      `another logbook command is taking the lock on this record (state/writer.lock names no holder yet;
+      if none is running, remove it); waiting`, and under `--no-wait` refuses with that sentence (exit 2).
+      One mtime is still read, and not as the age of a lock that names no holder: a reclaim file (this
+      implementation's own) naming this process's pid is another thread's when it is dated since this
+      process started, and a leftover of an earlier process given the same pid when dated before. The
+      reclaim file holds a pid and nothing else, no `since`, so its date is all there is to tell the two
+      apart; one dated ahead by another machine's clock is waited for, with one line after half a
+      second, by a process given that pid, and refused under `--no-wait`. The removal is a compare-and-remove under a second
+      exclusive file (`state/writer.lock.reclaim`, this implementation's own, the same that guards the
+      takeover of a dead holder's lock), the lock read again on one handle and its bytes, inode, size and
+      mtime compared right before the unlink; `taking it over` is said once it is taken over. An empty
+      reclaim file is held to the same half second; one naming a living pid (a reclaimer stopped, or a
+      crashed one's pid given to another process) is waited for after half a second with `another
+      logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid
+      N); waiting`, or refused under `--no-wait`. A reclaim file a crash leaves stays, and keeps
+      `state/` from being removed, until a writer here clears it; the reference leaves it alone.
+    - A lock naming this process's own pid is a leftover, as the reference reads it, only when its `since`
+      is before this process started; one dated since then may be held by another thread of this process
+      and is waited for. A `withWriterLock` inside another on the same record, in one thread, is refused
+      (`LogbookError`) instead of waiting on itself.
+
+    What is left open: a writer that makes its lock in two steps and is held between them for more than
+    half a second loses it under rule A, in either implementation, as the reference's own rule has it.
+    This implementation's two-step fallback notices (the file it wrote its holder into has no name any
+    more: its links are down to none, or, once it is closed, the lock's name is another file, a file
+    naming another holder, as when a freed inode number is given again, or none) and waits on the
+    writer that took the lock; the reference's writer, run so, goes on beside the other, and only the
+    head re-check stands between them. The name is read once the file is closed because Windows before
+    libuv 1.49 (Node 20) keeps a removed file's name, delete-pending, with one link, while a handle
+    holds it; there the writer that removed such a lock cannot read the lock again until the stalled
+    writer closes it, and refuses, `cannot read the writer lock (EPERM …)`, after the five seconds
+    Windows' refusals are retried, with nothing written. A two-step writer that writes its
+    holder in the instant between another's last read and its unlink is caught here only when that
+    unlink comes before its own check that its file still has the name; the reference's writer makes
+    no such check.
+    And a lock left by an earlier process given this pid, written in the second this process started,
+    reads as another thread's (`since` has seconds only) and is waited for; the message says to remove
+    it if no writer is running.
+
+    Suggest a paragraph in SPEC §3 beside *Write order*:
+
+    > **One writer at a time.** A writer holds `state/writer.lock` in the record folder for the whole of
+    > an append: a JSON object with the holder's `pid`, `command` and `since` (RFC 3339 UTC). It creates
+    > the file exclusively and SHOULD create it whole, its holder written to a temporary file and
+    > hard-linked into place. A lock whose `pid` names a living process other than the reader is waited
+    > for, or refused; one whose `pid` is not a positive integer or names no living process is taken over.
+    > A lock that names no holder (empty, or not a JSON object) is a writer between its create and its
+    > write: it MUST NOT be taken over until it has named no holder for 0.5 s (an implementation MAY
+    > also require it unchanged over that time); after that it is a leftover of a crash and MAY be
+    > removed and taken. Its modification time is not its age and MUST NOT keep a leftover from being
+    > taken. A writer MUST read
+    > `logbook.json` again under the lock before it writes and write nothing if the head has moved; the
+    > lock is a courtesy, the re-read is what keeps the chain whole. Readers never take the lock.
+
+92. **Who brings `logbook.json` forward after a crash, and on what check.** SPEC §3 says a crash leaves the
+    files ahead of `logbook.json`, "any lines past its `seq` are a complete, chained tail", and that `verify`
+    reports the record invalid "until `logbook.json` is brought forward" — by whom it does not say. The
+    reference answered it in its #294 (975229d, 2026-10-14; docs/recovery.md, *The files ahead of
+    logbook.json*; its docs/SPEC-QUESTIONS.md 83, which names this question and an earlier version of
+    this implementation's answer): every writer refuses while the files end past `logbook.json`, and an
+    explicit command brings it forward. This implementation now does the same (the owner's decision of 15
+    October); it no longer brings `logbook.json` forward itself during `add`.
+
+    Run on the sample with a line added and `logbook.json` set back one:
+    - `add` exits 2 and writes nothing: `` add: the files are ahead of logbook.json: they end at seq 33 head
+      d807cbcf26fc…, logbook.json says seq 32 head 58bfa9e704e3… (a crash between a line and logbook.json,
+      SPEC §3); nothing was written: run `logbook repair tail` ``; with the files ending at the seq
+      `logbook.json` names under another head, `` add: the files do not end where logbook.json says: they
+      end at seq 32 head 58bfa9e704e3…, logbook.json says seq 32 head aaaaaaaaaaaa…; nothing was written:
+      run `logbook repair tail` ``; with a month file cut inside its last line, `` add:
+      logbook/2026/10.jsonl line 2: the file ends inside this line (cut short); nothing was written: run
+      `logbook repair tail` ``. A lag whose tail is wrong (a hash, a `prev`, a second line of one seq)
+      gets the first sentence: its `add` looks at where the files end and no further.
+    - `repair tail --dry-run` exits 0 and writes nothing: `logbook.json says seq=32 head=58bfa9e704e3…; the
+      files hold 1 line past it, each verified (envelope, seq, prev, hash):`, one row per line past the head
+      (`  seq 33  logbook/2026/10.jsonl line 1  hash d807cbcf26fc…`, the first twenty, then `  … and 12 more
+      lines`), `would set logbook.json to seq=33 head=d807cbcf26fc…, and build no index (…)` and `nothing
+      written — run without --dry-run to repair`. `repair tail` prints the same rows, `logbook.json: seq 33,
+      head d807cbcf26fc…; no index (…)` and the verdict of `verify`, exit 0. On a record that verifies, both
+      say `nothing to repair: the files end where logbook.json says, seq=33 head=d807cbcf26fc…`, exit 0.
+    - It refuses with exit 2 and `nothing was changed`: the files ending before `logbook.json` (`…: the
+      files are behind logbook.json, which no crash leaves (SPEC §3); restore the month files from a backup;
+      nothing was changed`), the files ending at its seq under another head (`` …: no line is past the head
+      and the head is not the files'; run `logbook verify`; nothing was changed ``), and a line past the head
+      that does not verify, named by its place in the chain (`repair tail: line 34: hash does not
+      recompute; id …; nothing was changed`; `prev does not match previous hash`; `seq 33 expected 34`) or,
+      for a file cut inside its last line, by file and row. The writer lock is held throughout, the dry run
+      included: under `--no-wait`, `repair: another logbook command is writing to this record (…); --no-wait,
+      so not waiting`, exit 2.
+    - It checks only the lines past the head before it writes: with line 10 changed and a lag of one, the
+      repair sets `logbook.json` forward and then prints `INVALID — 1 problem(s) after the repair; …` and
+      exits 1.
+
+    This implementation's `repair tail <root> [--dry-run] [--no-wait]` prints the same lines and exits
+    with the same codes, and differs where it must or where it is safer:
+    - It verifies the whole chain, streaming it as `verify` does (one line per month file held, the rows
+      listed being the first twenty), before it writes anything, and refuses a record with any fault in
+      the files, before the head or past it; the reference's line-10 case is refused here with `nothing
+      was changed`. The owner's decision says "after verifying the chain", and a record that is wrong
+      somewhere else is not the crash this command mends.
+    - A line that does not verify is named as this implementation's `verify` names it (`repair tail:
+      logbook/2026/10.jsonl line 2: seq 34 — hash … does not recompute (got …); nothing was changed`), as
+      the reference names it as its own `verify` does; the two `verify`s word a line differently already.
+      A first line past the head whose `prev` is not the head `logbook.json` names is said as `verify`
+      would say it with that head as the previous hash.
+    - It keeps no index, so the index clauses are left out (`would set logbook.json to seq=33
+      head=d807cbcf26fc…`, `logbook.json: seq 33, head d807cbcf26fc…`).
+    - Its sentences name its own program, `` run `logbook-ts repair tail` `` and `` run `logbook-ts verify` ``,
+      as its lock names `logbook-ts add`.
+    - It refuses a `logbook.json` whose `seq` is not a whole number from 0 or whose `head` is not 64 hex
+      digits, which names no line to bring forward from, before it takes the lock, so a folder that is no
+      record gets no `state/`; the reference, given a `seq` that is a string, says there is nothing to
+      repair, and given a head of three digits, its same-seq refusal.
+    - `add` refuses in the reference's one sentence and exit 2 (`TailAhead`, said as a moved head is,
+      but not a `HeadMoved`, since reading the head again does not mend it) where the
+      reference's `add` does — a month file cut inside its last line; the files ending, at their last
+      line's `seq` and hash, past `logbook.json` or at its `seq` under another head — whatever else is
+      wrong with the record. Anything else that does not verify is refused as before, every problem
+      listed, exit 1, where the reference's `add`, looking no further, appends: to a record wrong in the
+      middle, and to one whose files end *before* `logbook.json`, past the gap.
+
+    Suggest SPEC §3's *Write order* end: "A writer MUST NOT append while the files end past `logbook.json`,
+    or at its `seq` under another head; bringing `logbook.json` forward over a tail is a repair, made only
+    after every line past the head verifies from it, and never by an append." — the fork it prevents is
+    the one the reference's #294 found.
+
+## Found while catching up with the reference at 7bcf728 and porting RFC 0038 §2 (openlogbook main at 7bcf728, 2026-10-15; docs/day.md, docs/goals.md, docs/speakers.md, rfcs/0038-speakers.md, rfcs/0004-transcript-v1.md's amendment of 2026-10-14)
+
+The reference was run, never read, on probe records written with its own `Logbook.append` and its
+persona helpers; every rule below is what it printed. Since this implementation last caught up
+(2026-10-14, about dbc4b70) the reference also changed the Day (the Night line, #288; a draft shown only
+under the crossing policy's `dream` entry, #273) and RFC 0036's rows in `show` (#275), and the
+cross-implementation job failed on those until they were read here too.
+
+93. **The Night line (docs/day.md since 0aeacdb).** What the reference does, which docs/day.md does not
+    all say:
+    a. The stages read are those that *start* from the day before (local midnight) to the day's end, so
+       a night that goes on past midnight is a night of the day it began on as well, cut at the day's
+       end: stages 22:00–23:30 on the 1st and 01:00–03:00 on the 2nd give the 1st `slept 22:00–23:30`
+       and the 2nd `slept 22:00–03:00`. docs/day.md says a night "belongs to the day its last stage
+       ends in … never split". Is the first reading meant? (Here: as the reference.)
+    b. Of two nights or two devices equally long, the device first by name (code point, a device-less
+       stage as the empty name) and then the earlier night is shown. Is that a rule or an accident?
+    c. A stage with no `end` is an instant, one whose `end` is before its `at` is none; a stage ending at
+       local midnight ends on the day that begins then.
+    d. Minutes are rounded half to even, so 30 s is `< 1 min` and 90 s `2 min`; a night under half a
+       minute is `< 1 min`, and so is a day's training of zero length.
+    e. Training is shown only beside a night: a day with workouts and no night has no row, and its
+       workouts are not counted under `health` either (`health no lines`).
+    f. The health row no longer says the sleep, and a day whose health lines are only sleep, or only a
+       heart rate variability, has no health row at all; `health no lines` is printed only when the
+       JSON's `health` is null.
+    g. `hrv` given in `s` is read as ms (×1000); any other unit, `ms`, `min`, `S` or none, as given.
+       This implementation read every unit as given before; it was found by probing, not by a fixture.
+    h. The JSON's `health` keeps the night's sleep by the older rule (the asleep stages that end on the
+       day, per device, the longest), and on a tie its `lines` are the stages of the device whose first
+       stage comes first in the record, by `seq`, while the Night line's tie goes to the device first by
+       name (b). Two rules for one night: which is meant? (Here: each as the reference; this
+       implementation took the device that fell asleep first until the independent review found it.)
+
+94. **RFC 0036's rows in `show` (#275, docs/goals.md, *On the Day*); 88b answered.** The reference now
+    prints the rows RFC 0036 described: a goal `<text>  (<horizon>, from <from>[, until <until>])`, a
+    review `<disposition> · <period> · <the goal's current text>`, a chapter `<name>  <from> – <to>`,
+    and the day's chapter in the heading. As run:
+    a. A missing field reads `None` (`Goal two.  (None, from None)`); `until` and `to` are left out when
+       falsy, and the chapter row loses the trailing space of an open chapter (`2027-03-01 –`).
+    b. ` · superseded by #N` names the latest standing goal (chapter) that names it in `supersedes`; a
+       retracted one replaces nothing, and a line of another kind never marks a goal.
+    c. A review of a goal not in the record, or of a retracted one, prints `goal <id>`; the goal's
+       current text follows the chain of standing rewordings to its end.
+    d. The heading's clash names the other chapter (`· chapter Clash, clashes with Winter`). With three
+       chapters on one day, are the others joined with `, `? (Here: yes; not seen.)
+    e. The Day's own RFC 0036 parts (the chapter in its header, the `reviews` row, the `goals`,
+       `chapters` and `reviews` keys, a draft's `proposals`, `draft_withheld`, `syntheses`) are not read
+       here yet; no fixture of the Day has such a line.
+
+95. **A transcript's voices (RFC 0038 §2, RFC 0004's amendment), as the reference reads them.** Behind the
+    `rfc0038` flag here.
+    a. Readers are lenient: a voice is an object whose `label` matches `^[^#\n]{1,64}$` (in code points:
+       64 emoji are a label); `seconds` is any number of 0 or more (a boolean is none, though a boolean
+       `extra.duration_s` is read as 1 or 0); a `name` of whitespace only is none, and a name is kept
+       unstripped; only `from_me: true` is the owner. Two voices with one label are both shown. Is
+       that the reader the RFC means, given that its schema forbids every one of those lines?
+    b. `diarization` is MUST when `speakers` is present, but no reader checks it: a line without it
+       shows its voices. Should a reader refuse to show voices without it? (Here: as the reference.)
+    c. The reference has no validator for the two fields at run time; `schema/transcript-v1.schema.json`
+       is checked by its tests only. So none is here, and nothing refuses a malformed voice.
+    d. A line a transcript supersedes is `superseded by #N` in `show`, whatever its kind (a note heard
+       as a recording is marked), but only when the transcript is not retracted, while a line a
+       *retracted* flight supersedes is still marked (`superseded by #6` beside `retracted #6`). Is the
+       difference meant?
+    e. The Day leaves out only a transcript superseded by another transcript *of the same day*: a
+       recording heard again the next day leaves the first listed on its own day, though `show` marks it.
+       A superseded transcript's line still counts in the day's `sources`, and the transcripts left out
+       are not evidence of who was there.
+    f. `person` is always null and `basis` is `channel` only for the owner's voice: RFC 0038 §3's
+       `speaker` resolution is not built. When it is, will a resolved voice's `name` be the person's?
+    g. Numbers past a double: a `seconds` (or an `extra.duration_s`) written as a JSON integer too large
+       for a float (`1` and 400 zeros) makes the reference's `show` and `day` raise `OverflowError`; here
+       it is no length. Past 2^53 both print the double's exact digits (`153722867280912928 min`). A
+       JSON integer past 2^53 in `extra.turns` is exact in Python and a double here, so its digits can
+       differ (`…808 turns` there, `…000 turns` here). Should the profile bound these numbers?
+
+96. **A line a flight supersedes is `superseded by #N` whatever its kind.** The reference marks a note or
+    a transcript a flight line supersedes, at 7bcf728 and before RFC 0038 alike; this implementation
+    marked only a flight. Fixed here, flag or not. Is a flight that supersedes a line of another kind
+    meaningful at all, or should a reader refuse to let a flight replace a note?
+
+97. **`people`, three things no fixture had shown (74 answered in part).** Found running the reference on
+    `tests/fixtures/rfc0037-0038-sample`, the same before RFC 0038 (09e2967) and at 7bcf728; fixed here,
+    flag or not:
+    a. A transcript some line names in `supersedes` is not counted, even when that line is retracted
+       (so a transcript "heard again" and then the second hearing retracted counts for nothing), and it
+       is no evidence of a day together. The Day, before RFC 0038, listed both and took both as evidence
+       of who was there. Should `people` and the Day agree, and should a retracted line's `supersedes`
+       still hide what it names, against RFC 0003's "a retracted line counts for nothing"?
+    b. One person is `1 person` (74 guessed `1 people`).
+    c. The whole record's window ends on the last line of any kind, a retraction's own `at` included,
+       so a record retracted from today reads to today. A retraction's `at` is when it was written; is
+       it meant to stretch the window of a reader of people?
+
+## Found while porting RFC 0037, entities (openlogbook main at 7bcf728, 2026-10-15; rfcs/0037-entities.md, docs/entities.md)
+
+On the owner's instruction, the validators, tiers and readers of RFC 0037's three profiles and the
+read-only half of `logbook status` were ported from the reference's `logbook/contrib/entities.py` and
+`entity_status.py` and their tests, and the reference was run beside this one on every case
+(`tests/cross-impl-entities.test.ts`). Where its code and the RFC's text differ, this implementation
+follows the code, which is what a record written by the reference holds; each place is below. Everything
+is behind the `rfc0037` flag where a command reads it (`status list`); the functions read a line
+wherever a caller holds one.
+
+98. **Where the reference's code and RFC 0037's text differ.**
+    a. §10.2 makes `until` MUST on a status of a place or an asset and `note` MUST beside a reason
+       (except an org's). The writer puts neither on the line: `until` is written into the registry
+       entry of `places.json` or `assets.json` (the listing's `until` is the standing line's local day,
+       never the file's), and the reason's note names the status line in its `extra.status`, written
+       after it, instead of the status naming the note. `validate_status` checks neither field. Which is
+       the profile?
+    b. §8 holds an `entity/v1` line of a place or an asset at tier 1 (a place's at 2 when it cites a
+       note), and a place's `entity-review/v1` no at 1; the code holds every `entity/v1` line at 2 and
+       every no at 2 or more ("a no is a decision").
+    c. §6.2's `entity-review/v1` has `type` and `name` fields, `entity` absent for a new entity, and a
+       place's spot as a `point` ref; the code has the kind as `entity.type`, a new entity as
+       `entity: {type}` alone, the offered name as `label`, and the spot as a `centre` ref
+       (`OBSERVED_REFS` adds `name`, `centre`, `subject`).
+    d. §3.2 says a ref of a kind the entity's type does not take makes the line invalid; the code takes
+       any of its ref kinds for any type. §3.2 says `entity.type` is never `person`; the code takes a
+       person with no refs (decision 1).
+    e. §4.6 names `stale_after_days` and `personal_max_people`; the code reads `stale_days`,
+       `merchant_min_lines`, `title_min_lines`, `registration_min_flights` and `mute_days`. §10.6's
+       `stale_since` is not in the listing's JSON, and staleness counts the status line's day only, never
+       a touch.
+    f. §9's person key `name:<words sorted>` is the name folded as given.
+    g. No reader, and not `verify`, checks the three profiles: only the writers do, before they append.
+       Should a reader refuse, or mark, a line that does not pass? (Here: the functions say so to a
+       caller; no command refuses a record for it.)
+
+99. **What this implementation adds, and where the reference raises.**
+    a. `orgReasonProblems` is this implementation's: §10.5 keeps an org's reason on its tier-3 line, and
+       the reference's writer never writes a note for it, but nothing checks a record that has one. It
+       names a `status/v1` line about an org that carries a `note`, a `note/v1` labelled `status` whose
+       `extra.entity` is an org or whose `extra.status` names an org's status line, and a status note
+       above tier 2. Should the reference say so too, and in which words?
+    b. RFC 0006's walk as the reference's entity readers run it differs from `src/resolve.ts`'s in two
+       places, so `entities.ts` carries its own: a `resolution`/`retraction` line counts whatever its
+       schema, and a retracted line's `supersedes` leaves the line it names standing. Which is the
+       rule for `show`'s names too?
+    c. The reference raises where it has no sentence: an org's or an idea's id with a trailing newline
+       (`ValueError` from `uuid.UUID`, after its pattern let the `\n` through), an `entity.type` or a
+       `status` that is a list (`TypeError: unhashable`), `tier_problems` with an empty kind
+       (`IndexError`), a `since` that is not a real day in `muted` and `stale`, an `aliases` that is a number
+       (`TypeError` in its readers; here no alias is read). This implementation
+       answers with the rule's sentence, or refuses naming the value (`'2026-13-45' is not a day,
+       YYYY-MM-DD`). A JSON number written `2.0` is a float to Python and a whole number here, so a
+       `policy/entities.json` number written so is refused there and read here.
+    d. `status list` of a kind that takes no status, and `status` with anything but `list`, are
+       refused: the first in the reference's words; the second, writing a status, in this
+       implementation's (`this implementation does not write status lines …`), since it writes only
+       notes.
+    e. `status list` puts a status on its day under `day_start` (RFC 0036) whatever flag is on here,
+       since the reference's listing always reads the key (a hold at 03:30 with `06:00` is `since` the
+       day before), while every reader of RFC 0036 here refuses a `day_start` other than midnight under
+       the `rfc0036` flag and ignores it without. Should a reader that is not RFC 0036's (an RFC 0037
+       listing) read `day_start` before RFC 0036 is Final? (Here: as the reference.)
+
+100. **`day --json`, byte for byte.** Laid out now as the reference's (two spaces, its keys in its order),
+    the two `day --json` outputs on `tests/fixtures/rfc0037-0038-sample` differ only in (a) the
+    `readiness` block, not read here (79), and (b) a number Python holds as a float and writes with
+    `.0` (`"seconds": 30.0`, `"spent": -45.0`), which JSON.stringify writes `30`: the same number to
+    every JSON reader, different bytes. Is the JSON's spelling of a whole float part of what a second
+    implementation must match, or only its value? (Here: the value; the tests compare parsed JSON.)
+
+101. **How far past the day the Day reads a stay.** Found by the checker, older than this branch, flag or
+    not. A stay at one place whose next point is the next morning at the same place (points every 30
+    minutes 18:00–23:00, then 09:00 the next day) is `18:00–24:00 · 6 h` in the reference, its `end`
+    the next morning's point and 12 points; here `18:00–23:00 · 5 h`, 11 points, since the Day's
+    window ends at the next day's night end (08:00). When a day's points end early (00:00–03:00, the
+    next at 09:00 the next day at home) the reference prints `night after Home · home` and `00:00–24:00
+    stay Home · 24 h`, this implementation `in transit` and `00:00–03:00 · 3 h`. docs/day.md says a
+    silence the tracker ends within a short walk of the place is time there; it does not say how far
+    past the day a reader looks for that end. What is the bound? (Not changed here: the window is
+    the stays engine's, and every vendored Day agrees.)
+
+102. **What a voice is (RFC 0038 §2), as reading the reference settled it.** The planner of PR #21 read the
+    reference's `logbook/rows.py`, `logbook/day.py` and `logbook/core/speakers.py` (the third exception the
+    README names, accepted by the owner on 2026-10-16); each point it settled is an entry here, 102–107,
+    every one checked since by running the reference. A voice is an object in `speakers` whose `label`
+    matches `^[^#\n]{1,64}$`, counted in code points (64 emoji are a label); anything else in the list — not
+    an object, no label, a label of 65 code points, with a `#` or a line break — is passed by without a word,
+    and a line none of whose voices is readable reads as a line without voices. Two voices with one label are
+    both shown. The RFC's schema forbids every one of those lines; is a reader meant to show what it can, as
+    the reference does, or to refuse the line? (95a asks the same of the fields.)
+
+103. **Who a voice is.** `you` when, and only when, the voice's `from_me` is the JSON `true` (`1`, `"true"`
+    and a missing `from_me` are not the owner); else its `name`, unless absent, not a string, or whitespace
+    only, and kept as written, unstripped; else its `label`. RFC 0038 §2 names the fields, not which of them a
+    reader prints. Should the spec say so, and say whether a resolved `speaker` (§3, not built here or, at
+    7bcf728, there) comes before the `name`?
+
+104. **How long a voice spoke, and a transcript's length.** A voice's `seconds` is any JSON number of 0 or more
+    (a boolean is none, a negative is none); a transcript's `extra.duration_s` the same, except that a boolean
+    is read as Python reads it, 1 or 0. Under a minute it prints as seconds (`2 s`), else as minutes
+    (`3 min`), each rounded half to even as Python's `{:.0f}` rounds, every digit printed. Nothing in the
+    spec or RFC 0038 says how a reader prints a length. Is this the rendering a second reader must match,
+    or is it the reference's own? (95g asks about numbers past a double.)
+
+105. **Where the voices go in `show` and the Day.** In `show`, after the transcript's title, its people and its
+    length: `Samtale · you 3 min · Ola Nordmann 3 min`; the writer's `turns` are left out beside them. In the
+    Day, the same after an attached or an unplaced transcript. Under `day --json`, `speakers` is a list of
+    `{label, person, name, seconds, basis, consent, owner}`, present only on a transcript with a readable
+    voice; `person` is always null and `basis` is `channel` only for the owner's voice (95f). Should
+    docs/day.md and RFC 0038 fix the row and the keys, so a second reader is held to them by the spec and
+    not by the reference's output?
+
+106. **A recording heard again.** `show` marks every line a standing transcript names in `supersedes`
+    `superseded by #N`, whatever that line's kind, and not when the transcript is retracted; the Day leaves out
+    only a transcript another transcript *of the same day* supersedes, still counts its line among the day's
+    sources, and does not take the transcripts it leaves out as evidence of who was there (95d, 95e). RFC 0004
+    says a transcript may supersede a line; it does not say what a reader shows of the line superseded, in
+    `show` or in the Day. Which is meant?
+
+107. **No check of the voices at run time.** The reference holds `speakers` and `diarization` to
+    `schema/transcript-v1.schema.json` in its tests only: nothing refuses a malformed voice when a line is
+    read or written, and a line with `speakers` and no `diarization`, which the RFC makes a MUST, shows its
+    voices (95b, 95c). This implementation does the same, and so refuses nothing either. Should a writer
+    refuse such a line, and a reader say so?

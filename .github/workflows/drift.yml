@@ -1,0 +1,35 @@
+name: drift
+# How far the reference has moved past the commit `REFERENCE` names: the cross-impl job's two steps,
+# the same tests, run against bighydro/logbook at main. It runs on its own, daily and by hand, never
+# on a pull request or a push, so the reference's merges show here as a red run of their own and
+# never block a PR. A red run is the list of what a catch-up PR has to do: move `REFERENCE` and
+# re-capture the expected files with tests/fixtures/capture-expected-*.mjs.
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  cross-impl-main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "22", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: clone the reference at main
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/bighydro/logbook ref
+          echo "pinned: $(cat REFERENCE)"
+          echo "main:   $(git -C ref rev-parse HEAD)"
+      - uses: astral-sh/setup-uv@v7
+      - name: install the reference
+        run: uv sync --project ref
+      - name: both implementations take the writer lock and refuse and repair a tail past logbook.json alike
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl-writer.test.ts
+      - name: both implementations print the same day and count the same record
+        if: ${{ !cancelled() }}
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts tests/profiles.test.ts tests/cross-impl-entities.test.ts
