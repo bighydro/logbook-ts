@@ -998,7 +998,12 @@ export function repairTailText(report: RepairTail): string {
  */
 function appendLine(root: string, stamp: string, text: string): void {
   const dir = join(root, LOG_DIR, stamp.slice(0, 4));
-  const made = mkdirSync(dir, { recursive: true });
+  // The folders this append makes, deepest first, found before it makes them and named as `dir`
+  // names them. What a recursive mkdir answers need not be spelled so (Windows, Node 22), and a walk
+  // up from `dir` that waited to meet it would climb to the root and stay there.
+  const making: string[] = [];
+  for (let at = dir; !existsSync(at) && dirname(at) !== at; at = dirname(at)) making.push(at);
+  mkdirSync(dir, { recursive: true });
   const file = join(dir, `${stamp.slice(5, 7)}.jsonl`);
   const fd = openSync(file, "a");
   try {
@@ -1008,11 +1013,7 @@ function appendLine(root: string, stamp: string, text: string): void {
     closeSync(fd);
   }
   syncFolder(dir);
-  if (made === undefined) return;
-  for (let child = dir; ; child = dirname(child)) {
-    syncFolder(dirname(child));
-    if (resolve(child) === resolve(made)) break;
-  }
+  for (const made of making) syncFolder(dirname(made));
 }
 
 /**

@@ -6,7 +6,12 @@ import { cleanup, copySample, freshLogbook } from "./helpers.js";
 
 // Every call that puts bytes or a name on disk is noted here, in order, then made for real: the test
 // reads the write order of SPEC §3 off the list. Nothing else changes.
-const calls = vi.hoisted(() => ({ list: [] as string[], names: new Map<number, string>() }));
+const calls = vi.hoisted(() => ({
+  list: [] as string[],
+  names: new Map<number, string>(),
+  /** Answer a recursive mkdir with another spelling of the folder it made, as Windows can name it. */
+  respell: false,
+}));
 vi.mock("node:fs", async (importOriginal) => {
   const fs = await importOriginal<typeof import("node:fs")>();
   const { basename } = await import("node:path");
@@ -32,7 +37,14 @@ vi.mock("node:fs", async (importOriginal) => {
     },
     mkdirSync: (...args: Parameters<typeof fs.mkdirSync>) => {
       calls.list.push(`mkdir ${name(args[0])}`);
-      return fs.mkdirSync(...args);
+      const made = fs.mkdirSync(...args);
+      return calls.respell && made !== undefined ? `\\\\?\\${made}` : made;
+    },
+    // A walk of the folders that never ends is stopped here, as a failure, not left to spin: the
+    // test's own timeout cannot end a synchronous loop.
+    closeSync: (fd: number): void => {
+      if (calls.list.length > 500) throw new Error("the folders' fsyncs did not end");
+      fs.closeSync(fd);
     },
   };
 });
@@ -78,6 +90,33 @@ describe("addNote writes in the order of SPEC §3", () => {
     expect(before).toEqual(
       expect.arrayContaining(["fsync 2027", "fsync logbook", `fsync ${basename(root)}`]),
     );
+    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 1 });
+  });
+
+  it("the folders it makes are known before it makes them, whatever mkdir answers: one it names in another spelling of the path is no walk past the root for ever", () => {
+    const root = freshLogbook();
+    calls.list.length = 0;
+    calls.respell = true;
+    try {
+      addNote(root, "the first line", { now: new Date("2027-01-01T00:00:00Z") });
+    } finally {
+      calls.respell = false;
+    }
+    const syncs = recordCalls();
+    const before = syncs.slice(
+      0,
+      syncs.findIndex((call) => call.startsWith("rename ")),
+    );
+    expect(before).toEqual([
+      "mkdir 2027",
+      "write 01.jsonl",
+      "fsync 01.jsonl",
+      "fsync 2027",
+      "fsync logbook",
+      `fsync ${basename(root)}`,
+      `write .logbook.json.${process.pid}.tmp`,
+      `fsync .logbook.json.${process.pid}.tmp`,
+    ]);
     expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 1 });
   });
 });
