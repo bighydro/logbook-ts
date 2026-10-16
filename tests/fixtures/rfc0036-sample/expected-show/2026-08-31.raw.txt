@@ -1,2 +1,2 @@
-2026-08-31  unsigned
-  22:00  review     manual         disposition=let go, goal=019cadd3-6bc0-7dcd-9133-000000000302, note=Engine gone in Bodø on the 9th. Towed home. Next summer., period=month
+2026-08-31  unsigned · chapter Ashore, fixing things
+  22:00  review     manual         let go · month · Sail to Lofoten and back between June and August, at anchor more nights than not.

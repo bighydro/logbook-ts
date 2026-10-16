@@ -1,0 +1,3 @@
+2026-10-05  unsigned
+  23:59  retracted #48: not killed after all
+  23:59  note       manual         a ferry kiosk exists already

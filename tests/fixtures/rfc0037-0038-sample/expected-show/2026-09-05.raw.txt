@@ -1,0 +1,5 @@
+2026-09-05  unsigned
+  11:00  mail       mail           ✉ Sunday — kari@nordmann.example.org → ines@example.org
+  11:30  mail       mail           ✉ Re: Sunday — per@nordmann.example.org → ines@example.org
+  15:00  mail       mail           ✉ Hello — liv.berg@example.org → ines@example.org
+  22:00  event      notion         The fjord kiosk

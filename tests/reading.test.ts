@@ -99,7 +99,9 @@ describe("the reading of a window", () => {
     // Four times the record, the same high-water mark: one month file's lines plus what is open.
     expect(long.peakHeld).toBeLessThanOrEqual(short.peakHeld * 1.05);
     expect(long.peakHeld).toBeLessThan(31 * 145 * 1.5);
-  });
+    // Two records read whole: about two seconds alone, more than five on a Windows runner busy with
+    // the test files that run children beside it. What is held is the measure here, not the time.
+  }, 20_000);
 });
 
 describe("the window of the readers over a window", () => {

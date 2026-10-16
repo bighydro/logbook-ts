@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { chapterOf, isChapter } from "./chapters.js";
 import {
   checkTimezone,
   DAY_MS,
@@ -11,8 +12,10 @@ import {
   monthKey,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
-import { isOn, RFC0036 } from "./flags.js";
+import { isOn, RFC0036, RFC0038 } from "./flags.js";
+import { isGoal } from "./goals.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
+import { pyStr } from "./pyrepr.js";
 import {
   keeperPhoto,
   payloadOf,
@@ -180,7 +183,8 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
 
   const keep = profileFilter(options.profiles);
   const files = monthFiles(root);
-  const { resolver, supersededFlights, first, last, signatures } = readJudgements(files);
+  const judgements = readJudgements(files);
+  const { resolver, supersededFlights, first, last, signatures } = judgements;
   const since = options.since ?? (first === undefined ? undefined : local(first)?.day);
   const until = options.until ?? (last === undefined ? undefined : local(last)?.day);
   const ctx: RenderContext = {
@@ -189,6 +193,11 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     clock: (at) => local(at)?.clock,
     supersededFlights,
     rfc0036: isOn(RFC0036),
+    rfc0038: isOn(RFC0038),
+    supersededByTranscript: judgements.supersededByTranscript,
+    replacedBy: (line) => judgements.supersededSameKind.get(`${line.kind}\u0000${line.id}`),
+    goalText: (goalId) => goalText(judgements, goalId),
+    chapterOf: isOn(RFC0036) ? (day) => chapterHeading(judgements, day) : undefined,
   };
   // The standing signature per day (RFC 0034 rule 3): the owner's, not retracted.
   const owner = typeof meta.owner_id === "string" ? meta.owner_id : undefined;
@@ -297,8 +306,9 @@ function renderDay(
   const built = toRows(entries, local, ctx);
   const note = notesFile(root, day);
   const text = [
-    // The header says whether the owner signed the day (RFC 0034 rule 6).
-    `${day}  ${signedStateText(signed)}`,
+    // The header says whether the owner signed the day (RFC 0034 rule 6), and, under the rfc0036
+    // flag, the chapter the day is in (RFC 0036, chapter/v1 rules 3 and 4).
+    `${day}  ${signedStateText(signed)}${ctx.chapterOf?.(day) ?? ""}`,
     ...heroLine(hero),
     ...built.flatMap(({ row, under }) => [rowText(row), ...under]),
     ...(note === undefined ? [] : ["  — note —", ...splitLines(note).map((r) => `  ${r}`)]),
@@ -333,19 +343,41 @@ function heroLine(hero: ShownHero[]): string[] {
 /** The judgements the whole record holds, read in one pass over every file. */
 export interface Judgements {
   resolver: Resolver;
-  /** For a `flight/v1` line another flight line supersedes: that line's seq. */
+  /** For a line a flight line supersedes, whatever its kind: that flight line's seq. */
   supersededFlights: Map<string, number>;
   /** Every id some line's payload names in `supersedes`, whatever the kind. */
   superseded: Set<string>;
+  /**
+   * For a line of a kind that the reference marks when a later line of its own kind replaces it
+   * (`goal`, `chapter`): that line's seq, the latest standing one when several do. A retracted line
+   * replaces nothing.
+   */
+  supersededSameKind: Map<string, number>;
+  /**
+   * For a line a transcript line supersedes, whatever its kind (a recording heard again, RFC 0038
+   * §2.8): the transcript's seq, the latest standing one when several do. A retracted one replaces
+   * nothing. Read under the rfc0038 flag.
+   */
+  supersededByTranscript: Map<string, number>;
+  /** Every `goal/v1` line by id, standing or not: a review names its goal by the id it had. */
+  goals: Map<string, Line>;
+  /** Every `chapter/v1` line, in file order: the day's chapter is read from the standing ones. */
+  chapters: Line[];
   /** Every `signed-day/v1` line (RFC 0034), standing or not, in file order; `standingSignatures` picks per day. */
   signatures: Line[];
   /** The first and last instant a listed line has, as written. */
   first: string | undefined;
   last: string | undefined;
+  /** The first and last instant of any line, a retraction included: the days `people` reads over. */
+  firstLine: string | undefined;
+  lastLine: string | undefined;
   /** The first and last instant of any location line, whatever its subject: the days the track covers. */
   firstLocation: string | undefined;
   lastLocation: string | undefined;
 }
+
+/** The kinds whose lines the reference marks `superseded by #N` when a later line of the kind replaces them. */
+const SAME_KIND = new Set(["goal", "chapter"]);
 
 /**
  * The judgements the whole record holds — who a ref is, which lines are hidden, which lines
@@ -355,9 +387,14 @@ export function readJudgements(files: MonthFile[]): Judgements {
   const judged: Line[] = [];
   const supersededFlights = new Map<string, number>();
   const superseded = new Set<string>();
+  const replacing = new Map<string, Array<{ id: string; seq: number }>>();
+  const goals = new Map<string, Line>();
+  const chapters: Line[] = [];
   const signatures: Line[] = [];
   let first: { at: string; ms: number } | undefined;
   let last: { at: string; ms: number } | undefined;
+  let firstLine: { at: string; ms: number } | undefined;
+  let lastLine: { at: string; ms: number } | undefined;
   let firstLocation: { at: string; ms: number } | undefined;
   let lastLocation: { at: string; ms: number } | undefined;
   for (const month of files) {
@@ -366,12 +403,25 @@ export function readJudgements(files: MonthFile[]): Judgements {
       if ("error" in parsed) continue;
       const { line } = parsed;
       if (line.kind === "resolution" || line.kind === "retraction") judged.push(line);
+      if (typeof line.at === "string") {
+        const ms = Date.parse(line.at);
+        if (!Number.isNaN(ms)) {
+          if (firstLine === undefined || ms < firstLine.ms) firstLine = { at: line.at, ms };
+          if (lastLine === undefined || ms > lastLine.ms) lastLine = { at: line.at, ms };
+        }
+      }
       if (line.kind === "retraction") continue;
       if (isSignedDay(line)) signatures.push(line);
+      if (isGoal(line)) goals.set(line.id, line);
+      if (isChapter(line)) chapters.push(line);
       const earlier = payloadOf(line).supersedes;
       if (typeof earlier === "string") {
         superseded.add(earlier);
         if (line.kind === "flight") supersededFlights.set(earlier, line.seq);
+        if (SAME_KIND.has(line.kind) || line.kind === "transcript") {
+          const key = `${line.kind}\u0000${earlier}`;
+          replacing.set(key, [...(replacing.get(key) ?? []), { id: line.id, seq: line.seq }]);
+        }
       }
       if (typeof line.at !== "string") continue;
       const ms = Date.parse(line.at);
@@ -387,13 +437,33 @@ export function readJudgements(files: MonthFile[]): Judgements {
       }
     }
   }
+  const resolver = buildResolver(judged);
+  const supersededSameKind = new Map<string, number>();
+  const supersededByTranscript = new Map<string, number>();
+  for (const [key, by] of replacing) {
+    const earlier = key.slice(key.indexOf("\u0000") + 1);
+    const kind = key.slice(0, key.indexOf("\u0000"));
+    const standing = by.filter((b) => resolver.retractedBy(b.id) === undefined);
+    if (standing.length === 0) continue;
+    const seq = Math.max(...standing.map((b) => b.seq));
+    // A transcript marks the line it replaces whatever its kind; a goal is marked only by a goal, a
+    // chapter by a chapter, so those are keyed by kind and id.
+    if (kind === "transcript") supersededByTranscript.set(earlier, seq);
+    else supersededSameKind.set(`${kind}\u0000${earlier}`, seq);
+  }
   return {
-    resolver: buildResolver(judged),
+    resolver,
     supersededFlights,
     superseded,
+    supersededSameKind,
+    supersededByTranscript,
+    goals,
+    chapters,
     signatures,
     first: first?.at,
     last: last?.at,
+    firstLine: firstLine?.at,
+    lastLine: lastLine?.at,
     firstLocation: firstLocation?.at,
     lastLocation: lastLocation?.at,
   };
@@ -541,4 +611,37 @@ function foldEvents(
     });
   }
   return { hidden, groups };
+}
+
+/**
+ * A goal's current text, as the reference's review row names it: the text of the last goal line
+ * that rewords the one `goalId` names (each the latest standing line that `supersedes` the one
+ * before); undefined when no goal line standing has that id. Python's `str()` of the text.
+ */
+function goalText(judgements: Judgements, goalId: string): string | undefined {
+  const { goals, resolver, supersededSameKind } = judgements;
+  let goal = goals.get(goalId);
+  if (goal === undefined || resolver.retractedBy(goal.id) !== undefined) return undefined;
+  const seen = new Set<string>([goal.id]);
+  for (;;) {
+    const by = supersededSameKind.get(`goal\u0000${goal.id}`);
+    const next = by === undefined ? undefined : [...goals.values()].find((g) => g.seq === by);
+    if (next === undefined || seen.has(next.id)) break;
+    seen.add(next.id);
+    goal = next;
+  }
+  return pyStr(payloadOf(goal).text);
+}
+
+/** ` · chapter <name>[, clashes with <name>…]` for a day a standing chapter holds, else empty. */
+function chapterHeading(judgements: Judgements, day: string): string {
+  const retracted = { has: (id: string) => judgements.resolver.retractedBy(id) !== undefined };
+  const { chapter, clash } = chapterOf(judgements.chapters, retracted, day);
+  if (chapter === null) return "";
+  const nameOf = (id: string): string =>
+    pyStr(payloadOf(judgements.chapters.find((c) => c.id === id) as Line).name);
+  const name = nameOf(chapter.line);
+  return clash.length
+    ? ` · chapter ${name}, clashes with ${clash.map(nameOf).join(", ")}`
+    : ` · chapter ${name}`;
 }

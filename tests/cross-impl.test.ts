@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -9,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, posix } from "node:path";
+import { basename, join, posix } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
@@ -80,7 +81,7 @@ function copyOf(fixture: string): string {
   const copy = join(tempDir(), fixture);
   cpSync(join(FIXTURES, fixture), copy, {
     recursive: true,
-    filter: (src) => !src.includes("expected-"),
+    filter: (src) => !basename(src).startsWith("expected-"),
   });
   return copy;
 }
@@ -287,6 +288,13 @@ const comparableGaps = (text: string): string =>
 
 type Json = Record<string, unknown>;
 
+/** What `run` gives, with the instants just before it started and just after it ended. */
+function bracketed<T>(run: () => T): [T, Date, Date] {
+  const before = new Date();
+  const result = run();
+  return [result, before, new Date()];
+}
+
 /** The gaps report with the running silences rounded to whole minutes, since the two clocks differ by the run. */
 function comparableGapsJson(text: string): Json {
   const report = JSON.parse(text) as {
@@ -345,30 +353,40 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts count the s
     });
     for (const args of [[], ["--since", since]]) {
       it(`${name}: sources --gaps ${args.join(" ")}`.trimEnd(), () => {
-        const theirs = referenceRun(copy(), ["sources", "--gaps", ...args]);
-        expect(theirs.status).toBe(0);
         const options = args.length ? { since } : {};
-        const ours = gapsText(sourceGaps(root, options));
-        expect(ours).toBe(comparableGaps(theirs.stdout));
-        const json = referenceRun(copy(), ["sources", "--gaps", "--json", ...args]);
-        expect(comparableGapsJson(JSON.stringify(sourceGaps(root, options)))).toEqual(
-          comparableGapsJson(json.stdout),
+        // A running silence is measured to the reference's own now, which is some instant while it
+        // ran: its report must be ours at the instant before it started or at the one after it
+        // ended (the run takes seconds, so one minute boundary at most lies between them).
+        const [theirs, before, after] = bracketed(() =>
+          referenceRun(copy(), ["sources", "--gaps", ...args]),
         );
+        expect(theirs.status).toBe(0);
+        const at = (now: Date) => gapsText(sourceGaps(root, { ...options, now }));
+        expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
+        const [json, from, to] = bracketed(() =>
+          referenceRun(copy(), ["sources", "--gaps", "--json", ...args]),
+        );
+        const atJson = (now: Date) =>
+          comparableGapsJson(JSON.stringify(sourceGaps(root, { ...options, now })));
+        expect([atJson(from), atJson(to)]).toContainEqual(comparableGapsJson(json.stdout));
       });
     }
     it(`${name}: sources --gaps --expect, a source silent for days and one with no line`, () => {
-      const theirs = referenceRun(copy(), [
-        "sources",
-        "--gaps",
-        "--since",
-        since,
-        "--expect",
-        "manual",
-        "nothing",
-      ]);
+      const [theirs, before, after] = bracketed(() =>
+        referenceRun(copy(), [
+          "sources",
+          "--gaps",
+          "--since",
+          since,
+          "--expect",
+          "manual",
+          "nothing",
+        ]),
+      );
       expect(theirs.status).toBe(1);
-      const ours = sourceGaps(root, { since, expect: ["manual", "nothing"] });
-      expect(gapsText(ours)).toBe(comparableGaps(theirs.stdout));
+      const at = (now: Date) =>
+        gapsText(sourceGaps(root, { since, expect: ["manual", "nothing"], now }));
+      expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
     });
   }
 });
@@ -687,6 +705,15 @@ describe.skipIf(!ready)(
           payload,
         };
         const root = writeRecord([...dayLines, draft]);
+        // The reference's Day shows a draft only while the `dream` entry of the crossing policy
+        // allows its tier (its #273, docs/dream.md, *When the entry changes*); without the entry it
+        // says `draft_withheld`. The entry here allows the draft's tier 2 and names no model.
+        mkdirSync(join(root, "policy"), { recursive: true });
+        writeFileSync(
+          join(root, "policy", "crossing.json"),
+          `${JSON.stringify({ dream: { max_tier: 2 } })}\n`,
+          "utf-8",
+        );
         const { status, out } = referenceAll(root, ["day", "2026-06-13", "--json"]);
         expect(status).toBe(0);
         const theirs = (
@@ -717,6 +744,88 @@ describe.skipIf(!ready)(
             why,
           })),
         );
+      }
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "RFC 0037 and RFC 0038 §2, under the rfc0037 and rfc0038 flags: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // A record the reference wrote with its own writers (rfc0037-0038-sample/make.py): entity,
+    // entity-review, people-review and status lines, the status notes, the registry entries closed,
+    // and transcripts with voices, heard again and retracted. One copy serves every run of the
+    // reference, which builds its index beside it once; it lives outside the folders each test
+    // cleans up, and goes when the block ends.
+    const fixture = join(FIXTURES, "rfc0037-0038-sample");
+    let copy: string | undefined;
+    const shared = (): string => {
+      if (copy === undefined) {
+        copy = join(mkdtempSync(join(tmpdir(), "logbook-ts-rfc0037-")), "rfc0037-0038-sample");
+        cpSync(fixture, copy, {
+          recursive: true,
+          filter: (src) => !basename(src).startsWith("expected-"),
+        });
+      }
+      return copy;
+    };
+    afterAll(() => {
+      if (copy !== undefined) rmSync(join(copy, ".."), { recursive: true, force: true });
+    });
+
+    for (const { day, raw, text } of expectedShows(fixture)) {
+      it(`show rfc0037-0038-sample ${day}${raw ? " --raw" : ""}`, () => {
+        vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
+        const reference = referenceShow(shared(), day, raw);
+        expect(showDay(fixture, { day, raw }).text, "logbook-ts disagrees with the reference").toBe(
+          reference,
+        );
+        expect(reference, "the reference moved; re-capture rfc0037-0038-sample/expected-show").toBe(
+          text,
+        );
+      });
+    }
+
+    it("day, every day with a line, as text and as JSON, and the vendored files are that output", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
+      for (const expected of expectedDays(fixture)) {
+        const text = reference(shared(), ["day", expected.day]);
+        const json = JSON.parse(reference(shared(), ["day", expected.day, "--json"])) as unknown;
+        expect(text).toBe(expected.raw.text);
+        expect(json).toEqual(expected.raw.json);
+        const ours = readDay(fixture, { day: expected.day });
+        expect(renderDay(ours), expected.day).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours)), expected.day).toEqual(comparableDayJson(json));
+      }
+    }, 600_000);
+
+    it("people and days, as text and as JSON, and the vendored files are that output", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
+      for (const expected of expectedWindows(fixture, "people")) {
+        const flags = windowFlags(expected.name);
+        const text = reference(shared(), ["people", ...flags]);
+        const json = JSON.parse(reference(shared(), ["people", ...flags, "--json"])) as unknown;
+        expect(text).toBe(expected.text);
+        expect(json).toEqual(expected.json);
+        const ours = readPeople(fixture, expected.options);
+        expect(renderPeople(ours, expected.options)).toBe(text);
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
+      }
+      for (const expected of expectedDaysWindows(fixture)) {
+        const text = reference(shared(), ["days"]);
+        const rows = reference(shared(), ["days", "--json"])
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => JSON.parse(line) as unknown);
+        expect(text).toBe(expected.text);
+        expect(rows).toEqual(expected.rows);
+        const ours = readDayRows(fixture, expected.options);
+        expect(renderDayRows(ours)).toBe(text);
+        expect(ours.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(rows);
       }
     }, 300_000);
   },

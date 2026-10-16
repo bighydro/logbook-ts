@@ -1,0 +1,3 @@
+2026-10-03  unsigned
+  23:59  status     manual         entity={'id': 'Båtplassen', 'registry': 'logbook', 'type': 'place'}, label=Båtplassen, logbook_head=0bd82d218e84594c7b8400f84e62c8427ec399f8275ff9942b373fb856453e3f, proposed_by=owner, reason=gave the berth up, status=let-go
+  23:59  note       manual         gave the berth up

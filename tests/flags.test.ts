@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { FLAGS, FLAGS_ENV, FlagError, flagsOn, isOn, RFC0036 } from "../src/flags.js";
+import {
+  FLAGS,
+  FLAGS_ENV,
+  FlagError,
+  flagsOn,
+  isOn,
+  RFC0036,
+  RFC0037,
+  RFC0038,
+} from "../src/flags.js";
 import { LogbookError } from "../src/store.js";
 
 describe("the draft-RFC flags (LOGBOOK_TS_FLAGS)", () => {
-  it("names one flag, rfc0036, read from LOGBOOK_TS_FLAGS", () => {
-    expect(FLAGS).toEqual(["rfc0036"]);
+  it("names three flags, rfc0036, rfc0037 and rfc0038, read from LOGBOOK_TS_FLAGS", () => {
+    expect(FLAGS).toEqual(["rfc0036", "rfc0037", "rfc0038"]);
     expect(RFC0036).toBe("rfc0036");
+    expect(RFC0037).toBe("rfc0037");
+    expect(RFC0038).toBe("rfc0038");
     expect(FLAGS_ENV).toBe("LOGBOOK_TS_FLAGS");
   });
 
@@ -22,12 +33,25 @@ describe("the draft-RFC flags (LOGBOOK_TS_FLAGS)", () => {
     expect(isOn(RFC0036, { LOGBOOK_TS_FLAGS: "rfc0036 rfc0036" })).toBe(true);
   });
 
+  it("turns each flag on alone: one RFC's draft never turns another's on", () => {
+    const env = { LOGBOOK_TS_FLAGS: "rfc0038" };
+    expect([isOn(RFC0036, env), isOn(RFC0037, env), isOn(RFC0038, env)]).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect([...flagsOn({ LOGBOOK_TS_FLAGS: "rfc0037,rfc0036" })].sort()).toEqual([
+      "rfc0036",
+      "rfc0037",
+    ]);
+  });
+
   it("refuses a name it does not know, so a typo never reads as off", () => {
     const run = (): boolean => isOn(RFC0036, { LOGBOOK_TS_FLAGS: "rfc36" });
     expect(run).toThrow(FlagError);
     expect(run).toThrow(LogbookError);
     expect(run).toThrow(
-      "LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036",
+      "LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036, rfc0037, rfc0038",
     );
   });
 

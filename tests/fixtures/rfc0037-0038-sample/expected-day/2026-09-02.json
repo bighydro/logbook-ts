@@ -1,0 +1,148 @@
+{
+  "day": "2026-09-02",
+  "weekday": "Wednesday",
+  "tz": "Europe/Oslo",
+  "nights": {
+    "before": {
+      "day": "2026-09-01",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    },
+    "after": {
+      "day": "2026-09-02",
+      "where": null,
+      "home": false,
+      "aboard": null,
+      "in_transit": true,
+      "stay": null,
+      "position": null,
+      "lines": []
+    }
+  },
+  "country": {
+    "code": null,
+    "method": null,
+    "by": null,
+    "from": null
+  },
+  "all_day": [],
+  "timeline": [],
+  "flights": [],
+  "unplaced": [
+    {
+      "kind": "mail",
+      "at": "2026-09-02T10:00:00Z",
+      "end": null,
+      "title": "Q3 numbers, part 2",
+      "line": "01a13fb4-8381-774d-8502-5d26561d6f1e"
+    }
+  ],
+  "stories": [],
+  "health": null,
+  "spend": null,
+  "weather": null,
+  "sources": [
+    {
+      "source": "mail",
+      "lines": 1,
+      "first": "2026-09-02T10:00:00Z",
+      "newest": "2026-09-02T10:00:00Z"
+    },
+    {
+      "source": "whatsapp",
+      "lines": 1,
+      "first": "2026-09-02T15:00:00Z",
+      "newest": "2026-09-02T15:00:00Z"
+    }
+  ],
+  "signed": null,
+  "readiness": {
+    "window": {
+      "since": "2026-08-06",
+      "until": "2026-09-02",
+      "logged_days": 2
+    },
+    "classes": [
+      {
+        "name": "mail",
+        "kinds": [
+          "mail"
+        ],
+        "present": true,
+        "lines": 1,
+        "sources": [
+          "mail"
+        ],
+        "usual": [
+          "mail"
+        ],
+        "missing": []
+      },
+      {
+        "name": "message",
+        "kinds": [
+          "message"
+        ],
+        "present": true,
+        "lines": 1,
+        "sources": [
+          "whatsapp"
+        ],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "meeting",
+        "kinds": [
+          "transcript"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "location",
+        "kinds": [
+          "location"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "photo",
+        "kinds": [
+          "photo"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      },
+      {
+        "name": "calendar",
+        "kinds": [
+          "event"
+        ],
+        "present": false,
+        "lines": 0,
+        "sources": [],
+        "usual": [],
+        "missing": []
+      }
+    ],
+    "missing": [],
+    "ready": true
+  },
+  "received": []
+}

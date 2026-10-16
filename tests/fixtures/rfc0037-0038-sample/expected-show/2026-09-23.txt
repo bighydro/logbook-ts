@@ -1,0 +1,2 @@
+2026-09-23  unsigned
+  22:00  entity     manual         entity={'id': '01a13fb4-838a-7aa8-8593-f373aef4b7fc', 'registry': 'logbook', 'type': 'idea'}, label=the ferry kiosk, method=owner, supersedes=01a13fb4-838b-7ba8-b7e4-c7ca53e9f264

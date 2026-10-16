@@ -164,8 +164,10 @@ export function openWindow(root: string, options: WindowOptions, open: OpenOptio
   const owner = ownerIdentity(judgements.resolver, policy, ownerEmails, meta.owner_id);
 
   let window: Window | null = null;
-  const firstAt = open.coverage === "lines" ? judgements.first : judgements.firstLocation;
-  const lastAt = open.coverage === "lines" ? judgements.last : judgements.lastLocation;
+  // By lines (`people`), the first and last line of any kind, a retraction's own `at` included, as
+  // the reference bounds its window; else the days the track covers.
+  const firstAt = open.coverage === "lines" ? judgements.firstLine : judgements.firstLocation;
+  const lastAt = open.coverage === "lines" ? judgements.lastLine : judgements.lastLocation;
   if (firstAt !== undefined && lastAt !== undefined) {
     const first = localOf(Date.parse(firstAt), timezone).day;
     const last = localOf(Date.parse(lastAt), timezone).day;

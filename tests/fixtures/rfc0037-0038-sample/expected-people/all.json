@@ -1,0 +1,98 @@
+{
+  "window": {
+    "since": "2026-08-01",
+    "until": "2026-10-15"
+  },
+  "tier": 2,
+  "people": [
+    {
+      "id": "019cadd3-6bc0-7dcd-9133-000000000111",
+      "name": "Ola Nordmann",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "ola@nordmann-verft.example.org"
+        },
+        {
+          "kind": "phone",
+          "value": "+447700900101"
+        },
+        {
+          "kind": "email",
+          "value": "ola@example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-09-01",
+      "last_contact": "2026-10-06",
+      "last_real_contact": {
+        "day": "2026-10-06",
+        "via": "meeting",
+        "line": "01a13fb4-841e-700f-b408-b0fc79a3cf10"
+      },
+      "channels": {
+        "messages": {
+          "lines": 3,
+          "first": "2026-09-02",
+          "last": "2026-09-03",
+          "tier": 2,
+          "last_line": "01a13fb4-8381-7482-9436-e24347440ee8"
+        },
+        "mail": {
+          "lines": 3,
+          "first": "2026-09-01",
+          "last": "2026-09-03",
+          "tier": 2,
+          "last_line": "01a13fb4-8381-73c7-95bb-c457bb77e789"
+        },
+        "transcripts": {
+          "lines": 3,
+          "first": "2026-09-11",
+          "last": "2026-10-06",
+          "tier": 2,
+          "last_line": "01a13fb4-841e-700f-b408-b0fc79a3cf10"
+        }
+      },
+      "days": 1,
+      "nights": 1,
+      "places": [
+        {
+          "where": "59.9139,10.7522 near Båtplassen, 1.3 km",
+          "days": 1
+        }
+      ],
+      "lines": [
+        "01a13fb4-841e-700f-b408-b0fc79a3cf10"
+      ]
+    },
+    {
+      "id": "019cadd3-6bc0-7dcd-9133-000000000112",
+      "name": "Kari Nordmann",
+      "refs": [
+        {
+          "kind": "email",
+          "value": "kari@nordmann.example.org"
+        }
+      ],
+      "tier": 2,
+      "birthday": null,
+      "first_contact": "2026-09-05",
+      "last_contact": "2026-09-05",
+      "last_real_contact": null,
+      "channels": {
+        "mail": {
+          "lines": 1,
+          "first": "2026-09-05",
+          "last": "2026-09-05",
+          "tier": 2,
+          "last_line": "01a13fb4-8381-791c-946a-9543cce4fe3d"
+        }
+      },
+      "days": 0,
+      "nights": 0,
+      "places": [],
+      "lines": []
+    }
+  ]
+}

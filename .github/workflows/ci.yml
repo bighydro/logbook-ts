@@ -11,6 +11,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node: ["20", "22"]
     runs-on: ${{ matrix.os }}
+    # A run takes two to three minutes; one held by a hung test ends here, with its log, not at six hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -58,6 +60,14 @@ jobs:
         run: |
           node dist/bin.js people tests/fixtures/demo-seed1
           node dist/bin.js people tests/fixtures/demo-seed1 --year 2026 --json
+      - name: the built binary reads RFC 0037's and RFC 0038's lines under their flags, a day shown and read back, as text and as JSON
+        env: { LOGBOOK_TS_FLAGS: "rfc0037,rfc0038" }
+        run: |
+          node dist/bin.js show tests/fixtures/rfc0037-0038-sample --day 2026-10-06
+          node dist/bin.js day tests/fixtures/rfc0037-0038-sample 2026-10-06
+          node dist/bin.js day tests/fixtures/rfc0037-0038-sample 2026-10-06 --json
+          node dist/bin.js status list tests/fixtures/rfc0037-0038-sample org
+          node dist/bin.js status list tests/fixtures/rfc0037-0038-sample asset --json
 
   conformance:
     # SPEC section 6, against the fixture as published at the spec's own revision: the 32-line
@@ -140,26 +150,45 @@ jobs:
 
   cross-impl:
     # The reference implementation (Python) and this one must print the same day, count the same
-    # record and derive the same trips: tests/cross-impl.test.ts runs `logbook show` of a clone of
-    # bighydro/logbook at main on every expected-show fixture (the two synthetic records and the
+    # record and derive the same trips: tests/cross-impl.test.ts runs `logbook show` of the reference at
+    # the commit `REFERENCE` names on every expected-show fixture (the two synthetic records and the
     # conformance sample), `logbook day` on every expected-day fixture and on three days of the
     # reference's demo record, `logbook stats` and `logbook sources --gaps` on the fixtures and on the
     # demo record, `logbook trips`, `logbook rollup countries` and `logbook rollup nights` on every
     # expected-trips fixture — the two probe records, the two day fixtures, the conformance sample and
     # the vendored `logbook demo --seed 1` — and on the whole seed-7 demo record, and `logbook days` and
     # `logbook people` on every expected-days and expected-people fixture — the conformance sample and
-    # the seed-1 demo among them — and diffs them against ours and against the vendored expected files.
+    # the seed-1 demo among them — and diffs them against ours and against the vendored expected files;
+    # under the draft flags, `logbook show`, `day`, `people` and `days` on the RFC 0036 sample and on the
+    # record the reference wrote with RFC 0037's and RFC 0038's lines (rfc0037-0038-sample); and
+    # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
+    # reference beside ours on payload variants, on synthetic records and on that record.
+    #
+    # The reference is the one commit `REFERENCE` names, not its moving main, so a PR is red for what
+    # it changes and not for what the reference merged since: a catch-up PR moves `REFERENCE` and
+    # re-captures the expected files with tests/fixtures/capture-expected-*.mjs. drift.yml runs these
+    # same steps against the reference's main, daily, to show how far it has moved.
     runs-on: ubuntu-latest
+    # A run takes about four minutes; one held by a hung reference ends here, with its log.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: "22", cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: clone the reference at main
-        run: git clone --depth 1 https://github.com/bighydro/logbook ref
+      - name: fetch the reference at the commit REFERENCE names
+        run: |
+          set -euo pipefail
+          git init ref
+          git -C ref fetch --depth 1 https://github.com/bighydro/logbook "$(cat REFERENCE)"
+          git -C ref checkout -q FETCH_HEAD
+          test "$(git -C ref rev-parse HEAD)" = "$(cat REFERENCE)"
       - uses: astral-sh/setup-uv@v7
       - name: install the reference
         run: uv sync --project ref
+      - name: both implementations take the writer lock and refuse and repair a tail past logbook.json alike
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl-writer.test.ts
       - name: both implementations print the same day and count the same record
-        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts tests/profiles.test.ts
+        if: ${{ !cancelled() }}
+        run: LOGBOOK_REF="$PWD/ref" pnpm vitest run tests/cross-impl.test.ts tests/profiles.test.ts tests/cross-impl-entities.test.ts

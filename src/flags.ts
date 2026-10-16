@@ -14,15 +14,31 @@
  * `policy/crossing.json`, read and checked (`policy.ts`). The profile functions of `goals.ts`,
  * `drafts.ts` and `chapters.ts` read and check a line wherever a caller holds one, as `signing.ts`
  * does for RFC 0034; their names and shapes may change while the RFC is a draft.
+ *
+ * `rfc0037` (RFC 0037, *Entities*, draft, 2026-10-13, decided 2026-10-14): `status list KIND`, every
+ * canonical org, idea, place or asset with its current `status/v1` line, as the reference's
+ * `logbook status list` prints it, and `policy/entities.json` read and checked for it. The profile
+ * functions of `entities.ts` (`entity/v1`, `entity-review/v1`, `status/v1`: their validation, their
+ * tiers, the standing lines) read a line wherever a caller holds one, flag or not; `show` and the Day
+ * print these lines as they print any other, as the reference does, so nothing else changes.
+ *
+ * `rfc0038` (RFC 0038 §2, *Speakers*, draft, and RFC 0004's dated amendment of 2026-10-14): a
+ * transcript's voices (`speakers`, `diarization`) where `show` and the Day print a transcript, and a
+ * transcript another transcript `supersedes` (a recording heard again) marked in `show` and left out
+ * of the Day, as the reference prints them. A transcript without the fields reads as before either way.
  */
 
 import { LogbookError } from "./store.js";
 
 /** Every flag this implementation knows. */
-export const FLAGS = ["rfc0036"] as const;
+export const FLAGS = ["rfc0036", "rfc0037", "rfc0038"] as const;
 export type Flag = (typeof FLAGS)[number];
 /** RFC 0036: goals, reviews, drafts and chapters; `day_start`; `signed_within_days`. */
 export const RFC0036: Flag = "rfc0036";
+/** RFC 0037: entities; `status list`. */
+export const RFC0037: Flag = "rfc0037";
+/** RFC 0038 §2: a transcript's voices in `show` and the Day; a transcript heard again. */
+export const RFC0038: Flag = "rfc0038";
 /** The environment variable that turns flags on. */
 export const FLAGS_ENV = "LOGBOOK_TS_FLAGS";
 

@@ -1,0 +1,11 @@
+2026-09-09  Wednesday · unsigned
+  night before  in transit
+  night after   in transit
+  country       unknown
+
+  timeline      nothing logged
+
+  health        no lines
+  spend         NOK -45.00 · 1 transaction · FJORDKIOSK AS
+  sources       copilot 1 line, last 19:00
+  readiness     mail none · message none · meeting none · location none · photo none · calendar none

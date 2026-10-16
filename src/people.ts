@@ -286,7 +286,10 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
           break;
         }
         case "transcript": {
-          if (p.schema !== "transcript/v1" || !Array.isArray(p.participants)) break;
+          // A transcript some line replaces (heard again, corrected) is not counted, as the
+          // reference reads it: the one that names it in `supersedes` stands for it.
+          if (p.schema !== "transcript/v1" || opened.judgements.superseded.has(line.id)) break;
+          if (!Array.isArray(p.participants)) break;
           const named = new Set<string>();
           for (const item of p.participants) {
             const o = obj(item);
@@ -349,6 +352,13 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
       for (const unit of row.units) {
         for (const e of unit.evidence) {
           if (!e.confirms || e.person === null || e.entry.day !== day.day) continue;
+          // A transcript some line replaces is no evidence here either: the reference counts the
+          // one that supersedes it (as it does among the channels above).
+          if (
+            e.entry.line.kind === "transcript" &&
+            opened.judgements.superseded.has(e.entry.line.id)
+          )
+            continue;
           if (isOwner(e.person, e.name)) continue;
           const acc = account(e.person);
           acc.days.add(day.day);
@@ -517,7 +527,7 @@ export function renderPeople(report: People, options: PeopleOptions = {}): strin
   if (report.window === null)
     return `no people: the record has no days${options.year === undefined ? "" : ` in ${options.year}`}\n`;
   const head = [
-    `${report.people.length} people · ${report.window.since} ${DASH} ${report.window.until}`,
+    `${report.people.length} ${report.people.length === 1 ? "person" : "people"} · ${report.window.since} ${DASH} ${report.window.until}`,
   ];
   if (report.tier !== null) head.push(`tier ${report.tier}`);
   const lines = [head.join(" · ")];

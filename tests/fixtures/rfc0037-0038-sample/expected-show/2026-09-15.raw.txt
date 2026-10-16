@@ -1,0 +1,2 @@
+2026-09-15  unsigned
+  09:00  flight     flighty        XY 561  →, ZZ-ABC, tracked

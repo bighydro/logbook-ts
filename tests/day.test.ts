@@ -6,6 +6,7 @@ import { verifyLogbook } from "../src/store.js";
 import {
   cleanup,
   copySample,
+  type Draft,
   expectedDays,
   FIXTURES,
   readLines,
@@ -312,5 +313,192 @@ describe("the spend line, as the reference's `logbook day` prints it since its l
     expect(day.spend).toBeNull();
     expect(renderDay(day)).not.toContain("spend");
     expect(readDay(DAY_SAMPLE, { day: "2026-04-06" }).spend).toBeNull();
+  });
+});
+
+describe("counts of a thousand or more, as the reference prints them", () => {
+  // Run on the reference (main at 7bcf728) with the same lines: 1,001 points of one tracker and
+  // 1,001 messages in one day. The Day groups the thousands of its counts and its sources, and
+  // show those of a run of points; `days` does not (`(1000 attached)`, as here).
+  const drafts: Draft[] = [];
+  for (let i = 0; i < 1001; i++) {
+    const at = new Date(Date.UTC(2026, 8, 1, 0, i)).toISOString().replace(".000Z", "Z");
+    const later = new Date(Date.UTC(2026, 8, 1, 0, i, 30)).toISOString().replace(".000Z", "Z");
+    drafts.push(
+      {
+        at,
+        source: "dawarich",
+        kind: "location",
+        tier: 1 as const,
+        payload: {
+          schema: "location/v1",
+          lat: 59.9139,
+          lon: 10.7522,
+          accuracy_m: 10,
+          raw_id: `p${i}`,
+        },
+      },
+      {
+        at: later,
+        source: "whatsapp",
+        kind: "message",
+        payload: {
+          schema: "message/v1",
+          raw_id: `m${i}`,
+          chat: { id: "c1", type: "direct", name: "Ola" },
+          sender: { kind: "phone", value: "+447700900101", name: "Ola Nordmann" },
+          from_me: false,
+          text: "hei",
+        },
+      },
+    );
+  }
+  it("in the Day's attachments and sources", () => {
+    const text = renderDay(readDay(writeRecord(drafts), { day: "2026-09-01" }));
+    expect(text).toContain(
+      "  02:00–18:40  stay   59.9139,10.7522 · 16 h 40 min · 1,000 messages\n",
+    );
+    expect(text).toContain(
+      "  sources       dawarich 1,001 lines, last 18:40 · whatsapp 1,001 lines, last 18:40\n",
+    );
+  });
+});
+
+describe("a transcript with no title, as the reference names it", () => {
+  // Run on the reference (main at 7bcf728): the Day says `a recording` for a transcript whose title
+  // is absent, empty or null, in its rows and in who was there; a title that is not a string is
+  // Python's str() of it; show says `transcript` (tests/show.test.ts).
+  it("in the Day's rows and its reasons", () => {
+    const ola = {
+      at: "2026-10-01T08:00:00Z",
+      source: "manual",
+      kind: "resolution",
+      payload: {
+        schema: "resolution/v1",
+        ref: { kind: "email", value: "ola@example.org" },
+        entity: { type: "person", id: "019cadd3-6bc0-7dcd-9133-000000000002", registry: "logbook" },
+        label: "Ola Nordmann",
+        method: "owner",
+      },
+    };
+    const points: Draft[] = [];
+    for (let m = 16 * 60; m <= 21 * 60; m += 5) {
+      points.push({
+        at: new Date(Date.UTC(2026, 9, 6, 0, m)).toISOString().replace(".000Z", "Z"),
+        source: "dawarich",
+        kind: "location",
+        tier: 1,
+        payload: {
+          schema: "location/v1",
+          lat: 59.9139,
+          lon: 10.7522,
+          accuracy_m: 12,
+          raw_id: `p${m}`,
+        },
+      });
+    }
+    const transcript = (at: string, title: Record<string, unknown>): Draft => ({
+      at,
+      source: "granola",
+      kind: "transcript",
+      payload: {
+        schema: "transcript/v1",
+        raw_id: at,
+        participants: [{ name: "Ola Nordmann", email: "ola@example.org" }],
+        ...title,
+      },
+    });
+    const root = writeRecord([
+      ola,
+      ...points,
+      transcript("2026-10-06T17:00:00Z", {}),
+      transcript("2026-10-06T17:30:00Z", { title: "" }),
+      transcript("2026-10-06T18:00:00Z", { title: null }),
+      transcript("2026-10-06T07:00:00Z", {}),
+      transcript("2026-10-06T07:30:00Z", { title: 5 }),
+    ]);
+    const day = readDay(root, { day: "2026-10-06" });
+    const text = renderDay(day);
+    expect(text).toContain(
+      "      transcript   a recording\n      transcript   a recording\n      transcript   a recording\n",
+    );
+    expect(text).toContain("  unplaced      09:00  transcript a recording\n");
+    expect(text).toContain("  unplaced      09:30  transcript 5\n");
+    const stay = rows(day.timeline).find((r) => r.attached !== undefined);
+    expect(stay?.with?.confirmed[0]?.reasons).toEqual([
+      "spoke in a recording",
+      "spoke in a recording",
+      "spoke in a recording",
+    ]);
+  });
+});
+
+describe("who a transcript's participant is, as the reference's Day reads it", () => {
+  // Run on the reference (main at 7bcf728) with each participant below alone in a transcript held at
+  // a stay: it names only someone the record's resolution lines make a person, by an address the
+  // lines resolve, else by a name that is one person's label (case aside) or first name; a name or an
+  // address the record does not know names nobody.
+  const OLA = "019cadd3-6bc0-7dcd-9133-000000000002";
+  const KARI = "019cadd3-6bc0-7dcd-9133-000000000003";
+  const resolution = (ref: Record<string, string>, id: string, label: string): Draft => ({
+    at: "2026-10-01T08:00:00Z",
+    source: "manual",
+    kind: "resolution",
+    payload: {
+      schema: "resolution/v1",
+      ref,
+      entity: { type: "person", id, registry: "logbook" },
+      label,
+      method: "owner",
+    },
+  });
+  const withOf = (participant: Record<string, string>) => {
+    const points: Draft[] = [];
+    for (let m = 16 * 60; m <= 21 * 60; m += 5) {
+      points.push({
+        at: new Date(Date.UTC(2026, 9, 6, 0, m)).toISOString().replace(".000Z", "Z"),
+        source: "dawarich",
+        kind: "location",
+        tier: 1,
+        payload: {
+          schema: "location/v1",
+          lat: 59.9139,
+          lon: 10.7522,
+          accuracy_m: 12,
+          raw_id: `p${m}`,
+        },
+      });
+    }
+    const root = writeRecord([
+      resolution({ kind: "email", value: "ola@example.org" }, OLA, "Ola Nordmann"),
+      resolution({ kind: "phone", value: "+447700900102" }, KARI, "Kari Nordmann"),
+      ...points,
+      {
+        at: "2026-10-06T17:00:00Z",
+        source: "granola",
+        kind: "transcript",
+        payload: {
+          schema: "transcript/v1",
+          raw_id: "t",
+          title: "Middag",
+          participants: [participant],
+        },
+      },
+    ]);
+    const stay = rows(readDay(root, { day: "2026-10-06" }).timeline).find(
+      (r) => r.attached !== undefined,
+    );
+    return (stay?.with?.confirmed ?? []).map((p) => [p.person, p.name]);
+  };
+  it("by a resolved address, a label or a first name, and nobody else", () => {
+    expect(withOf({ name: "Ola Nordmann" })).toEqual([[OLA, "Ola Nordmann"]]);
+    expect(withOf({ name: "Per Hansen" })).toEqual([]);
+    expect(withOf({ email: "per@example.org" })).toEqual([]);
+    expect(withOf({ name: "Per Hansen", email: "per@example.org" })).toEqual([]);
+    expect(withOf({ name: "ola nordmann" })).toEqual([[OLA, "Ola Nordmann"]]);
+    expect(withOf({ name: "Ola" })).toEqual([[OLA, "Ola Nordmann"]]);
+    expect(withOf({ name: "Kari Nordmann", email: "kari@example.org" })).toEqual([
+      [KARI, "Kari Nordmann"],
+    ]);
   });
 });

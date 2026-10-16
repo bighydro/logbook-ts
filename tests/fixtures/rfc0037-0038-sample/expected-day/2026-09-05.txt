@@ -1,0 +1,15 @@
+2026-09-05  Saturday · unsigned
+  night before  in transit
+  night after   in transit
+  country       unknown
+
+  timeline      nothing logged
+
+  unplaced      11:00  mail   Sunday
+  unplaced      11:30  mail   Re: Sunday
+  unplaced      15:00  mail   Hello
+  unplaced      22:00  event  The fjord kiosk
+
+  health        no lines
+  sources       mail 3 lines, last 15:00 · notion 1 line, last 22:00
+  readiness     mail present · message none · meeting none · location none · photo none · calendar present

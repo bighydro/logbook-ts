@@ -1,0 +1,1 @@
+{"at":"2026-10-12T20:14:01Z","end":null,"tz":"Europe/Oslo","source":"manual","kind":"resolution","tier":2,"payload":{"schema":"resolution/v1","ref":{"kind":"domain","value":"nordmann-verft.example"},"entity":{"type":"company","id":"019cadd3-6bc0-7dcd-9133-000000000201","registry":"logbook"},"label":"Nordmann Verft AS","method":"owner"}}
