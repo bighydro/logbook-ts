@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
+import { SPAWN_BUDGET_MS } from "./budgets.js";
 import {
   cleanup,
   copySample,
@@ -67,29 +68,33 @@ describe("logbook-ts add under the writer lock", () => {
     writeFileSync(join(root, "state", "writer.lock"), text, "utf-8");
   }
 
-  it("with --no-wait, says who holds the writer lock as the reference does, exits 2 and writes nothing", () => {
-    const root = copySample();
-    // A living holder that is not this process: a detached child that outlives the test.
-    const holder = livingPid();
-    plantLock(
-      root,
-      `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
-    );
-    for (const argv of [
-      ["add", root, "--no-wait", "held"],
-      ["add", root, "held", "--no-wait"],
-      ["add", "--no-wait", root, "held"],
-    ]) {
-      const { code, out, err } = run(argv);
-      expect(code).toBe(2);
-      expect(out).toBe("");
-      expect(err).toBe(
-        "add: another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z); --no-wait, so not waiting\n",
+  it(
+    "with --no-wait, says who holds the writer lock as the reference does, exits 2 and writes nothing",
+    () => {
+      const root = copySample();
+      // A living holder that is not this process: a detached child that outlives the test.
+      const holder = livingPid();
+      plantLock(
+        root,
+        `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
       );
-    }
-    expect(readLines(root)).toHaveLength(32);
-    rmSync(join(root, "state"), { recursive: true, force: true });
-  });
+      for (const argv of [
+        ["add", root, "--no-wait", "held"],
+        ["add", root, "held", "--no-wait"],
+        ["add", "--no-wait", root, "held"],
+      ]) {
+        const { code, out, err } = run(argv);
+        expect(code).toBe(2);
+        expect(out).toBe("");
+        expect(err).toBe(
+          "add: another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z); --no-wait, so not waiting\n",
+        );
+      }
+      expect(readLines(root)).toHaveLength(32);
+      rmSync(join(root, "state"), { recursive: true, force: true });
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it("takes over a stale lock with one line on stderr, and appends", () => {
     const root = copySample();
@@ -240,26 +245,30 @@ describe("logbook-ts add and repair tail on the files ahead of logbook.json (SPE
     expect(readLines(wrong.root, wrong.month)).toHaveLength(1);
   });
 
-  it("repair tail under --no-wait while a living writer holds the lock: `repair: …; --no-wait, so not waiting`, exit 2, as the reference says it", () => {
-    const { root } = lagging();
-    const holder = livingPid();
-    mkdirSync(join(root, "state"), { recursive: true });
-    writeFileSync(
-      join(root, "state", "writer.lock"),
-      `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
-      "utf-8",
-    );
-    for (const argv of [
-      ["repair", "tail", root, "--no-wait"],
-      ["repair", "tail", root, "--dry-run", "--no-wait"],
-      ["repair", "--no-wait", "tail", "--dry-run", root],
-    ]) {
-      expect(run(argv)).toEqual({
-        code: 2,
-        out: "",
-        err: "repair: another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z); --no-wait, so not waiting\n",
-      });
-    }
-    rmSync(join(root, "state"), { recursive: true, force: true });
-  });
+  it(
+    "repair tail under --no-wait while a living writer holds the lock: `repair: …; --no-wait, so not waiting`, exit 2, as the reference says it",
+    () => {
+      const { root } = lagging();
+      const holder = livingPid();
+      mkdirSync(join(root, "state"), { recursive: true });
+      writeFileSync(
+        join(root, "state", "writer.lock"),
+        `{"pid": ${holder}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`,
+        "utf-8",
+      );
+      for (const argv of [
+        ["repair", "tail", root, "--no-wait"],
+        ["repair", "tail", root, "--dry-run", "--no-wait"],
+        ["repair", "--no-wait", "tail", "--dry-run", root],
+      ]) {
+        expect(run(argv)).toEqual({
+          code: 2,
+          out: "",
+          err: "repair: another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z); --no-wait, so not waiting\n",
+        });
+      }
+      rmSync(join(root, "state"), { recursive: true, force: true });
+    },
+    SPAWN_BUDGET_MS,
+  );
 });
