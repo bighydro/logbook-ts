@@ -20,6 +20,7 @@ import { canonicalize } from "../src/jcs.js";
 import { monthFiles } from "../src/lines.js";
 import { verifyLogbook } from "../src/store.js";
 import type { Line } from "../src/types.js";
+import { SPAWN_BUDGET_MS } from "./budgets.js";
 import {
   cleanup,
   copySample,
@@ -410,37 +411,41 @@ const seqOf = (run: Run): number[] =>
     .map((row) => (JSON.parse(row) as Line).seq);
 
 describe("two processes on one record", () => {
-  it("the second waits for the first, says so, and the chain has one line each, in order", async () => {
-    const root = copySample();
-    const gates = gatesFolder();
-    const first = start(root, "first", ["--gates", gates.dir, "--hold-append"]);
-    await until(() => gates.reached("holding"), [first]);
-    const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as Record<string, unknown>;
-    expect(holder).toEqual({
-      pid: first.pid,
-      command: "logbook-ts add",
-      since: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
-    });
+  it(
+    "the second waits for the first, says so, and the chain has one line each, in order",
+    async () => {
+      const root = copySample();
+      const gates = gatesFolder();
+      const first = start(root, "first", ["--gates", gates.dir, "--hold-append"]);
+      await until(() => gates.reached("holding"), [first]);
+      const holder = JSON.parse(readFileSync(lockOf(root), "utf-8")) as Record<string, unknown>;
+      expect(holder).toEqual({
+        pid: first.pid,
+        command: "logbook-ts add",
+        since: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
+      });
 
-    // The first holds the lock until the second has said it waits.
-    const second = start(root, "second");
-    await until(() => second.err().endsWith("; waiting\n"), [first, second]);
-    gates.open("release");
-    const [a, b] = await Promise.all([first.done, second.done]);
-    expect(a.code).toBe(0);
-    expect(b.code).toBe(0);
-    expect(b.err).toBe(
-      `another logbook command is writing to this record (logbook-ts add, since ${String(holder.since)}); waiting\n`,
-    );
-    expect(a.err).toBe("");
-    expect(seqOf(a)).toEqual([33]);
-    expect(seqOf(b)).toEqual([34]);
-    const result = verifyLogbook(root);
-    expect(result.errors).toEqual([]);
-    expect(result.lines).toBe(34);
-    expect(existsSync(lockOf(root))).toBe(false);
-    expect(existsSync(join(root, "state"))).toBe(false);
-  }, 30_000);
+      // The first holds the lock until the second has said it waits.
+      const second = start(root, "second");
+      await until(() => second.err().endsWith("; waiting\n"), [first, second]);
+      gates.open("release");
+      const [a, b] = await Promise.all([first.done, second.done]);
+      expect(a.code).toBe(0);
+      expect(b.code).toBe(0);
+      expect(b.err).toBe(
+        `another logbook command is writing to this record (logbook-ts add, since ${String(holder.since)}); waiting\n`,
+      );
+      expect(a.err).toBe("");
+      expect(seqOf(a)).toEqual([33]);
+      expect(seqOf(b)).toEqual([34]);
+      const result = verifyLogbook(root);
+      expect(result.errors).toEqual([]);
+      expect(result.lines).toBe(34);
+      expect(existsSync(lockOf(root))).toBe(false);
+      expect(existsSync(join(root, "state"))).toBe(false);
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it("under --no-wait the second is refused with exit 2 and the reference's sentence, and writes nothing", async () => {
     const root = copySample();
@@ -782,54 +787,58 @@ describe("a crash between the two writes of an append (SPEC §3, write order; de
 });
 
 describe("the guard behind the lock", () => {
-  it("a writer that ignores the lock and moves the head while a line is being prepared: HeadMoved, exit 2, nothing written", async () => {
-    const root = copySample();
-    const gates = gatesFolder();
-    const paused = start(root, "chained from a head that moved", [
-      "--gates",
-      gates.dir,
-      "--pause-after-scan",
-    ]);
-    await until(() => gates.reached("paused"), [paused]);
+  it(
+    "a writer that ignores the lock and moves the head while a line is being prepared: HeadMoved, exit 2, nothing written",
+    async () => {
+      const root = copySample();
+      const gates = gatesFolder();
+      const paused = start(root, "chained from a head that moved", [
+        "--gates",
+        gates.dir,
+        "--pause-after-scan",
+      ]);
+      await until(() => gates.reached("paused"), [paused]);
 
-    // A writer that never took the lock: a line chained by hand onto the sample's head, and
-    // logbook.json moved to it, as a test fixture is written (tests/helpers.ts).
-    const rows = readLines(root);
-    const intruder: Line = {
-      id: "00000000-0000-4000-8000-000000000033",
-      seq: 33,
-      at: "2026-03-09T08:00:00Z",
-      end: null,
-      tz: "Europe/Oslo",
-      source: "manual",
-      kind: "note",
-      tier: 2,
-      payload: { schema: "note/v1", text: "written past the lock" },
-      recorded_at: "2026-03-09T08:00:00Z",
-      prev: EXPECTED.head,
-      hash: "",
-    };
-    intruder.hash = hashLine(intruder);
-    writeFileSync(
-      join(root, SAMPLE_MONTH),
-      `${rows.join("\n")}\n${canonicalize(intruder)}\n`,
-      "utf-8",
-    );
-    writeMeta(root, { ...readMetaFile(root), seq: 33, head: intruder.hash });
+      // A writer that never took the lock: a line chained by hand onto the sample's head, and
+      // logbook.json moved to it, as a test fixture is written (tests/helpers.ts).
+      const rows = readLines(root);
+      const intruder: Line = {
+        id: "00000000-0000-4000-8000-000000000033",
+        seq: 33,
+        at: "2026-03-09T08:00:00Z",
+        end: null,
+        tz: "Europe/Oslo",
+        source: "manual",
+        kind: "note",
+        tier: 2,
+        payload: { schema: "note/v1", text: "written past the lock" },
+        recorded_at: "2026-03-09T08:00:00Z",
+        prev: EXPECTED.head,
+        hash: "",
+      };
+      intruder.hash = hashLine(intruder);
+      writeFileSync(
+        join(root, SAMPLE_MONTH),
+        `${rows.join("\n")}\n${canonicalize(intruder)}\n`,
+        "utf-8",
+      );
+      writeMeta(root, { ...readMetaFile(root), seq: 33, head: intruder.hash });
 
-    gates.open("resume");
-    const run = await paused.done;
-    expect(run.code).toBe(2);
-    expect(run.out).toBe("");
-    expect(run.err).toBe(
-      `HeadMoved: the record's head moved while the line was being prepared: logbook.json named seq 32, head ${EXPECTED.head}, and names seq 33, head ${intruder.hash} now; nothing was written\n`,
-    );
-    expect(readLines(root)).toHaveLength(33);
-    const result = verifyLogbook(root);
-    expect(result.errors).toEqual([]);
-    expect(result.head).toBe(intruder.hash);
-    expect(existsSync(lockOf(root))).toBe(false);
-  }, 30_000);
+      gates.open("resume");
+      const run = await paused.done;
+      expect(run.code).toBe(2);
+      expect(run.out).toBe("");
+      expect(run.err).toBe(
+        `HeadMoved: the record's head moved while the line was being prepared: logbook.json named seq 32, head ${EXPECTED.head}, and names seq 33, head ${intruder.hash} now; nothing was written\n`,
+      );
+      expect(readLines(root)).toHaveLength(33);
+      const result = verifyLogbook(root);
+      expect(result.errors).toEqual([]);
+      expect(result.head).toBe(intruder.hash);
+      expect(existsSync(lockOf(root))).toBe(false);
+    },
+    SPAWN_BUDGET_MS,
+  );
 });
 
 describe("the folders an append makes (SPEC §3: each folder fsynced once it holds the name it gained)", () => {
@@ -941,6 +950,6 @@ describe("rule A and the take at their edges", () => {
       expect(run.code).toBe(1);
       expect(run.err).toMatch(/^LogbookError: .*state/);
     },
-    30_000,
+    SPAWN_BUDGET_MS,
   );
 });

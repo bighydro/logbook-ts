@@ -28,6 +28,7 @@ import {
   withWriterLock,
 } from "../src/store.js";
 import type { Line } from "../src/types.js";
+import { SPAWN_BUDGET_MS } from "./budgets.js";
 import {
   cleanup,
   copyFixture,
@@ -805,42 +806,50 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     expect(existsSync(lockOf(root))).toBe(false);
   });
 
-  it("refuses at once with WriterBusy when told not to wait, naming the holder as the reference does, and writes nothing", () => {
-    const root = copySample();
-    const pid = livingPid(20_000);
-    const planted = `{"pid": ${pid}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
-    plantLock(root, planted);
-    const said: string[] = [];
-    expect(() => addNote(root, "no", { wait: false, say: (l) => said.push(l) })).toThrow(
-      WriterBusy,
-    );
-    expect(() => addNote(root, "no", { wait: false })).toThrow(
-      "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
-    );
-    expect(said).toEqual([]);
-    expect(readFileSync(lockOf(root), "utf-8")).toBe(planted); // the holder's lock is not touched
-    expect(readLines(root)).toHaveLength(32);
-    expect(readMetaFile(root).seq).toBe(32);
-    rmSync(join(root, "state"), { recursive: true, force: true });
-  });
+  it(
+    "refuses at once with WriterBusy when told not to wait, naming the holder as the reference does, and writes nothing",
+    () => {
+      const root = copySample();
+      const pid = livingPid(20_000);
+      const planted = `{"pid": ${pid}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
+      plantLock(root, planted);
+      const said: string[] = [];
+      expect(() => addNote(root, "no", { wait: false, say: (l) => said.push(l) })).toThrow(
+        WriterBusy,
+      );
+      expect(() => addNote(root, "no", { wait: false })).toThrow(
+        "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
+      );
+      expect(said).toEqual([]);
+      expect(readFileSync(lockOf(root), "utf-8")).toBe(planted); // the holder's lock is not touched
+      expect(readLines(root)).toHaveLength(32);
+      expect(readMetaFile(root).seq).toBe(32);
+      rmSync(join(root, "state"), { recursive: true, force: true });
+    },
+    SPAWN_BUDGET_MS,
+  );
 
-  it("waits for a lock whose process is alive, saying so once, and goes on when that process is gone", () => {
-    const root = copySample();
-    const pid = livingPid(1500);
-    expect(pid).toBeGreaterThan(0);
-    plantLock(root, `{"pid": ${pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
-    const said: string[] = [];
-    const started = Date.now();
-    const line = addNote(root, "after waiting", { say: (l) => said.push(l) });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(1000);
-    expect(line.seq).toBe(33);
-    expect(said).toEqual([
-      "another logbook command is writing to this record (add, since 2026-10-13T06:00:00Z); waiting",
-      `a stale lock from add (pid ${pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over`,
-    ]);
-    expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
-    expect(existsSync(lockOf(root))).toBe(false);
-  }, 20_000);
+  it(
+    "waits for a lock whose process is alive, saying so once, and goes on when that process is gone",
+    () => {
+      const root = copySample();
+      const pid = livingPid(1500);
+      expect(pid).toBeGreaterThan(0);
+      plantLock(root, `{"pid": ${pid}, "command": "add", "since": "2026-10-13T06:00:00Z"}`);
+      const said: string[] = [];
+      const started = Date.now();
+      const line = addNote(root, "after waiting", { say: (l) => said.push(l) });
+      expect(Date.now() - started).toBeGreaterThanOrEqual(1000);
+      expect(line.seq).toBe(33);
+      expect(said).toEqual([
+        "another logbook command is writing to this record (add, since 2026-10-13T06:00:00Z); waiting",
+        `a stale lock from add (pid ${pid}, since 2026-10-13T06:00:00Z) whose process is gone; taking it over`,
+      ]);
+      expect(verifyLogbook(root)).toMatchObject({ valid: true, lines: 33 });
+      expect(existsSync(lockOf(root))).toBe(false);
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it("takes over a lock whose process is gone, with one line saying so, as the reference does", () => {
     const root = copySample();
@@ -963,38 +972,46 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     // here, more than five on a Windows runner. What is taken, and when, is the measure, not the time.
   }, 20_000);
 
-  it("a lock that names no holder and changes meanwhile (touched, as by a writer still making it) is someone taking it: never taken while it changes; waited for with one line saying so, then taken once it has stayed as it is for half a second (rule A)", async () => {
-    const root = copySample();
-    plantLock(root, "");
-    await touchedMeanwhile(lockOf(root), 1500);
-    const started = Date.now();
-    const said: string[] = [];
-    const line = addNote(root, "once the lock stops changing", { say: (l) => said.push(l) });
-    // Touched for a second and a half, then left: half a second as it is after the last touch.
-    expect(Date.now() - started).toBeGreaterThanOrEqual(1400);
-    expect(line.seq).toBe(33);
-    expect(said).toEqual([`${NO_HOLDER_YET}; waiting`]);
-    expect(existsSync(lockOf(root))).toBe(false);
-  }, 20_000);
-
-  it("and under --no-wait it is refused after half a second with the no-holder sentence, the lock left to whoever is making it (rule A)", async () => {
-    for (const bytes of ["", '{"pid": 12', "garbage\n", "[1]"]) {
+  it(
+    "a lock that names no holder and changes meanwhile (touched, as by a writer still making it) is someone taking it: never taken while it changes; waited for with one line saying so, then taken once it has stayed as it is for half a second (rule A)",
+    async () => {
       const root = copySample();
-      plantLock(root, bytes);
-      await touchedMeanwhile(lockOf(root), 5000);
-      const said: string[] = [];
+      plantLock(root, "");
+      await touchedMeanwhile(lockOf(root), 1500);
       const started = Date.now();
-      expect(() =>
-        addNote(root, "not over a lock being made", { wait: false, say: (l) => said.push(l) }),
-      ).toThrow(new WriterBusy(NO_HOLDER_YET));
-      expect(Date.now() - started).toBeGreaterThanOrEqual(450);
-      expect(said).toEqual([]);
-      expect(readFileSync(lockOf(root), "utf-8")).toBe(bytes);
-      expect(readLines(root)).toHaveLength(32);
-      expect(readdirSync(join(root, "state"))).toEqual(["writer.lock"]);
-      for (const child of touchers.splice(0)) child.kill("SIGKILL");
-    }
-  }, 30_000);
+      const said: string[] = [];
+      const line = addNote(root, "once the lock stops changing", { say: (l) => said.push(l) });
+      // Touched for a second and a half, then left: half a second as it is after the last touch.
+      expect(Date.now() - started).toBeGreaterThanOrEqual(1400);
+      expect(line.seq).toBe(33);
+      expect(said).toEqual([`${NO_HOLDER_YET}; waiting`]);
+      expect(existsSync(lockOf(root))).toBe(false);
+    },
+    SPAWN_BUDGET_MS,
+  );
+
+  it(
+    "and under --no-wait it is refused after half a second with the no-holder sentence, the lock left to whoever is making it (rule A)",
+    async () => {
+      for (const bytes of ["", '{"pid": 12', "garbage\n", "[1]"]) {
+        const root = copySample();
+        plantLock(root, bytes);
+        await touchedMeanwhile(lockOf(root), 5000);
+        const said: string[] = [];
+        const started = Date.now();
+        expect(() =>
+          addNote(root, "not over a lock being made", { wait: false, say: (l) => said.push(l) }),
+        ).toThrow(new WriterBusy(NO_HOLDER_YET));
+        expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+        expect(said).toEqual([]);
+        expect(readFileSync(lockOf(root), "utf-8")).toBe(bytes);
+        expect(readLines(root)).toHaveLength(32);
+        expect(readdirSync(join(root, "state"))).toEqual(["writer.lock"]);
+        for (const child of touchers.splice(0)) child.kill("SIGKILL");
+      }
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it("clears a reclaim left by a writer that died taking over a stale lock", () => {
     const root = copySample();
@@ -1004,32 +1021,36 @@ describe("the writer lock (one writer at a time, as the reference's state/writer
     expect(existsSync(join(root, "state"))).toBe(false);
   });
 
-  it("a reclaim that names no writer is held to the lock's rule: as it is for half a second it is a leftover, cleared, and the stale lock taken, whatever its mtime; changing, it is someone making it, and under --no-wait refused (rule A)", async () => {
-    const stale = `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`;
-    const guard = (root: string): string => join(root, "state", "writer.lock.reclaim");
+  it(
+    "a reclaim that names no writer is held to the lock's rule: as it is for half a second it is a leftover, cleared, and the stale lock taken, whatever its mtime; changing, it is someone making it, and under --no-wait refused (rule A)",
+    async () => {
+      const stale = `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`;
+      const guard = (root: string): string => join(root, "state", "writer.lock.reclaim");
 
-    for (const offset of [-10_000, 60_000]) {
-      const left = copySample();
-      plantLock(left, stale);
-      writeFileSync(guard(left), "", "utf-8");
-      utimesSync(guard(left), (Date.now() + offset) / 1000, (Date.now() + offset) / 1000);
-      expect(addNote(left, "past a reclaim a crash left empty", { wait: false }).seq).toBe(33);
-      expect(existsSync(join(left, "state"))).toBe(false);
-    }
+      for (const offset of [-10_000, 60_000]) {
+        const left = copySample();
+        plantLock(left, stale);
+        writeFileSync(guard(left), "", "utf-8");
+        utimesSync(guard(left), (Date.now() + offset) / 1000, (Date.now() + offset) / 1000);
+        expect(addNote(left, "past a reclaim a crash left empty", { wait: false }).seq).toBe(33);
+        expect(existsSync(join(left, "state"))).toBe(false);
+      }
 
-    const young = copySample();
-    plantLock(young, stale);
-    writeFileSync(guard(young), "", "utf-8");
-    await touchedMeanwhile(guard(young), 5000);
-    expect(() => addNote(young, "not past a reclaim being made", { wait: false })).toThrow(
-      new WriterBusy(
-        "another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names no holder yet; if none is running, remove it)",
-      ),
-    );
-    expect(readFileSync(lockOf(young), "utf-8")).toBe(stale);
-    expect(readFileSync(guard(young), "utf-8")).toBe("");
-    expect(readLines(young)).toHaveLength(32);
-  }, 20_000);
+      const young = copySample();
+      plantLock(young, stale);
+      writeFileSync(guard(young), "", "utf-8");
+      await touchedMeanwhile(guard(young), 5000);
+      expect(() => addNote(young, "not past a reclaim being made", { wait: false })).toThrow(
+        new WriterBusy(
+          "another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names no holder yet; if none is running, remove it)",
+        ),
+      );
+      expect(readFileSync(lockOf(young), "utf-8")).toBe(stale);
+      expect(readFileSync(guard(young), "utf-8")).toBe("");
+      expect(readLines(young)).toHaveLength(32);
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it("a release that cannot read the lock back does not hide what the writer threw: the writer's error is the one seen", () => {
     const root = copySample();
@@ -1087,42 +1108,54 @@ describe("the writer lock at its edges", () => {
   const stale = (): string =>
     `{"pid": ${deadPid()}, "command": "add", "since": "2026-10-13T06:00:00Z"}`;
 
-  it("a reclaim file naming a living pid (a reclaimer stopped, or a crashed one's pid given to another process) is refused under --no-wait after half a second, not waited out in silence", () => {
-    const root = copySample();
-    plantLock(root, stale());
-    writeFileSync(reclaimOf(root), String(livingPid(3000)), "utf-8");
-    const started = Date.now();
-    expect(() => addNote(root, "not under --no-wait", { wait: false })).toThrow(WriterBusy);
-    expect(Date.now() - started).toBeLessThan(1500);
-    expect(readLines(root)).toHaveLength(32);
-  }, 20_000);
+  it(
+    "a reclaim file naming a living pid (a reclaimer stopped, or a crashed one's pid given to another process) is refused under --no-wait after half a second, not waited out in silence",
+    () => {
+      const root = copySample();
+      plantLock(root, stale());
+      writeFileSync(reclaimOf(root), String(livingPid(3000)), "utf-8");
+      const started = Date.now();
+      expect(() => addNote(root, "not under --no-wait", { wait: false })).toThrow(WriterBusy);
+      expect(Date.now() - started).toBeLessThan(1500);
+      expect(readLines(root)).toHaveLength(32);
+    },
+    SPAWN_BUDGET_MS,
+  );
 
-  it("and waited for with one line saying so, as a lock's holder is, then the stale lock taken", () => {
-    const root = copySample();
-    plantLock(root, stale());
-    const pid = livingPid(1500);
-    writeFileSync(reclaimOf(root), String(pid), "utf-8");
-    const said: string[] = [];
-    expect(addNote(root, "after the reclaimer", { say: (l) => said.push(l) }).seq).toBe(33);
-    expect(said[0]).toBe(
-      `another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid ${pid}); waiting`,
-    );
-    expect(said[1]).toMatch(
-      /^a stale lock from add \(pid \d+, since 2026-10-13T06:00:00Z\) whose process is gone; taking it over$/,
-    );
-  }, 20_000);
+  it(
+    "and waited for with one line saying so, as a lock's holder is, then the stale lock taken",
+    () => {
+      const root = copySample();
+      plantLock(root, stale());
+      const pid = livingPid(1500);
+      writeFileSync(reclaimOf(root), String(pid), "utf-8");
+      const said: string[] = [];
+      expect(addNote(root, "after the reclaimer", { say: (l) => said.push(l) }).seq).toBe(33);
+      expect(said[0]).toBe(
+        `another logbook command is taking over a stale lock on this record (state/writer.lock.reclaim names pid ${pid}); waiting`,
+      );
+      expect(said[1]).toMatch(
+        /^a stale lock from add \(pid \d+, since 2026-10-13T06:00:00Z\) whose process is gone; taking it over$/,
+      );
+    },
+    SPAWN_BUDGET_MS,
+  );
 
-  it("`taking it over` is said once the lock is taken over, not when the take is then refused (an empty reclaim file still being made, under --no-wait)", async () => {
-    const root = copySample();
-    plantLock(root, stale());
-    writeFileSync(reclaimOf(root), "", "utf-8");
-    await touchedMeanwhile(reclaimOf(root), 5000);
-    const said: string[] = [];
-    expect(() =>
-      addNote(root, "refused after all", { wait: false, say: (l) => said.push(l) }),
-    ).toThrow(WriterBusy);
-    expect(said).toEqual([]);
-  }, 20_000);
+  it(
+    "`taking it over` is said once the lock is taken over, not when the take is then refused (an empty reclaim file still being made, under --no-wait)",
+    async () => {
+      const root = copySample();
+      plantLock(root, stale());
+      writeFileSync(reclaimOf(root), "", "utf-8");
+      await touchedMeanwhile(reclaimOf(root), 5000);
+      const said: string[] = [];
+      expect(() =>
+        addNote(root, "refused after all", { wait: false, say: (l) => said.push(l) }),
+      ).toThrow(WriterBusy);
+      expect(said).toEqual([]);
+    },
+    SPAWN_BUDGET_MS,
+  );
 
   it.skipIf(process.platform === "win32")(
     "a second take in one thread through another spelling of the record (a symlink) is refused as a second take, not met as another writer's lock and waited on for ever",
@@ -1461,20 +1494,24 @@ describe("the files ahead of logbook.json (SPEC §3, write order): add refuses, 
     );
   });
 
-  it("holds the writer lock throughout, the dry run too: WriterBusy while a living writer holds it, the lock left to it", () => {
-    const root = writeRecord(THREE);
-    setBack(root, 1);
-    const planted = `{"pid": ${livingPid(20_000)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
-    plantLock(root, planted);
-    for (const dryRun of [true, false]) {
-      expect(() => repairTail(root, { dryRun, wait: false })).toThrow(
-        new WriterBusy(
-          "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
-        ),
-      );
-    }
-    expect(readFileSync(lockOf(root), "utf-8")).toBe(planted);
-    expect(readMetaFile(root).seq).toBe(1);
-    rmSync(join(root, "state"), { recursive: true, force: true });
-  });
+  it(
+    "holds the writer lock throughout, the dry run too: WriterBusy while a living writer holds it, the lock left to it",
+    () => {
+      const root = writeRecord(THREE);
+      setBack(root, 1);
+      const planted = `{"pid": ${livingPid(20_000)}, "command": "sync immich", "since": "2026-10-13T06:00:00Z"}`;
+      plantLock(root, planted);
+      for (const dryRun of [true, false]) {
+        expect(() => repairTail(root, { dryRun, wait: false })).toThrow(
+          new WriterBusy(
+            "another logbook command is writing to this record (sync immich, since 2026-10-13T06:00:00Z)",
+          ),
+        );
+      }
+      expect(readFileSync(lockOf(root), "utf-8")).toBe(planted);
+      expect(readMetaFile(root).seq).toBe(1);
+      rmSync(join(root, "state"), { recursive: true, force: true });
+    },
+    SPAWN_BUDGET_MS,
+  );
 });
