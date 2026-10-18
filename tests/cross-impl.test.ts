@@ -27,6 +27,7 @@ import { gapsText, sourceGaps } from "../src/sources.js";
 import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
+import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
 import {
   cleanup,
   comparableDayJson,
@@ -92,16 +93,20 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts print the s
   for (const name of ["show-sample", "profiles-sample", "sample-logbook"]) {
     const root = join(FIXTURES, name);
     for (const { day, raw, text } of expectedShows(root)) {
-      it(`${name} ${day}${raw ? " --raw" : ""}`, () => {
-        const copy = join(tempDir(), name);
-        cpSync(root, copy, { recursive: true });
-        const reference = referenceShow(copy, day, raw);
-        const ours = showDay(root, { day, raw }).text;
-        expect(ours, "logbook-ts disagrees with the reference").toBe(reference);
-        expect(reference, "the reference moved; re-capture tests/fixtures/*/expected-show").toBe(
-          text,
-        );
-      });
+      it(
+        `${name} ${day}${raw ? " --raw" : ""}`,
+        () => {
+          const copy = join(tempDir(), name);
+          cpSync(root, copy, { recursive: true });
+          const reference = referenceShow(copy, day, raw);
+          const ours = showDay(root, { day, raw }).text;
+          expect(ours, "logbook-ts disagrees with the reference").toBe(reference);
+          expect(reference, "the reference moved; re-capture tests/fixtures/*/expected-show").toBe(
+            text,
+          );
+        },
+        CROSS_IMPL_BUDGET_MS,
+      );
     }
   }
 });
@@ -231,36 +236,40 @@ describe.skipIf(!ready)(
       }, 120_000);
     }
 
-    it("sample-logbook cut inside its first line: no whole line remains, and both say 0 and GENESIS", () => {
-      const copy = copyOf("sample-logbook");
-      const parts = ["logbook", "2026", "03.jsonl"] as const;
-      const file = join(copy, ...parts);
-      const first = readFileSync(file, "utf-8").split("\n")[0] as string;
-      writeFileSync(file, first.slice(0, Math.floor(first.length / 2)), "utf-8");
-      const meta = JSON.parse(readFileSync(join(copy, "logbook.json"), "utf-8")) as Record<
-        string,
-        unknown
-      >;
-      writeFileSync(
-        join(copy, "logbook.json"),
-        JSON.stringify({ ...meta, seq: 0, head: "0".repeat(64) }),
-        "utf-8",
-      );
-      const theirs = referenceVerify(copy);
-      const ours = verifyLogbook(copy);
-      const sentence = cutShort(parts, 1);
-      expect(theirs.status).toBe(1);
-      expect([theirs.lines, theirs.head, theirs.errors]).toEqual([
-        0,
-        "0".repeat(64),
-        [sentence.theirs],
-      ]);
-      expect([ours.lines, ours.head, ours.errors]).toEqual([
-        theirs.lines,
-        theirs.head,
-        [sentence.ours],
-      ]);
-    });
+    it(
+      "sample-logbook cut inside its first line: no whole line remains, and both say 0 and GENESIS",
+      () => {
+        const copy = copyOf("sample-logbook");
+        const parts = ["logbook", "2026", "03.jsonl"] as const;
+        const file = join(copy, ...parts);
+        const first = readFileSync(file, "utf-8").split("\n")[0] as string;
+        writeFileSync(file, first.slice(0, Math.floor(first.length / 2)), "utf-8");
+        const meta = JSON.parse(readFileSync(join(copy, "logbook.json"), "utf-8")) as Record<
+          string,
+          unknown
+        >;
+        writeFileSync(
+          join(copy, "logbook.json"),
+          JSON.stringify({ ...meta, seq: 0, head: "0".repeat(64) }),
+          "utf-8",
+        );
+        const theirs = referenceVerify(copy);
+        const ours = verifyLogbook(copy);
+        const sentence = cutShort(parts, 1);
+        expect(theirs.status).toBe(1);
+        expect([theirs.lines, theirs.head, theirs.errors]).toEqual([
+          0,
+          "0".repeat(64),
+          [sentence.theirs],
+        ]);
+        expect([ours.lines, ours.head, ours.errors]).toEqual([
+          theirs.lines,
+          theirs.head,
+          [sentence.ours],
+        ]);
+      },
+      CROSS_IMPL_BUDGET_MS,
+    );
   },
 );
 
@@ -338,56 +347,72 @@ describe.skipIf(!ready)("the reference implementation and logbook-ts count the s
       cpSync(root, dir, { recursive: true, filter: (src) => !src.includes("expected-show") });
       return dir;
     };
-    it(`${name}: stats`, () => {
-      const theirs = referenceRun(copy(), ["stats"]);
-      expect(theirs.status).toBe(0);
-      const ours = statsText(collectStats(root));
-      expect(comparableStats(ours, true)).toBe(comparableStats(theirs.stdout, false));
-    });
-    it(`${name}: stats --json`, () => {
-      const theirs = JSON.parse(referenceRun(copy(), ["stats", "--json"]).stdout) as Json;
-      const ours = JSON.parse(JSON.stringify(collectStats(root))) as Json;
-      for (const key of ["took_seconds", "tiers", "months"]) delete ours[key];
-      delete theirs.took_seconds;
-      expect(ours).toEqual(theirs);
-    });
-    for (const args of [[], ["--since", since]]) {
-      it(`${name}: sources --gaps ${args.join(" ")}`.trimEnd(), () => {
-        const options = args.length ? { since } : {};
-        // A running silence is measured to the reference's own now, which is some instant while it
-        // ran: its report must be ours at the instant before it started or at the one after it
-        // ended (the run takes seconds, so one minute boundary at most lies between them).
-        const [theirs, before, after] = bracketed(() =>
-          referenceRun(copy(), ["sources", "--gaps", ...args]),
-        );
+    it(
+      `${name}: stats`,
+      () => {
+        const theirs = referenceRun(copy(), ["stats"]);
         expect(theirs.status).toBe(0);
-        const at = (now: Date) => gapsText(sourceGaps(root, { ...options, now }));
-        expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
-        const [json, from, to] = bracketed(() =>
-          referenceRun(copy(), ["sources", "--gaps", "--json", ...args]),
-        );
-        const atJson = (now: Date) =>
-          comparableGapsJson(JSON.stringify(sourceGaps(root, { ...options, now })));
-        expect([atJson(from), atJson(to)]).toContainEqual(comparableGapsJson(json.stdout));
-      });
-    }
-    it(`${name}: sources --gaps --expect, a source silent for days and one with no line`, () => {
-      const [theirs, before, after] = bracketed(() =>
-        referenceRun(copy(), [
-          "sources",
-          "--gaps",
-          "--since",
-          since,
-          "--expect",
-          "manual",
-          "nothing",
-        ]),
+        const ours = statsText(collectStats(root));
+        expect(comparableStats(ours, true)).toBe(comparableStats(theirs.stdout, false));
+      },
+      CROSS_IMPL_BUDGET_MS,
+    );
+    it(
+      `${name}: stats --json`,
+      () => {
+        const theirs = JSON.parse(referenceRun(copy(), ["stats", "--json"]).stdout) as Json;
+        const ours = JSON.parse(JSON.stringify(collectStats(root))) as Json;
+        for (const key of ["took_seconds", "tiers", "months"]) delete ours[key];
+        delete theirs.took_seconds;
+        expect(ours).toEqual(theirs);
+      },
+      CROSS_IMPL_BUDGET_MS,
+    );
+    for (const args of [[], ["--since", since]]) {
+      it(
+        `${name}: sources --gaps ${args.join(" ")}`.trimEnd(),
+        () => {
+          const options = args.length ? { since } : {};
+          // A running silence is measured to the reference's own now, which is some instant while it
+          // ran: its report must be ours at the instant before it started or at the one after it
+          // ended (the run takes seconds, so one minute boundary at most lies between them).
+          const [theirs, before, after] = bracketed(() =>
+            referenceRun(copy(), ["sources", "--gaps", ...args]),
+          );
+          expect(theirs.status).toBe(0);
+          const at = (now: Date) => gapsText(sourceGaps(root, { ...options, now }));
+          expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
+          const [json, from, to] = bracketed(() =>
+            referenceRun(copy(), ["sources", "--gaps", "--json", ...args]),
+          );
+          const atJson = (now: Date) =>
+            comparableGapsJson(JSON.stringify(sourceGaps(root, { ...options, now })));
+          expect([atJson(from), atJson(to)]).toContainEqual(comparableGapsJson(json.stdout));
+        },
+        CROSS_IMPL_BUDGET_MS,
       );
-      expect(theirs.status).toBe(1);
-      const at = (now: Date) =>
-        gapsText(sourceGaps(root, { since, expect: ["manual", "nothing"], now }));
-      expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
-    });
+    }
+    it(
+      `${name}: sources --gaps --expect, a source silent for days and one with no line`,
+      () => {
+        const [theirs, before, after] = bracketed(() =>
+          referenceRun(copy(), [
+            "sources",
+            "--gaps",
+            "--since",
+            since,
+            "--expect",
+            "manual",
+            "nothing",
+          ]),
+        );
+        expect(theirs.status).toBe(1);
+        const at = (now: Date) =>
+          gapsText(sourceGaps(root, { since, expect: ["manual", "nothing"], now }));
+        expect([at(before), at(after)]).toContain(comparableGaps(theirs.stdout));
+      },
+      CROSS_IMPL_BUDGET_MS,
+    );
   }
 });
 /** The flags a window name stands for: `all`, `YYYY`, or `since..until`. */
@@ -588,16 +613,21 @@ describe.skipIf(!ready)(
 
     const fixture = join(FIXTURES, "rfc0036-sample");
     for (const { day, raw, text } of expectedShows(fixture)) {
-      it(`show rfc0036-sample ${day}${raw ? " --raw" : ""}`, () => {
-        vi.stubEnv(FLAGS_ENV, "rfc0036");
-        const reference = referenceShow(copyOf("rfc0036-sample"), day, raw);
-        expect(showDay(fixture, { day, raw }).text, "logbook-ts disagrees with the reference").toBe(
-          reference,
-        );
-        expect(reference, "the reference moved; re-capture rfc0036-sample/expected-show").toBe(
-          text,
-        );
-      });
+      it(
+        `show rfc0036-sample ${day}${raw ? " --raw" : ""}`,
+        () => {
+          vi.stubEnv(FLAGS_ENV, "rfc0036");
+          const reference = referenceShow(copyOf("rfc0036-sample"), day, raw);
+          expect(
+            showDay(fixture, { day, raw }).text,
+            "logbook-ts disagrees with the reference",
+          ).toBe(reference);
+          expect(reference, "the reference moved; re-capture rfc0036-sample/expected-show").toBe(
+            text,
+          );
+        },
+        CROSS_IMPL_BUDGET_MS,
+      );
     }
 
     it("refuse a day_start that is not a clock in the same sentence, on every reader that groups by day", () => {
@@ -778,16 +808,22 @@ describe.skipIf(!ready)(
     });
 
     for (const { day, raw, text } of expectedShows(fixture)) {
-      it(`show rfc0037-0038-sample ${day}${raw ? " --raw" : ""}`, () => {
-        vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
-        const reference = referenceShow(shared(), day, raw);
-        expect(showDay(fixture, { day, raw }).text, "logbook-ts disagrees with the reference").toBe(
-          reference,
-        );
-        expect(reference, "the reference moved; re-capture rfc0037-0038-sample/expected-show").toBe(
-          text,
-        );
-      });
+      it(
+        `show rfc0037-0038-sample ${day}${raw ? " --raw" : ""}`,
+        () => {
+          vi.stubEnv(FLAGS_ENV, "rfc0037,rfc0038");
+          const reference = referenceShow(shared(), day, raw);
+          expect(
+            showDay(fixture, { day, raw }).text,
+            "logbook-ts disagrees with the reference",
+          ).toBe(reference);
+          expect(
+            reference,
+            "the reference moved; re-capture rfc0037-0038-sample/expected-show",
+          ).toBe(text);
+        },
+        CROSS_IMPL_BUDGET_MS,
+      );
     }
 
     it("day, every day with a line, as text and as JSON, and the vendored files are that output", () => {
