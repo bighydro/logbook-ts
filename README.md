@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (openlogbook at 7bcf728, 2026-10-15, the commit [`REFERENCE`](./REFERENCE) pins) does, matched against the
+the reference implementation (openlogbook v0.7.0 at b82a11c, 2026-10-18, the commit [`REFERENCE`](./REFERENCE) pins; four differences under the draft flags are in SPEC-QUESTIONS 108–111) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files

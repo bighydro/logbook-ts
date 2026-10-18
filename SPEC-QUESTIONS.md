@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (tag v0.7.0, 2026-10-18) for what the catch-up to it found (108–111).
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1200,3 +1200,87 @@ wherever a caller holds one.
     read or written, and a line with `speakers` and no `diarization`, which the RFC makes a MUST, shows its
     voices (95b, 95c). This implementation does the same, and so refuses nothing either. Should a writer
     refuse such a line, and a reader say so?
+
+## Found while catching up with the reference at b82a11c (openlogbook v0.7.0, 2026-10-18; rfcs/0037-entities.md as amended 2026-10-14 and 2026-10-15, rfcs/0038-speakers.md §3–4)
+
+The reference was run, never read. `REFERENCE` moved from 7bcf728 to b82a11c, the commit tag v0.7.0
+names (its #292, #306, #318 and #319 among the merges since), and every fixture's expected files were
+captured again with `tests/fixtures/capture-expected-*.mjs`: only `rfc0037-0038-sample`'s
+`expected-day/2026-10-06.json` and `expected-people/` (`all` and `2026`, text and JSON) changed; every
+other vendored file is the reference's output at v0.7.0 as it was at 7bcf728. The cross-impl job's first
+step (the writer lock, `tests/cross-impl-writer.test.ts`) agrees in all 14 cases. Its second step fails 6
+cases on the four differences below, every one under the draft flags (`rfc0037`, `rfc0038`); none
+touches the chain, a frozen profile or a conformance sample. With the files captured again, three unit
+tests that hold this implementation to them fail too, on 110 and 111: `tests/cli.test.ts` (*lays the JSON
+out as the reference does*) and `tests/rfc0037-0038-sample.test.ts` (*day, every day with a line* and
+*people, the whole record and its year*). Each entry gives the test, the fixture and the first differing
+line. Nothing in `src/` was changed for them: this is the catch-up, and the port is its own PR.
+
+108. **A no may name a voice (RFC 0038 §4.4 and §12; RFC 0037 §6.2).** `tests/cross-impl-entities.test.ts`,
+    *RFC 0037: the reference and logbook-ts validate a payload with the same sentences › on at least
+    sixty payload variants*, the variants `review: ref kind url` and `review: refs kind url` (the
+    payloads are the test's; no fixture). First differing line, the reference's: `ref.kind 'url' is not
+    one of email, phone, handle, provider_id, device_id, domain, line, repo, page, title, group,
+    merchant, mmsi, icao24, registration, place, name, centre, subject, speaker`; this implementation's
+    list ends at `subject` (`refs[0].kind` alike). At v0.7.0 the reference's `entity-review/v1` validator
+    takes the ref kind `speaker` in `ref` and in `refs`, in one list for every `type`. RFC 0038 §4.4
+    (`--reject`) and §12 add `speaker` to RFC 0035's `people-review/v1`, which RFC 0037 §6 reads as an
+    `entity-review/v1` line of `type` `person`; §6.2's order of refs per kind does not name it. Is
+    `speaker` a ref kind of `entity-review/v1` for every `type`, or only for `person` (and the
+    `people-review/v1` lines read as one)? Is its value held to RFC 0038 §3.1's pattern
+    (`<line id>#<label>`) on these lines too? Not changed here: `OBSERVED_REFS` (`src/entities.ts`)
+    still refuses it.
+
+109. **`status list --json` carries `note` and `portfolio` (RFC 0037 §10.2, §10.5, §11, as amended
+    2026-10-14 and 2026-10-15).** `tests/cross-impl-entities.test.ts`, *agrees on `status list KIND` and
+    its --json for every kind, on the synthetic record*, *reads a line's day under day_start (RFC 0036)
+    alike, with rfc0037 alone or both flags on*, and *lists the statuses of every kind alike, as text
+    and as JSON, and refuses a person alike* (`tests/fixtures/rfc0037-0038-sample`). First differing
+    line, of `status list org --json` on `rfc0037-0038-sample`: the reference's line 14, `"note": null,`
+    after `"line"`, where this implementation's is `"stale": false,`. The text agrees on every listing the
+    three tests make (every kind on both records, `org` on the `day_start` one); the JSON differs on every
+    one of them, and only by these two keys. An
+    entry is now `id, label, key, status, since, reason, proposed_by, line, note, stale, muted, until,
+    portfolio`. `note` is the id of the status's reason note (`note/v1`, labels `["status"]`), null when
+    there is none, so null on every org (§10.5 as amended: an org's reason stays on its tier-3 line). On
+    both records the link runs from the note's `extra.status` to the status line, the order the reference
+    wrote before its #308, and no status line carries a `note` field, so which link a reader takes when
+    both are present is not shown. `portfolio` is null on every entry of the three records, none of
+    whose lines carries the field. Should RFC 0037 or docs/entities.md fix `status list --json`'s keys and
+    their order? Is `portfolio` on the entry of an idea, a place or an asset, which §10.2 says MUST NOT
+    carry the field, part of the shape or the reference's own? Under a ceiling without tier 3 (§10.2:
+    a reader shows a portfolio "only where it may show tier 3"), is an org's `portfolio` null, or absent?
+    Not changed here.
+
+110. **The owner's voice is the owner (RFC 0038 §3.4, `day`).** `tests/cross-impl.test.ts`, *RFC 0037 and
+    RFC 0038 §2, under the rfc0037 and rfc0038 flags › day, every day with a line, as text and as JSON*,
+    `tests/fixtures/rfc0037-0038-sample/expected-day/2026-10-06.json`. First differing line, the
+    re-captured file's line 106, `"person": "01a13fb4-8379-7cc9-bd88-0c3b46e771ac",`, the record's
+    `owner_id`, where this implementation gives `"person": null`. Three voices of that day differ, every
+    one on the `mic` channel with `owner` true (`timeline[0].attached.transcripts[2].speakers[0]`,
+    `unplaced[0].speakers[0]`, `unplaced[1].speakers[5]`): `person` is the `owner_id`; and on the third,
+    labelled `mic.2`, whose transcript gives it the name `Ines`, `name` is null where this implementation
+    keeps `Ines`. The text of the day is unchanged (`you`). The record holds no `resolution/v1` line with a
+    `speaker` ref: the reference binds the owner's voice from `from_me` alone, as §3.4 lists ("the
+    owner's (bound to owner_id, or from_me with no attribution)"). 105 said `person` is always null; so it
+    was at 7bcf728. §3.4 says `person` is null "for an unnamed or not yet named voice": is it the
+    `owner_id` for the owner's voice, bound by no line, as the reference prints? And is `name` the bound
+    person's label, so null for the owner, who is never listed (§3.2), whatever name the source displayed
+    (§2.2), or the displayed name, as this implementation and the reference at 7bcf728 gave it? Not
+    changed here: under the `rfc0038` flag every `person` is still null.
+
+111. **`people` counts the voices not yet named (RFC 0038 §3.4, `people`).** `tests/cross-impl.test.ts`,
+    *RFC 0037 and RFC 0038 §2, under the rfc0037 and rfc0038 flags › people and days, as text and as
+    JSON*, `tests/fixtures/rfc0037-0038-sample/expected-people/all.txt` and `2026.txt`, and their `.json`.
+    First differing line, line 1, the reference's `2 people · 2026-08-01 – 2026-10-15 · tier 2 · 15 voices
+    not yet named · review speakers`, where this implementation's ends at `tier 2`; under `--json` the
+    reference adds `"unnamed": 0` and `"not_yet_named": 15` after `people`. The rows agree, and so does
+    `days`. §3.4 gives the head's words (`3 voices not yet named · review speakers`, `and 2 unnamed`) and
+    says `--json` carries the count, not under which key, nor what is counted. On this record 15 is the
+    readable voices (102) not the owner's on every transcript of the window that is not retracted: 13 on
+    standing transcripts and 2 on one another transcript supersedes, heard again (106); the retracted
+    transcript's voice is not counted. Is a voice of a superseded transcript not yet named, when §3.3
+    rule 5 says such a voice "names nobody"? Is a voice counted once per transcript, or once per voice
+    the review would ask about (§4.1: one row may hold the same guest heard at four dinners)? Is
+    `unnamed` printed when it is 0, as the JSON carries it, or left out of the head, as the text does?
+    Not changed here.
