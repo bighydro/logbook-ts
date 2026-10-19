@@ -307,6 +307,68 @@ describe("the standing signature of a day (RFC 0034 rule 3)", () => {
   });
 });
 
+describe("a re-sign (RFC 0034 amendment 4, 2026-10-18): the readers read what the standing signature confirmed, nothing merged", () => {
+  // Amendment 4 is the writer's: a re-sign without --confirm writes the standing signature's
+  // confirmations still on the page and not retracted, its dispositions and its note. A reader reads
+  // the line it wrote, as it reads any signature: the standing one's confirmed set and nothing of the
+  // one it supersedes (tests/cross-impl.test.ts has the reference write both).
+  const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const sign = (seq: number, extra: Record<string, unknown>): Line =>
+    line({ id: id(seq), seq }, { day: "2026-03-01", ...extra });
+
+  it("reads the confirmations it kept, a line retracted since dropped, a disposition and the note kept", () => {
+    const first = sign(40, {
+      confirmed: [id(1), id(2), id(3)],
+      page: { sha256: "ab".repeat(32), lines: 3 },
+      dispositions: { [id(2)]: "kept" },
+      note: "første",
+    });
+    // Line 1 retracted since, line 4 added since: kept are 2 and 3, line 4 stays unconfirmed.
+    const again = sign(41, {
+      confirmed: [id(2), id(3)],
+      page: { sha256: "cd".repeat(32), lines: 3 },
+      dispositions: { [id(2)]: "kept" },
+      note: "første",
+      supersedes: first.id,
+    });
+    const standing = standingSignatures([first, again], new Set([id(1)]), OWNER).get("2026-03-01");
+    expect(standing?.seq).toBe(41);
+    const state = signedState(standing, "Europe/Oslo", undefined, "2026-03-01");
+    expect(state).toMatchObject({
+      confirmed: 2,
+      lines: 3,
+      note: "første",
+      supersedes: first.id,
+      dispositions: { [id(2)]: "kept" },
+    });
+    expect(signedDayRow(again.payload)).toBe(
+      "signed 2026-03-01: 2 lines confirmed of 3 · kept 1 · første",
+    );
+  });
+
+  it("reads a re-sign that clears the note, and one that confirms the whole page, as written", () => {
+    const first = sign(40, { confirmed: [id(1)], note: "første" });
+    const cleared = sign(41, { confirmed: [id(1)], supersedes: first.id });
+    const all = sign(42, {
+      confirmed: [id(1), id(2), id(3)],
+      page: { sha256: "ef".repeat(32), lines: 3 },
+      supersedes: cleared.id,
+    });
+    const states = [cleared, all].map((s) =>
+      signedState(
+        standingSignatures([first, s], new Set(), OWNER).get("2026-03-01"),
+        "Europe/Oslo",
+        undefined,
+        "2026-03-01",
+      ),
+    );
+    expect(states.map((s) => [s?.confirmed, s?.note])).toEqual([
+      [1, null],
+      [3, null],
+    ]);
+  });
+});
+
 describe("show and day say whether the day is signed (RFC 0034 rule 6)", () => {
   it("show prints `signed <when>` on the sample's first day, `unsigned` on the others, and lists the signature on its own day", () => {
     const first = showDay(SAMPLE, { day: "2026-03-01" });

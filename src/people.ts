@@ -1,11 +1,14 @@
 import { nearestAirport } from "./airports.js";
 import { addDays, localOf, localToMs, monthKey } from "./clock.js";
+import { isOn, RFC0038 } from "./flags.js";
 import { coordinates, distanceM, roundTo } from "./geo.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
 import { type Opened, openWindow, type ReadingStats, type RowUnit, readDays } from "./reading.js";
 import { payloadOf } from "./render.js";
 import { asRef, type Ref } from "./resolve.js";
 import type { Asset, Place } from "./settings.js";
+import { isSuperseded } from "./show.js";
+import { bindVoices } from "./speakers.js";
 import type { Stay } from "./stays.js";
 import type { JsonValue, Line } from "./types.js";
 
@@ -23,6 +26,8 @@ export interface Channel {
   last: string;
   tier: number;
   last_line: string;
+  /** The seconds the person's voices spoke in the transcripts counted (RFC 0038 §3.4); only when a voice of theirs was. */
+  spoke_s?: number;
 }
 
 export interface RealContact {
@@ -58,6 +63,9 @@ export interface People {
   /** The highest tier of any evidence the report rests on; null without people. */
   tier: number | null;
   people: PersonReport[];
+  /** The unnamed people whose voices the window holds, and its voices not yet named (RFC 0038 §3.4); only when either is some. */
+  unnamed?: number;
+  not_yet_named?: number;
 }
 
 type Obj = { [key: string]: JsonValue };
@@ -96,6 +104,8 @@ interface Account {
   evidence: Array<{ day: string; ms: number; seq: number; line: string }>;
   evidenceTier: number;
   real: Map<string, RealDay>;
+  /** The seconds their voices spoke, when a voice of theirs was counted. */
+  spoke?: number;
 }
 
 /**
@@ -142,6 +152,9 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
     return isOwner(entity.id, entity.label) ? undefined : entity.id;
   };
   const byName = namesIndex(opened);
+  const voices = isOn(RFC0038);
+  const unnamed = new Set<string>();
+  let notYetNamed = 0;
   /** The one person the record labels by this name, or by its first word. */
   const personByName = (name: string): string | undefined => {
     const exact = byName.labels.get(name.trim().toLowerCase());
@@ -263,7 +276,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
           break;
         }
         case "event": {
-          if (p.schema !== "event/v1" || opened.judgements.superseded.has(line.id)) break;
+          if (p.schema !== "event/v1" || isSuperseded(opened.judgements, line)) break;
           if (!Array.isArray(p.attendees)) break;
           const named = new Set<string>();
           for (const item of p.attendees) {
@@ -288,10 +301,21 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
         case "transcript": {
           // A transcript some line replaces (heard again, corrected) is not counted, as the
           // reference reads it: the one that names it in `supersedes` stands for it.
-          if (p.schema !== "transcript/v1" || opened.judgements.superseded.has(line.id)) break;
-          if (!Array.isArray(p.participants)) break;
+          if (p.schema !== "transcript/v1" || isSuperseded(opened.judgements, line)) break;
           const named = new Set<string>();
-          for (const item of p.participants) {
+          // A voice bound to a person counts the transcript for them, with the seconds it spoke
+          // (RFC 0038 §3.4); an unnamed one is counted, never a row; one not yet named is nobody's.
+          if (voices) {
+            for (const v of bindVoices(line, resolver, opened.owner)) {
+              if (v.who === "nobody") notYetNamed += 1;
+              if (v.who === "unnamed" && v.person !== undefined) unnamed.add(v.person);
+              if (v.who !== "person" || v.person === undefined) continue;
+              named.add(v.person);
+              const acc = account(v.person);
+              acc.spoke = (acc.spoke ?? 0) + (v.seconds ?? 0);
+            }
+          }
+          for (const item of Array.isArray(p.participants) ? p.participants : []) {
             const o = obj(item);
             if (o === undefined) continue;
             let who: string | undefined;
@@ -354,10 +378,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
           if (!e.confirms || e.person === null || e.entry.day !== day.day) continue;
           // A transcript some line replaces is no evidence here either: the reference counts the
           // one that supersedes it (as it does among the channels above).
-          if (
-            e.entry.line.kind === "transcript" &&
-            opened.judgements.superseded.has(e.entry.line.id)
-          )
+          if (e.entry.line.kind === "transcript" && isSuperseded(opened.judgements, e.entry.line))
             continue;
           if (isOwner(e.person, e.name)) continue;
           const acc = account(e.person);
@@ -405,6 +426,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
         last: c.last,
         tier: c.tier,
         last_line: c.lastLine.id,
+        ...(channel === "transcripts" && acc.spoke !== undefined ? { spoke_s: acc.spoke } : {}),
       };
       tier = Math.max(tier, c.tier);
       firsts.push(c.first);
@@ -421,7 +443,9 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
     people.push({
       id: acc.id,
       name,
-      refs: named.map((r) => r.ref),
+      // A voice's ref names one recording's label, not the person: under the rfc0038 flag, never
+      // listed among their refs, as the reference lists them.
+      refs: named.filter((r) => !voices || r.ref.kind !== "speaker").map((r) => r.ref),
       tier,
       birthday: text(obj(birthdayLine?.line.payload.extra)?.birthday) ?? null,
       first_contact: firsts[0] as string,
@@ -443,7 +467,11 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
       (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
   );
   const tier = people.length ? Math.max(...people.map((p) => p.tier)) : null;
-  return { window: { since, until }, tier, people };
+  const counts =
+    unnamed.size > 0 || notYetNamed > 0
+      ? { unnamed: unnamed.size, not_yet_named: notYetNamed }
+      : {};
+  return { window: { since, until }, tier, people, ...counts };
 }
 
 /** The latest real contact: the latest day with one; on that day a meeting first, else the later of a message and a call. */
@@ -530,6 +558,12 @@ export function renderPeople(report: People, options: PeopleOptions = {}): strin
     `${report.people.length} ${report.people.length === 1 ? "person" : "people"} · ${report.window.since} ${DASH} ${report.window.until}`,
   ];
   if (report.tier !== null) head.push(`tier ${report.tier}`);
+  if (report.not_yet_named)
+    head.push(
+      `${report.not_yet_named} ${report.not_yet_named === 1 ? "voice" : "voices"} not yet named`,
+      "review speakers",
+    );
+  if (report.unnamed) head.push(`and ${report.unnamed} unnamed`);
   const lines = [head.join(" · ")];
   const w = Math.max(0, ...report.people.map((p) => width(p.name)));
   for (const p of report.people) {

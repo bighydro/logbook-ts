@@ -385,3 +385,131 @@ export function dayStartRecord(): string {
   writeMeta(root, { ...readMetaFile(root), day_start: "06:00" });
   return root;
 }
+
+function retraction(at: string, seq: number, tier: 1 | 2 | 3): Draft {
+  return {
+    at,
+    source: "manual",
+    kind: "retraction",
+    tier,
+    payload: { schema: "retraction/v1", supersedes: lineId(seq), seq, reason: "test" },
+  };
+}
+
+/**
+ * Three orgs' portfolios (RFC 0037's amendment of 2026-10-15, §10.2): the yard's carried by a status
+ * a later status without the field supersedes, the kiosk's moved by a line that is retracted, then a
+ * value that is not text, Havn Data's cleared by an empty one; a fourth org with a hold of 2020 in a
+ * portfolio given with spaces, and a fifth muted, with a reason.
+ */
+export function portfolioRecord(): string {
+  const yard = "Nordmann Verft AS";
+  const kiosk = "Fjordkiosk AS";
+  const havn = "Havn Data AS";
+  const old = "Gamle Verft AS";
+  const muted = "Kaia AS";
+  const OLD_ID = "019cadd3-6bc0-7dcd-9133-000000000204";
+  const MUTED_ID = "019cadd3-6bc0-7dcd-9133-000000000205";
+  const org = (id: string, label: string, domain: string): Draft =>
+    entity("2026-10-01T08:00:00Z", "org", id, label, { refs: [{ kind: "domain", value: domain }] });
+  return writeRecord(
+    [
+      org(YARD_ID, yard, YARD_DOMAIN), // 1
+      org(KIOSK_ID, kiosk, "fjordkiosk.example.org"), // 2
+      org(HAVN_ID, havn, "havn-data.example.org"), // 3
+      org(OLD_ID, old, "gamle-verft.example.org"), // 4
+      org(MUTED_ID, muted, "kaia.example.org"), // 5
+      status("2026-10-02T08:00:00Z", "org", YARD_ID, yard, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: "Fund I",
+      }), // 6
+      status("2026-10-03T08:00:00Z", "org", YARD_ID, yard, {
+        status: "add",
+        proposed_by: "owner",
+        supersedes: lineId(6),
+      }), // 7
+      status("2026-10-02T08:00:00Z", "org", KIOSK_ID, kiosk, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: "Angel",
+      }), // 8
+      status("2026-10-03T08:00:00Z", "org", KIOSK_ID, kiosk, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: "Fund II",
+        since: "2026-10-02",
+        supersedes: lineId(8),
+      }), // 9
+      retraction("2026-10-09T08:00:00Z", 9, 3), // 10
+      status("2026-10-04T08:00:00Z", "org", KIOSK_ID, kiosk, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: 5,
+        supersedes: lineId(8),
+      }), // 11
+      status("2026-10-02T08:00:00Z", "org", HAVN_ID, havn, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: "Fund I",
+      }), // 12
+      status("2026-10-04T08:00:00Z", "org", HAVN_ID, havn, {
+        status: "hold",
+        proposed_by: "owner",
+        portfolio: "",
+        supersedes: lineId(12),
+      }), // 13
+      status("2020-10-02T08:00:00Z", "org", OLD_ID, old, {
+        status: "hold",
+        proposed_by: "owner",
+        reason: "long",
+        portfolio: "  Fund   II ",
+      }), // 14
+      status("2026-10-02T08:00:00Z", "org", MUTED_ID, muted, {
+        status: "hold",
+        proposed_by: "owner",
+        reason: "orders",
+        proposal: { status: "let-go" },
+        portfolio: "Fund I",
+      }), // 15
+    ],
+    TZ,
+  );
+}
+
+/**
+ * Three ideas and the notes that hold their reasons (§10.5): two notes for one status line, the
+ * later one standing; a note without the `status` label; a retracted note.
+ */
+export function statusNotesRecord(): string {
+  const idea = (id: string, label: string): Draft =>
+    entity("2026-10-01T08:00:00Z", "idea", id, label, { refs: [{ kind: "title", value: label }] });
+  const exploring = (id: string, label: string, at: string): Draft =>
+    status(at, "idea", id, label, { status: "exploring", reason: "why", proposed_by: "owner" });
+  const note = (statusSeq: number, labels: string[], at: string): Draft => ({
+    at,
+    source: "manual",
+    kind: "note",
+    tier: 2,
+    payload: { schema: "note/v1", text: "why", labels, extra: { status: lineId(statusSeq) } },
+  });
+  const ALPHA = "019cadd3-6bc0-7dcd-9133-000000000311";
+  const BETA = "019cadd3-6bc0-7dcd-9133-000000000312";
+  const GAMMA = "019cadd3-6bc0-7dcd-9133-000000000313";
+  return writeRecord(
+    [
+      idea(ALPHA, "alpha kiosk"), // 1
+      idea(BETA, "beta ferry"), // 2
+      idea(GAMMA, "gamma boat"), // 3
+      exploring(ALPHA, "alpha kiosk", "2026-10-02T08:00:00Z"), // 4
+      note(4, ["status"], "2026-10-02T08:00:00Z"), // 5
+      note(4, ["status"], "2026-10-02T09:00:00Z"), // 6
+      exploring(BETA, "beta ferry", "2026-10-03T08:00:00Z"), // 7
+      note(7, [], "2026-10-03T08:00:00Z"), // 8
+      exploring(GAMMA, "gamma boat", "2026-10-04T08:00:00Z"), // 9
+      note(9, ["status"], "2026-10-04T08:00:00Z"), // 10
+      retraction("2026-10-09T08:00:00Z", 10, 2), // 11
+    ],
+    TZ,
+  );
+}

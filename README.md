@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (openlogbook at 7bcf728, 2026-10-15, the commit [`REFERENCE`](./REFERENCE) pins) does, matched against the
+the reference implementation (openlogbook 0.7.0, tag v0.7.0 at b82a11c, 2026-10-18, the commit [`REFERENCE`](./REFERENCE) pins) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,29 +133,56 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 0.6.1** (bighydro/logbook, tag v0.6.1), plus RFC 0034's signed-day amendments
-1–3 and the `write` keys of its PR 252 (branch `feat/mcp-write-tools`), as of 2026-10-13, and the draft
-RFCs 0036–0038 and the Day as they stand on its main at 7bcf728 (2026-10-15). *Read* means
+matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18), its RFC 0034
+signed-day amendments 1–4, the draft RFCs 0036–0038, 0040 and 0041 and the Day as they stand there. The
+settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
+are not compared again by the cross-implementation tests. *Read* means
 the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
 as the reference does; *verify* means the chain (SPEC §3, every profile hashes alike) and, where the
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
 
+### Coverage at v0.7.0
+
+What changed in the format's documents between 7bcf728 and v0.7.0, and what this implementation does
+with each: **implemented** (read, and validated where the profile is, held to the reference by tests),
+**verified only** (nothing here needs to change; tests hold that the readers already agree), or **not
+implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speakers-bound.test.ts`,
+`tests/marks.test.ts`, `tests/entities.test.ts`, `tests/signing.test.ts` and their cases in
+`tests/cross-impl.test.ts` and `tests/cross-impl-entities.test.ts`, run against the reference at b82a11c.
+
+| Document at v0.7.0 | Here | What |
+|---|---|---|
+| docs/SPEC-QUESTIONS.md, a line superseded twice (the reference's #321) | implemented | a line is superseded while a line of its kind that is not retracted names it; a superseder superseded in turn still supersedes. `show`'s marks, the Day, `people` (transcripts and events, by kind), a flight's mark and the Day's flights, and the resolver's names (SPEC-QUESTIONS 108). One exception follows the reference against the rule: the hero photo (SPEC-QUESTIONS 109) |
+| docs/rfcs/0034-the-signed-day.md, amendment 4 (a re-sign keeps the confirmations) | verified only | the writer's; nothing here signs. The readers read the standing signature's own confirmed set, and a re-sign the reference writes is read alike (`tests/cross-impl.test.ts`) |
+| rfcs/0006-resolution-v1.md, amendment 2026-10-15 (the `speaker` ref; `basis`, `consent`, `unnamed`, `spans`) | implemented, read | under `rfc0038`: a voice bound to a person (`bindVoices`), its `basis`, `consent` and `unnamed`; `spans` is not read (no reader here reads a transcript's words). No validator of the four fields, as for every frozen profile here |
+| schema/resolution-v1-speaker.schema.json (new) | not implemented | no JSON Schema is run here |
+| rfcs/0024-keeper-v1.md, amendment 2026-10-14 (`note`; `supersedes` read) | implemented | `show` prints the keeper's note; a superseded keeper is no hero. The Day lists every keeper as the reference's does |
+| rfcs/0030-trip-bundle-v1.md, amendment 2026-10-14 (the stars a bundle carries) | not implemented | no bundle is exported or imported here; `received/v1` reads as `[]` |
+| rfcs/0037-entities.md, amendments 2026-10-15 (`portfolio`) and 2026-10-16 (a database row is its own root; `idea_rows`) | implemented: `portfolio`; not implemented: `idea_rows` | `statusProblems` refuses a portfolio that is not text and one on any kind but an org's, in the reference's words; `status list` reads an org's portfolio and the note that holds a reason. The idea proposals of §4.3 and their `idea_rows` setting are the reference's dream's, not ported; the setting is passed by |
+| rfcs/0038-speakers.md (the diarizer's own extra; open question 13 answered) | not applicable | packaging and an install sentence only. RFC 0038 §3, unchanged in the text but read by the reference since 0.7.0, is implemented (the row of `0006` above, the Day's company, `people`) |
+| rfcs/0039-anchor.md (draft, new) | not implemented | `anchor/v1` lines verify as any line and `show` prints them as a kind it does not know |
+| rfcs/0040-videos.md (new): `scene-review/v1` | implemented | under `rfc0040`: `sceneReviewProblems` (§5's table and schema, this implementation's sentences), `show`'s row and its `superseded by #N` |
+| rfcs/0040-videos.md: `video/v1`, `attribution/v1`, the scene draft | not implemented | verified as any line; `show` prints `video` and `attribution` lines as kinds it does not know, where the reference prints rows of its own |
+| rfcs/0041-star-v1.md (draft, new) | implemented | under `rfc0041`: `starProblems`, `starLineProblems`, the standing star of a line, `show`'s row, the Day's ★ and its `stars` |
+| rfcs/0042-hold.md (draft, new) | not implemented | proposals no code writes, in the reference either |
+| rfcs/README.md | not applicable | the index |
+
 | Profile | Read | Verify | Write | Notes |
 |---|---|---|---|---|
 | the envelope (SPEC §2–3), `logbook/0.2` and `logbook/0.3` | yes | chain, seq, prev, hash, head; a torn file; a sealed line kept closed | `note/v1` only | Level 1 and keyless Level 2 of SPEC §6 on the 32-line samples |
 | `location/v1` (0001) | yes | chain | — | a `subject` is an asset's run |
 | `photo/v1` (0002) | yes | chain | — | |
-| `retraction/v1` (0003) | yes | chain | — | hides what it names in every reader |
-| `transcript/v1` (0004, amended 2026-10-14: `speakers`, `diarization`, RFC 0038 §2) | yes; the voices under the `rfc0038` flag: `show` and the Day name them as the reference does (`Samtale · you 3 min · Ola Nordmann 3 min`, `speakers` under `day --json`), a line a standing transcript supersedes is `superseded by #N` in `show`, and the Day leaves out a transcript another of the same day supersedes; a transcript without the fields reads as before, flag on or off | chain | — | `src/speakers.ts`; the reference has no validator for the two fields (its JSON Schema is checked by its tests only), so none is here (SPEC-QUESTIONS 95) |
-| `resolution/v1` (0006) | yes | chain | — | names, aliases, the owner |
+| `retraction/v1` (0003) | yes | chain | — | hides what it names in every reader; a retracted line supersedes nothing (#321, SPEC-QUESTIONS 108) |
+| `transcript/v1` (0004, amended 2026-10-14: `speakers`, `diarization`, RFC 0038 §2) | yes; the voices under the `rfc0038` flag: `show` names them as the source gave them (`Samtale · you 3 min · Ola Nordmann 3 min`), the Day as RFC 0038 §3 binds them (`Middag · Kari Nordmann 10 min · you 30 s · 1 unnamed · recorded with consent: unknown`, `speakers` under `day --json` with `person`, `basis` and `consent`), a line a standing transcript supersedes is `superseded by #N` in `show`, and the Day leaves out a transcript another of the same day supersedes; a transcript without the fields reads as before, flag on or off | chain | — | `src/speakers.ts`; the reference has no validator for the two fields (its JSON Schema is checked by its tests only), so none is here (SPEC-QUESTIONS 95) |
+| `resolution/v1` (0006, amended 2026-10-15: the `speaker` ref) | yes; a `speaker` ref under the `rfc0038` flag: the voice it binds in the Day, its company at a stay and `people` (`spoke_s`, `N voices not yet named · review speakers`, `and N unnamed`) | chain | — | names, aliases, the owner; a retracted resolution supersedes nothing (#321); `spans` is not read |
 | `message/v1` (0008) | yes | chain | — | |
 | `event/v1` (0009) | yes | chain | — | folded across sources, `all_day` |
 | `note/v1` (0010) | yes | chain | `add` writes `{schema, text}` as `logbook add` does | `labels` (RFC 0010, 2026-10-01; what PR 252's `note_day` writes as `[kind]`), `title`, `folder`, `supersedes` are read and preserved; no reader of the reference prints the label, so none here does |
 | `crossing/v1` (0011) | yes | chain | — | `policy.signed_only` read as a field like any other |
 | `call/v1` (0012) | yes | chain | — | |
-| `flight/v1` (0013) | yes | chain | — | a tracked line supersedes a declared one |
+| `flight/v1` (0013) | yes | chain | — | a tracked line supersedes a declared one, and a retracted one nothing (#321); the reference's Day keeps one flight per carrier, number and date, which this does not yet (SPEC-QUESTIONS 110) |
 | `health-sample/v1` (0014) | yes | chain | — | |
 | `mail/v1` (0015) | yes | chain | — | |
 | `task/v1` (0016) | yes | chain | — | |
@@ -163,16 +190,20 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 | `trip/v1` (0020) | yes | chain | — | |
 | `transaction/v1` (0021) | yes | chain | — | the Day's `spend` |
 | `highlight/v1` (0022), `voice-memo/v1` (0023) | yes | chain | — | |
-| `keeper/v1` (0024) | yes | chain | — | the hero line |
+| `keeper/v1` (0024, amended 2026-10-14: `note`, `supersedes` read) | yes | chain | — | the hero line; `show` prints the note after the photo, and a keeper another keeper names in `supersedes` is no hero (SPEC-QUESTIONS 109) |
 | `weather/v1` (0026) | `null` only | chain | — | SPEC-QUESTIONS 69d |
-| `story/v1` (0028), `received/v1` (0025) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
-| `signed-day/v1` (0034, amendments 1–3) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2 and 3 are the writer's (`--confirm none`, `--at`, the MCP door) and leave the line as it is |
+| `story/v1` (0028), `received/v1` (0030) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
+| `signed-day/v1` (0034, amendments 1–4) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2, 3 and 4 are the writer's (`--confirm none`, `--at`, the MCP door; a re-sign keeping the standing signature's confirmations, `--confirm all`) and leave the line as it is; a re-sign the reference writes is read alike |
 | `goal/v1`, `review/v1` (0036) | draft (RFC 0036): `standingGoals`, `standingGoal`, `standingReviews` (a review counts for the goals that reword the one it names), `openGoals`; under the flag `show` prints a goal as `<text>  (year, from 2026-01-01)` and a review as `let go · month · <the goal's current text>` as the reference does since its #275, ` · superseded by #N` on a goal a later goal rewords; with the flag off, the text and the `key=value` row as before | draft (RFC 0036): `goalProblems`, `reviewProblems` (the field tables; tier 2 and `source` `manual`, MUST), `reviewRecordProblems` (the goal is a goal line not retracted, `at` not before its `from` nor five minutes after `recorded_at`), `reviewKey` `(goal, period, at)`; a goal has no key. The reference checks neither profile yet, so the sentences are this implementation's (SPEC-QUESTIONS 88) | — | the Day's `reviews` row is not read yet; the writers (`goal add`, `goal review`, amendment 1) are the reference's |
 | `draft/v1` (0036, and amendment 1's `person`, `window`, `read_policy` as PR 269 proposes them) | draft (RFC 0036): `readDraft`, a draft as the reference's Day reads it (each segment supported or not and why, `malformed`), `standingDrafts`; `show`'s row (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`) under the flag | draft (RFC 0036): `draftProblems`, the five fields the reference's reader checks in its words (`read_head`, `read_count`, `language`, `segments` with the segment rule, `supersedes`), and `unit`, `subject`, `source` `model:<name>`, `window`, `read_policy` in this implementation's (SPEC-QUESTIONS 89); `draftTierProblems`, never below a line it cites; `draftKey` | — | the Day's draft block is not shown yet; nothing here writes a draft |
 | `chapter/v1` (0036) | draft (RFC 0036): `standingChapters`, `chapterOf` (the standing chapter open on a day, and the clash of rule 4); `show`'s row, `<name>  <from> – <to>`, and the day's chapter in its heading (`unsigned · chapter Ashore, fixing things`, `, clashes with …`), under the flag | draft (RFC 0036): `chapterProblems`, `chapterKey` `(name, from)` (a closing line that supersedes the open one is not a duplicate), `chapterClashes`; sentences this implementation's | — | the Day's header does not name the chapter yet, nor its `chapter`, `reviews`, `goals` and `chapters` keys (SPEC-QUESTIONS 94) |
 | `entity/v1` (0037) | draft (RFC 0037): `standing`, `canonical` (every entity the lines name; a `resolution/v1` of type `company` read as an org, by RFC 0006's walk as the reference runs it), `bindings`, `registry` and `known` (the entries of `places.json` and `assets.json`, `until` as each holds it), `lookup`, the dedupe keys (`keyOf`, `registeredDomain`); `show` prints the line as the reference does, the generic `key=value` row, flag or not, and the Day counts it among the sources only, as the reference does | draft (RFC 0037), in the reference's words, ported from its source on the owner's instruction: `entityProblems`, and `tierProblems` (tier 2 for every kind, never citing a tier-3 line); `entityLineProblems` holds a whole line to what the reference's writers check | — | the reference's code differs from the RFC's text in places (SPEC-QUESTIONS 98); nothing here writes an entity |
-| `entity-review/v1` (0037), and `people-review/v1` (0035), read as one of type person | draft (RFC 0037): `reviews`, the standing noes, `reviewHolds`; `show`'s generic row | draft (RFC 0037): `entityReviewProblems`; its tier the highest it cites, never under 2 (`reviewTier`) | — | `review KIND` is the reference's |
-| `status/v1` (0037) | draft (RFC 0037): `statuses` (the last standing line is the current status), `muted`, `stale`, `policy/entities.json` (`readEntitySettings`); `status list <root> <kind> [--json]` under the `rfc0037` flag, as the reference prints it; `show`'s generic row | draft (RFC 0037): `statusProblems` (the kind's dispositions, a reason where one MUST be given, no money on the line, `proposed_by`, `proposal`, `since`); the tier rules, an org's status tier 3 and every other kind's tier 2, never citing a tier-3 line; and, this implementation's own sentences, `orgReasonProblems`: an org's reason stays on its tier-3 line and is never a tier-2 `note/v1` (RFC 0037 §10.5), and no status note is above tier 2 | — | the writer, `logbook status` (and the registry entry it closes with `until`), is the reference's; `status <kind> <entity> <disposition>` is refused here |
+| `entity-review/v1` (0037), and `people-review/v1` (0035), read as one of type person | draft (RFC 0037): `reviews`, the standing noes, `reviewHolds`; `show`'s generic row | draft (RFC 0037): `entityReviewProblems`, a `speaker` ref among the observed kinds (RFC 0038 §12); its tier the highest it cites, never under 2 (`reviewTier`) | — | `review KIND` is the reference's |
+| `status/v1` (0037) | draft (RFC 0037): `statuses` (the last standing line is the current status), `muted`, `stale`, `policy/entities.json` (`readEntitySettings`); `status list <root> <kind> [--json]` under the `rfc0037` flag, as the reference prints it, an org's `portfolio` (§10.2, amended 2026-10-15) and the `note` that holds a reason with it; `show`'s generic row | draft (RFC 0037): `statusProblems` (the kind's dispositions, a reason where one MUST be given, no money on the line, `proposed_by`, `proposal`, `since`, a `portfolio` text and on an org's line only); the tier rules, an org's status tier 3 and every other kind's tier 2, never citing a tier-3 line; and, this implementation's own sentences, `orgReasonProblems`: an org's reason stays on its tier-3 line and is never a tier-2 `note/v1` (RFC 0037 §10.5), and no status note is above tier 2 | — | the writer, `logbook status` (and the registry entry it closes with `until`), is the reference's; `status <kind> <entity> <disposition>` is refused here |
+| `star/v1` (0041) | draft (RFC 0041), under the `rfc0041` flag: `standingStars`, one star per line; `show`'s row, `★ event 019cadd3… · <note>`; the Day's ★ after a disposition on every row it lists, and `stars` under `day --json` | draft (RFC 0041): `starProblems`, `starLineProblems` (`at`, `tier` and `kind` the starred line's; never on a star, a keeper, a retraction or a draft); sentences this implementation's | — | `logbook star` and `unstar` are the reference's |
+| `scene-review/v1` (0040 §5) | draft (RFC 0040), under the `rfc0040` flag: `show`'s row, `scene 2:10–2:50 ≠ Hjem` or `…: nothing to name`, and `superseded by #N` on a no a later standing no replaces | draft (RFC 0040): `sceneReviewProblems`, §5's table and schema, `scene` the ref's and `end_s` after `start_s`, the tier never under 2; sentences this implementation's | — | `review video` is the reference's |
+| `video/v1`, `attribution/v1` (0040 §2, §4) | the generic row | chain | — | not implemented; the reference prints rows of its own |
+| `anchor/v1`, `anchor-export/v1` (0039, draft); the profiles of 0042 (draft) | the generic row | chain | — | not implemented; nothing writes 0042's |
 
 | Settings and policy file | Read | Validated as the reference validates it | Written |
 |---|---|---|---|
@@ -256,18 +287,37 @@ code and says so (SPEC-QUESTIONS 98–99).
   length, the writer's turns left out beside them; the same after a transcript attached to a row of the
   Day or unplaced, and under `day --json` a `speakers` list, `{label, person, name, seconds, basis,
   consent, owner}` each, only on a transcript with voices. A voice is `you` when the source says it is
-  the owner's microphone (`from_me: true`), else the name the source displayed, else its label; nothing
-  binds a label to a person yet, so `person` is null, as in the reference. A voice the reader cannot read
+  the owner's microphone (`from_me: true`), else the name the source displayed, else its label. A voice the reader cannot read
   (a label that is not 1 to 64 characters without `#` or a line break, an entry that is not an object)
   is passed by; a line with none it can read reads as a line without `speakers`;
 - a recording heard again (RFC 0038 §2.8): a line a standing transcript supersedes is `superseded by
   #N` in `show`, whatever its kind, and the Day leaves out a transcript another transcript of the same
-  day supersedes, its line still counted among the day's sources.
+  day supersedes, its line still counted among the day's sources;
+- who spoke (RFC 0038 §3, read by the reference since 0.7.0): a voice is bound by the standing
+  `resolution/v1` line of its `speaker` ref, `<transcript line id>#<label>`, through RFC 0006's walk.
+  The Day names it (`Middag · Kari Nordmann 10 min · you 30 s · 1 unnamed · recorded with consent:
+  unknown`; `person`, `basis` and `consent` under `speakers`; the owner's own voice is the owner's
+  `owner_id`), counts a voice bound to a person as company at a stay ahead of the participants (never
+  the far end of a call; `with  … · 2 unnamed`), and `people` counts the transcript for that person
+  with `spoke_s` and says `N voices not yet named · review speakers` and `and N unnamed` in its head.
 
 A transcript without the two fields reads exactly as before, flag on or off: every vendored `show` and
 `day` fixture prints byte for byte as captured with the flag on (`tests/speakers.test.ts`).
 `tests/fixtures/rfc0037-0038-sample` is a record the reference wrote with its own writers, its `show`
 and `day` output beside it on every day, and `tests/cross-impl.test.ts` holds both implementations to it.
+
+**`rfc0040`** (RFC 0040, *Videos*, draft of 2026-10-14). Off until the RFC is Final. With it on, `show`
+prints the owner's no on a scene, `scene-review/v1`, as the reference does: `scene 2:10–2:50 ≠ Hjem`
+(the offsets `m:ss`, `h:mm:ss` from an hour; what the proposal named, the place's label or the days),
+`scene 0:40–1:30: nothing to name`, and `superseded by #N` on a no a later no of the scene replaces.
+`sceneReviewProblems` holds a line to §5, flag or not. `video/v1` and `attribution/v1` are not read.
+
+**`rfc0041`** (RFC 0041, `star/v1`, draft of 2026-10-14). Off until the RFC is Final. With it on, `show`
+prints a star as the reference does (`★ event 019cadd3… · the table by the river`), and the Day marks
+each line it lists that has a standing star with ★, after its disposition (`event        ✓ ★ Middag
+18:00–20:00`), and gives the day's standing stars under `stars` in `--json`, `{line, star, kind, note}`
+each, only on a day that has one. A photo's star is its keeper (RFC 0024), read flag or not.
+`tests/marks-cases.ts` holds the records and the reference's output; `tests/cross-impl.test.ts` both.
 
 ## Reading a day
 

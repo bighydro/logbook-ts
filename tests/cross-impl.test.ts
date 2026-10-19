@@ -43,10 +43,14 @@ import {
   SAMPLE_MONTH,
   tempDir,
   windowOptions,
+  writeBareRecord,
   writeDuplicateKey,
   writeMeta,
   writeRecord,
 } from "./helpers.js";
+import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
+import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
+import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
 
 /**
  * The two implementations must print the same day. This test runs the reference implementation
@@ -863,6 +867,190 @@ describe.skipIf(!ready)(
         expect(renderDayRows(ours)).toBe(text);
         expect(ours.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(rows);
       }
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "a line superseded twice (the reference's #321): the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // The six rows of the reference's table and the same rule for a flight, a person's name and a
+    // person's transcripts: `show` and the Day of each record, and `people`, of both implementations.
+    for (const c of [...TRANSCRIPT_CASES, ...FLIGHT_CASES]) {
+      it(`show and day: ${c.name}`, () => {
+        if (TRANSCRIPT_CASES.includes(c)) vi.stubEnv(FLAGS_ENV, "rfc0038");
+        const root = writeRecord(c.lines);
+        const theirs = reference(root, ["show", c.day]);
+        expect(showDay(root, { day: c.day }).text).toBe(theirs);
+        expect(theirs, "the reference moved; tests/superseded-cases.ts holds its output").toBe(
+          c.show,
+        );
+        const day = reference(root, ["day", c.day]);
+        expect(renderDay(readDay(root, { day: c.day }))).toBe(comparableDayText(day));
+        expect(dayRows(day)).toEqual(c.rows);
+      }, 60_000);
+    }
+
+    for (const c of PEOPLE_CASES) {
+      it(`people: ${c.name}`, () => {
+        const root = writeRecord(c.lines);
+        const theirs = reference(root, ["people"]);
+        expect(renderPeople(readPeople(root, {}), {})).toBe(theirs);
+        expect(theirs, "the reference moved; tests/superseded-cases.ts holds its output").toBe(
+          c.people,
+        );
+      }, 60_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)(
+  "who spoke (RFC 0038 §3), under the rfc0038 flag: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // A transcript's voices bound to people by `speaker` refs: the Day, as text and as JSON, and
+    // `people`, as text and as JSON, of both implementations on each record of tests/speakers-cases.ts.
+    for (const c of SPEAKER_CASES) {
+      it(c.name, () => {
+        vi.stubEnv(FLAGS_ENV, "rfc0038");
+        const root = speakerRecord(c);
+        const text = reference(root, ["day", "2026-10-03"]);
+        const json = JSON.parse(reference(root, ["day", "2026-10-03", "--json"])) as unknown;
+        const ours = readDay(root, { day: "2026-10-03" });
+        expect(renderDay(ours)).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+        const people = reference(root, ["people"]);
+        const peopleJson = JSON.parse(reference(root, ["people", "--json"])) as Record<
+          string,
+          unknown
+        >;
+        const report = readPeople(root, {});
+        expect(renderPeople(report, {})).toBe(people);
+        expect(JSON.parse(JSON.stringify(report))).toEqual(peopleJson);
+        expect(
+          observed(text, json, people, peopleJson),
+          "the reference moved; tests/speakers-cases.ts holds its output",
+        ).toEqual(c.expected);
+      }, 120_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)(
+  "stars, keepers and the owner's no on a scene (RFC 0041, RFC 0024's amendment, RFC 0040 §5), under the rfc0040 and rfc0041 flags: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // `show` and the Day of both implementations, as text and as JSON, on each record of
+    // tests/marks-cases.ts, and the reference's output the same as the one held there.
+    for (const c of MARKS_CASES) {
+      it(c.name, () => {
+        vi.stubEnv(FLAGS_ENV, "rfc0040,rfc0041");
+        const root = marksRecord(c);
+        const show = reference(root, ["show", MARKS_DAY]);
+        expect(showDay(root, { day: MARKS_DAY }).text).toBe(show);
+        const text = reference(root, ["day", MARKS_DAY]);
+        const json = JSON.parse(reference(root, ["day", MARKS_DAY, "--json"])) as {
+          stars?: unknown;
+        };
+        const ours = readDay(root, { day: MARKS_DAY });
+        expect(renderDay(ours)).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+        expect(
+          { show, day: text, stars: json.stars ?? null },
+          "the reference moved; tests/marks-cases.ts holds its output",
+        ).toEqual(c.expected);
+      }, 120_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)(
+  "a re-sign keeps the standing signature's confirmations (RFC 0034 amendment 4): the reference writes, both read alike",
+  () => {
+    // The reference signs a synthetic day, then signs it again four ways; after each, `show` of the
+    // day and of the next (where a re-sign is written) and the Day's `signed` must be the same in
+    // both implementations, and the confirmed set what amendment 4 says it is.
+    it("keeps the confirmations, drops one retracted since, clears the note, takes the whole page", () => {
+      const at = (h: number): string => `2026-10-03T${String(h).padStart(2, "0")}:00:00Z`;
+      const root = writeBareRecord([
+        {
+          at: "2026-10-03T16:00:00Z",
+          end: "2026-10-03T18:00:00Z",
+          source: "sim-cal",
+          kind: "event",
+          tier: 1,
+          payload: { schema: "event/v1", title: "Middag", raw_id: "middag" },
+        },
+        {
+          at: at(16),
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text: "god mat" },
+        },
+        {
+          at: "2026-10-03T16:25:00Z",
+          source: "phone",
+          kind: "call",
+          tier: 1,
+          payload: {
+            schema: "call/v1",
+            counterparty: { kind: "phone", value: "+447700900123" },
+            direction: "outgoing",
+            duration_s: 60,
+            answered: true,
+            raw_id: "c1",
+          },
+        },
+        {
+          at: at(19),
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text: "seint" },
+        },
+      ]);
+      const agree = (): { confirmed: number; note: unknown; dispositions: unknown } => {
+        const json = JSON.parse(reference(root, ["day", "2026-10-03", "--json"])) as {
+          signed: { confirmed: number; note: unknown; dispositions: unknown };
+        };
+        expect(JSON.parse(JSON.stringify(readDay(root, { day: "2026-10-03" }).signed))).toEqual(
+          json.signed,
+        );
+        for (const day of ["2026-10-03", "2026-10-04"])
+          expect(showDay(root, { day }).text, day).toBe(reference(root, ["show", day]));
+        return json.signed;
+      };
+      const sign = (...args: string[]): string =>
+        reference(root, ["day", "sign", "2026-10-03", ...args]);
+
+      sign("--confirm", "1,3", "--kept", "3", "--note", "første", "--at", "2026-10-03T20:00:00Z");
+      expect(agree()).toMatchObject({ confirmed: 2, note: "første" });
+      // Signed again without --confirm: the two kept, the disposition and the note with them.
+      expect(sign("--at", "2026-10-04T08:00:00Z")).toContain(
+        "keeps from the signature it supersedes (#5): 2 lines confirmed, kept 1, the note",
+      );
+      expect(agree()).toMatchObject({
+        confirmed: 2,
+        note: "første",
+        dispositions: { "00000000-0000-4000-8000-000000000003": "kept" },
+      });
+      // A confirmed line retracted since is dropped, never refused; `--note ""` clears the note.
+      reference(root, ["repair", "retract", "1", "feil"]);
+      sign("--note", "", "--at", "2026-10-04T09:00:00Z");
+      expect(agree()).toMatchObject({ confirmed: 1, note: null });
+      // `--confirm all` is a fresh reading: the whole page not retracted.
+      sign("--confirm", "all", "--at", "2026-10-04T10:00:00Z");
+      expect(agree()).toMatchObject({ confirmed: 3 });
+      expect(verifyLogbook(root).valid).toBe(true);
     }, 300_000);
   },
 );

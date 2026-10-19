@@ -72,6 +72,8 @@ import {
   KIOSK_ID,
   lineId,
   OLA_ID,
+  portfolioRecord,
+  statusNotesRecord,
   TZ,
   YARD_DOMAIN,
   YARD_ID,
@@ -353,7 +355,7 @@ describe("entity-review/v1 takes every kind, and a new entity by type alone", ()
     expect(entityReviewProblems({ ...org, ref: { kind: "url", value: "x" } })).toEqual([
       `ref.kind 'url' is not one of ${OBSERVED_REFS.join(", ")}`,
     ]);
-    expect(OBSERVED_REFS).toEqual([...REF_KINDS, "name", "centre", "subject"]);
+    expect(OBSERVED_REFS).toEqual([...REF_KINDS, "name", "centre", "subject", "speaker"]);
   });
 
   it("names every other rule of the table, in the table's order", () => {
@@ -1312,9 +1314,11 @@ describe("status list KIND: every canonical entity of the kind with its current 
           reason: "orders through 2027",
           proposed_by: "dream",
           line: lineId(13),
+          note: null,
           stale: false,
           muted: [{ status: "let-go", until: "2027-11-04" }],
           until: null,
+          portfolio: null,
         },
         {
           id: KIOSK_ID,
@@ -1325,9 +1329,11 @@ describe("status list KIND: every canonical entity of the kind with its current 
           reason: "good team, but a kiosk is a place and I do not want to own places",
           proposed_by: "dream",
           line: lineId(14),
+          note: null,
           stale: false,
           muted: [],
           until: null,
+          portfolio: null,
         },
         {
           id: HAVN_ID,
@@ -1338,9 +1344,11 @@ describe("status list KIND: every canonical entity of the kind with its current 
           reason: null,
           proposed_by: null,
           line: null,
+          note: null,
           stale: false,
           muted: [],
           until: null,
+          portfolio: null,
         },
       ],
     });
@@ -1572,5 +1580,72 @@ describe("status list KIND: every canonical entity of the kind with its current 
     expect(() => statusListing(root, "org", TODAY)).toThrow(
       `${join(root, "policy", "entities.json")} must be an object`,
     );
+  });
+});
+
+describe("status list: an org's portfolio and the note that holds a reason (RFC 0037's amendment of 2026-10-15, §10.2, §10.5)", () => {
+  // Every expected value is the reference's `status list` at b82a11c (0.7.0) on the same record.
+  const TODAY = "2026-10-18";
+
+  it("reads an org's portfolio from its latest status line that carries one as text, words collapsed; retracted lines count for nothing, an empty one clears it", () => {
+    const listing = statusListing(portfolioRecord(), "org", TODAY);
+    expect(statusListingText(listing)).toBe(
+      [
+        "status · 5 orgs · 2026-10-18",
+        "  Fjordkiosk AS      hold since 2026-10-04 (owner) · portfolio Angel",
+        "  Havn Data AS       hold since 2026-10-04 (owner)",
+        "  Nordmann Verft AS  add since 2026-10-03 (owner) · portfolio Fund I",
+        "  Kaia AS            hold since 2026-10-02 (owner) · portfolio Fund I · not proposed: let-go to 2027-10-01",
+        "                     reason: orders",
+        "  Gamle Verft AS     hold since 2020-10-02 (owner) · portfolio Fund II · stale",
+        "                     reason: long",
+        "",
+      ].join("\n"),
+    );
+    expect(statusListingJson(listing).entities.map((e) => [e.label, e.portfolio, e.note])).toEqual([
+      ["Fjordkiosk AS", "Angel", null],
+      ["Havn Data AS", null, null],
+      ["Nordmann Verft AS", "Fund I", null],
+      ["Kaia AS", "Fund I", null],
+      ["Gamle Verft AS", "Fund II", null],
+    ]);
+  });
+
+  it("names the note that holds a status's reason: the latest one labelled status, not retracted", () => {
+    const listing = statusListing(statusNotesRecord(), "idea", TODAY);
+    expect(statusListingJson(listing).entities.map((e) => [e.label, e.note, e.portfolio])).toEqual([
+      ["gamma boat", null, null],
+      ["beta ferry", null, null],
+      ["alpha kiosk", "00000000-0000-4000-8000-000000000006", null],
+    ]);
+  });
+
+  it("refuses a portfolio on any status line but an org's, and one that is not text", () => {
+    const base = { schema: "status/v1", proposed_by: "owner", reason: "x" };
+    const only =
+      "portfolio: only an org's status line carries one (RFC 0037 §10.2): which portfolio holds a company is a position in money, on the org's tier-3 line";
+    const text = "portfolio must be the portfolio's name, free text, or empty to clear it";
+    const org = { type: "org", id: "019cadd3-6bc0-7dcd-9133-000000000201", registry: "logbook" };
+    expect(statusProblems({ ...base, entity: org, status: "hold", portfolio: "Fund I" })).toEqual(
+      [],
+    );
+    expect(statusProblems({ ...base, entity: org, status: "hold", portfolio: "" })).toEqual([]);
+    expect(statusProblems({ ...base, entity: org, status: "hold", portfolio: 5 })).toEqual([text]);
+    expect(
+      statusProblems({
+        ...base,
+        entity: { type: "asset", id: "solvind", registry: "logbook" },
+        status: "sold",
+        portfolio: 5,
+      }),
+    ).toEqual([text, only]);
+    expect(
+      statusProblems({
+        ...base,
+        entity: { type: "place", id: "Hytta", registry: "logbook" },
+        status: "let-go",
+        portfolio: "Fund I",
+      }),
+    ).toEqual([only]);
   });
 });

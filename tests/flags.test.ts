@@ -12,8 +12,8 @@ import {
 import { LogbookError } from "../src/store.js";
 
 describe("the draft-RFC flags (LOGBOOK_TS_FLAGS)", () => {
-  it("names three flags, rfc0036, rfc0037 and rfc0038, read from LOGBOOK_TS_FLAGS", () => {
-    expect(FLAGS).toEqual(["rfc0036", "rfc0037", "rfc0038"]);
+  it("names five flags, rfc0036, rfc0037, rfc0038, rfc0040 and rfc0041, read from LOGBOOK_TS_FLAGS", () => {
+    expect(FLAGS).toEqual(["rfc0036", "rfc0037", "rfc0038", "rfc0040", "rfc0041"]);
     expect(RFC0036).toBe("rfc0036");
     expect(RFC0037).toBe("rfc0037");
     expect(RFC0038).toBe("rfc0038");
@@ -51,7 +51,7 @@ describe("the draft-RFC flags (LOGBOOK_TS_FLAGS)", () => {
     expect(run).toThrow(FlagError);
     expect(run).toThrow(LogbookError);
     expect(run).toThrow(
-      "LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036, rfc0037, rfc0038",
+      "LOGBOOK_TS_FLAGS names rfc36, which is not a flag of this implementation; the flags are rfc0036, rfc0037, rfc0038, rfc0040, rfc0041",
     );
   });
 

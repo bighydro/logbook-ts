@@ -1,8 +1,10 @@
 import { draftRow } from "./drafts.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
+import { sceneReviewRow } from "./sceneReviews.js";
 import { signedDayRow } from "./signing.js";
 import { lengthText, voicesOf, voicesSuffix } from "./speakers.js";
+import { starRow } from "./stars.js";
 import type { JsonValue, Line, Payload } from "./types.js";
 
 /** What a row's summary needs besides the line itself. */
@@ -18,9 +20,13 @@ export interface RenderContext {
   rfc0036?: boolean;
   /** A transcript's voices, and a line a transcript replaces marked, as the reference prints them (the `rfc0038` flag). */
   rfc0038?: boolean;
+  /** The owner's no on a scene, `scene-review/v1`, and its superseding marked (the `rfc0040` flag). */
+  rfc0040?: boolean;
+  /** A star's row, `star/v1` (the `rfc0041` flag). */
+  rfc0041?: boolean;
   /** For a line a standing transcript line supersedes, whatever its kind: that line's seq. */
   supersededByTranscript?: Map<string, number>;
-  /** For a goal or chapter line a later line of its kind replaces: that line's seq. */
+  /** For a goal, chapter or scene-review line a later line of its kind replaces: that line's seq. */
   replacedBy?: (line: Line) => number | undefined;
   /** A goal's current text (the last line rewording it), undefined when no standing goal has the id. */
   goalText?: (goalId: string) => string | undefined;
@@ -66,7 +72,16 @@ export function summarize(line: Line, ctx: RenderContext): string {
     case "crossing":
       return crossing(p);
     case "keeper":
-      return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}`;
+      // The owner's words on the mark (RFC 0024's amendment of 2026-10-14) after the photo.
+      return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}${truthy(p.note) ? ` · ${pyStr(p.note)}` : ""}`;
+    case "star":
+      return ctx.rfc0041 === true ? starRow(p) : fallback(line.kind, p);
+    case "scene-review": {
+      if (ctx.rfc0040 !== true) return fallback(line.kind, p);
+      // A no a later no on the scene replaces is `superseded by #N`, the whole row (rule 3).
+      const by = ctx.replacedBy?.(line);
+      return by === undefined ? sceneReviewRow(p) : `superseded by #${by}`;
+    }
     case "signed-day":
       return signedDayRow(p);
     case "draft":

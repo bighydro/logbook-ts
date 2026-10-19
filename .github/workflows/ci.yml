@@ -164,6 +164,11 @@ jobs:
     # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
     # reference beside ours on payload variants, on synthetic records and on that record.
     #
+    # Since the catch-up of 2026-10-18 `REFERENCE` is b82a11c4, the reference's release 0.7.0 (tag
+    # v0.7.0); the file holds the hash alone, as the steps below read it. The cases of
+    # tests/superseded-cases.ts, speakers-cases.ts and marks-cases.ts, and a day the reference signs and
+    # signs again, run the reference beside ours as well.
+    #
     # The reference is the one commit `REFERENCE` names, not its moving main, so a PR is red for what
     # it changes and not for what the reference merged since: a catch-up PR moves `REFERENCE` and
     # re-captures the expected files with tests/fixtures/capture-expected-*.mjs. drift.yml runs these
