@@ -25,6 +25,10 @@ export interface Resolver {
   name(ref: Ref): string | undefined;
   /** The entity the same walk reaches, with its label; undefined when it names nothing. */
   entity(ref: Ref): Resolved | undefined;
+  /** The resolution line standing for this ref itself, before any `alias_of` is followed. */
+  lineFor(ref: Ref): Line | undefined;
+  /** The line the same walk ends on, the one that names the entity; undefined when it names nothing. */
+  mintingLine(ref: Ref): Line | undefined;
   /** Every person the record's resolution lines standing mint: entity id to the last label given. */
   people(): Map<string, string>;
   /** The retraction that hides the line with this id, the highest `seq` winning (RFC 0003 rule 4). */
@@ -54,7 +58,6 @@ const key = (ref: Ref): string => `${ref.kind}\u0000${ref.value}`;
 export function buildResolver(lines: Iterable<Line>): Resolver {
   const resolutions: Line[] = [];
   const retractions = new Map<string, Line>();
-  const superseded = new Set<string>();
 
   for (const line of lines) {
     const schema = line.payload?.schema;
@@ -65,8 +68,15 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
       if (standing === undefined || standing.seq < line.seq) retractions.set(target, line);
     } else if (line.kind === "resolution" && schema === "resolution/v1") {
       resolutions.push(line);
-      if (typeof line.payload.supersedes === "string") superseded.add(line.payload.supersedes);
     }
+  }
+
+  // A resolution is superseded while a resolution that is not retracted names it (the reference's
+  // #321): a retracted one supersedes nothing, and one superseded in turn still supersedes.
+  const superseded = new Set<string>();
+  for (const line of resolutions) {
+    if (retractions.has(line.id)) continue;
+    if (typeof line.payload.supersedes === "string") superseded.add(line.payload.supersedes);
   }
 
   resolutions.sort((a, b) => a.seq - b.seq);
@@ -92,7 +102,8 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
     };
   };
 
-  const entity = (ref: Ref): Resolved | undefined => {
+  /** The line RFC 0006's walk ends on, the one that names the entity; undefined when it names nothing. */
+  const minting = (ref: Ref): Line | undefined => {
     const visited = new Set<string>();
     let current = ref;
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
@@ -102,10 +113,14 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
       const line = standing.get(k);
       if (line === undefined) return undefined; // no line standing
       const alias = asRef(line.payload.alias_of);
-      if (alias === undefined) return entityOf(line);
+      if (alias === undefined) return line;
       current = alias; // an alias line names nothing itself
     }
     return undefined; // more than MAX_HOPS aliases
+  };
+  const entity = (ref: Ref): Resolved | undefined => {
+    const line = minting(ref);
+    return line === undefined ? undefined : entityOf(line);
   };
 
   let known: Map<string, string> | undefined;
@@ -116,6 +131,10 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
       return entity(ref)?.label;
     },
     entity,
+    lineFor(ref) {
+      return standing.get(key(ref));
+    },
+    mintingLine: minting,
     people() {
       if (known === undefined) {
         known = new Map();

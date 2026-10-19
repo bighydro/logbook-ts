@@ -8,12 +8,20 @@
  * later writer, or a broken one, never stops a reader. A voice is an object whose `label` is a
  * string of 1 to 64 characters with no `#` and no line break (RFC 0038 §2.4); anything else in the
  * list is skipped, and a line with no voice it can read reads as a line without `speakers`, exactly
- * as before. Nothing binds a label to a person yet (RFC 0038 §3 is not built in the reference): a
- * voice is shown as `you` when the source says the channel is the owner's own microphone
- * (`from_me: true`), else as the name the source displayed, else as its label.
+ * as before. `show` shows a voice as the source gave it: `you` when the source says the channel is
+ * the owner's own microphone (`from_me: true`), else as the name the source displayed, else as its
+ * label.
+ *
+ * Who a voice is (RFC 0038 §3, RFC 0006's amendment of 2026-10-15), as the reference's Day and
+ * `people` read it since 0.7.0, matched by running it: the standing `resolution/v1` line whose ref is
+ * `{kind: "speaker", value: "<transcript line id>#<label>"}`, through RFC 0006's walk (`alias_of`
+ * included), binds the voice to a person (`bindVoices`). Each voice is then the owner's (bound to the
+ * owner, or `from_me` with no line), a person's, unnamed (`unnamed: true`), or not yet named (no
+ * line). Only a standing transcript's voices are read: its callers pass no other.
  */
 
-import type { JsonValue, Payload } from "./types.js";
+import type { Resolver } from "./resolve.js";
+import type { JsonValue, Line, Payload } from "./types.js";
 
 /** One voice as the reader reads it. */
 export interface Voice {
@@ -24,19 +32,152 @@ export interface Voice {
   name: string | null;
   /** `from_me: true`: the source says it is the owner's own microphone. */
   owner: boolean;
+  /** The recording's channel the voice is on (`mic`, `system`), when the source says. */
+  channel: string | null;
 }
 
 /** One voice as the reference's `day --json` gives it, under a transcript's `speakers`. */
 export interface SpeakerJson {
   label: string;
-  /** Who the voice is: null until a resolution binds it (RFC 0038 §3, not built). */
-  person: null;
+  /** Who the voice is: the person a standing line binds it to, or the owner's id; null when unnamed or not yet named. */
+  person: string | null;
+  /** The person's label, or the name the source displayed for a voice not yet named; null for the owner's. */
   name: string | null;
   seconds: number | null;
-  /** `channel` for the owner's voice, which the source's channel says is theirs; else null. */
-  basis: "channel" | null;
-  consent: null;
+  /** The binding line's `basis`; `channel` for the owner's voice by its channel; null when not yet named. */
+  basis: string | null;
+  /** The binding line's `consent`, `unknown` when absent or not one of the three; null when no line binds it. */
+  consent: string | null;
   owner: boolean;
+}
+
+/** A voice as a reader of RFC 0038 §3 reads it: the source's voice and who it is. */
+export interface BoundVoice extends Voice {
+  /** `owner`, `person`, `unnamed` or `nobody` (not yet named). */
+  who: "owner" | "person" | "unnamed" | "nobody";
+  /** The person bound: the owner's id for the owner's voice; undefined when not yet named. */
+  person: string | undefined;
+  /** The person's label when the line names one. */
+  personLabel: string | undefined;
+  basis: string | null;
+  consent: string | null;
+  /** The binding line's `confidence`, a number from 0 to 1; undefined when asserted (absent). */
+  confidence: number | undefined;
+}
+
+/** Who the owner is, as the readers know them: `owner_id` and the ids and names that are theirs. */
+export interface Owner {
+  id?: string | undefined;
+  ids: ReadonlySet<string>;
+  names: ReadonlySet<string>;
+}
+
+const CONSENT = new Set(["yes", "no", "unknown"]);
+
+/**
+ * The voices of a standing transcript, each with who it is: the standing line for its `speaker` ref
+ * (RFC 0038 §3.3 rule 2) and the entity RFC 0006's walk reaches from it. A line naming the owner, or
+ * a `from_me` voice with no line, is the owner's; a line marked `unnamed` names nobody by name; a
+ * voice with no line, or one whose walk reaches no person, is not yet named.
+ */
+export function bindVoices(transcript: Line, resolver: Resolver, owner: Owner): BoundVoice[] {
+  return voicesOf(transcript.payload ?? {}).map((voice) => {
+    const ref = { kind: "speaker", value: `${transcript.id}#${voice.label}` };
+    const line = resolver.lineFor(ref);
+    const entity = line === undefined ? undefined : resolver.entity(ref);
+    if (line === undefined || entity === undefined || entity.type !== "person") {
+      return voice.owner
+        ? {
+            ...voice,
+            who: "owner",
+            person: owner.id,
+            personLabel: undefined,
+            basis: "channel",
+            consent: null,
+            confidence: undefined,
+          }
+        : {
+            ...voice,
+            who: "nobody",
+            person: undefined,
+            personLabel: undefined,
+            basis: null,
+            consent: null,
+            confidence: undefined,
+          };
+    }
+    const p = line.payload;
+    const basis = typeof p.basis === "string" ? p.basis : null;
+    const given = typeof p.consent === "string" && CONSENT.has(p.consent) ? p.consent : undefined;
+    const confidence =
+      typeof p.confidence === "number" && Number.isFinite(p.confidence) ? p.confidence : undefined;
+    const isOwner =
+      owner.ids.has(entity.id) ||
+      (entity.label !== undefined && owner.names.has(entity.label.toLowerCase()));
+    if (isOwner) {
+      return {
+        ...voice,
+        who: "owner",
+        person: entity.id,
+        personLabel: undefined,
+        basis,
+        consent: given ?? null,
+        confidence,
+      };
+    }
+    // A voice said to be the same as an unnamed one (`alias_of`) is that unnamed person (RFC 0038
+    // §3.2): unnamed when its own line or the one the walk ends on says so.
+    const unnamed = p.unnamed === true || resolver.mintingLine(ref)?.payload.unnamed === true;
+    return {
+      ...voice,
+      who: unnamed ? "unnamed" : "person",
+      person: entity.id,
+      personLabel: entity.label,
+      basis,
+      consent: given ?? "unknown",
+      confidence,
+    };
+  });
+}
+
+/** A bound voice as the reference's `day --json` gives it, under a transcript's `speakers`. */
+export function boundSpeakerJson(v: BoundVoice): SpeakerJson {
+  return {
+    label: v.label,
+    person: v.who === "unnamed" || v.who === "nobody" ? null : (v.person ?? null),
+    name: v.who === "person" ? (v.personLabel ?? null) : v.who === "nobody" ? v.name : null,
+    seconds: v.seconds,
+    basis: v.basis,
+    consent: v.consent,
+    owner: v.who === "owner",
+  };
+}
+
+/**
+ * ` · Kari Nordmann 14 min · you 31 min · 1 unnamed · recorded with consent: unknown`, after a
+ * transcript's row of the Day, from its `speakers`: the owner's voice is `you`, a person's their
+ * name (the label when the person has none), an unnamed voice is counted, never named, and a voice
+ * not yet named is the name the source displayed or its label. The consent is said when a voice
+ * that is not the owner's was bound with a consent other than `yes`: `no` when any says no.
+ */
+export function boundVoicesSuffix(speakers: readonly SpeakerJson[]): string {
+  let unnamed = 0;
+  const shown: string[] = [];
+  const consents = new Set<string>();
+  for (const s of speakers) {
+    if (!s.owner && s.consent !== null) consents.add(s.consent);
+    // An unnamed voice: a line binds it (so it has a consent, `unknown` at least) and names nobody.
+    if (!s.owner && s.person === null && s.consent !== null) {
+      unnamed += 1;
+      continue;
+    }
+    const who = s.owner ? "you" : (s.name ?? s.label);
+    shown.push(s.seconds === null ? who : `${who} ${lengthText(s.seconds)}`);
+  }
+  if (unnamed > 0) shown.push(`${unnamed} unnamed`);
+  const consent = consents.has("no") ? "no" : consents.has("unknown") ? "unknown" : undefined;
+  if (consent !== undefined) shown.push(`recorded with consent: ${consent}`);
+  return shown.map((t) => ` · ${t}`).join("");
 }
 
 /** A label as RFC 0038 §2.4 has it: 1 to 64 characters, no `#`, no line break. */
@@ -69,6 +210,7 @@ export function voicesOf(p: Payload): Voice[] {
         typeof seconds === "number" && Number.isFinite(seconds) && seconds >= 0 ? seconds : null,
       name: typeof name === "string" && !blank(name) ? name : null,
       owner: item.from_me === true,
+      channel: typeof item.channel === "string" ? item.channel : null,
     });
   }
   return voices;
@@ -103,7 +245,11 @@ export function voicesSuffix(
   return voices.map((v) => ` · ${voiceText(v)}`).join("");
 }
 
-/** The voices as `day --json` gives them; undefined when the line has none a reader can read. */
+/**
+ * The voices as the source gave them, in `day --json`'s shape with nobody bound: what the Day gave
+ * before RFC 0038 §3, and what it gives of a record whose lines bind no voice but for the owner's
+ * (the Day itself now reads `bindVoices`). Undefined when the line has none a reader can read.
+ */
 export function speakersJson(p: Payload): SpeakerJson[] | undefined {
   const voices = voicesOf(p);
   if (voices.length === 0) return undefined;

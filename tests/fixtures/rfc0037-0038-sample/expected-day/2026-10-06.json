@@ -103,7 +103,7 @@
             "speakers": [
               {
                 "label": "mic",
-                "person": null,
+                "person": "01a13fb4-8379-7cc9-bd88-0c3b46e771ac",
                 "name": null,
                 "seconds": 30.0,
                 "basis": "channel",
@@ -188,7 +188,7 @@
       "speakers": [
         {
           "label": "mic",
-          "person": null,
+          "person": "01a13fb4-8379-7cc9-bd88-0c3b46e771ac",
           "name": null,
           "seconds": 201.7,
           "basis": "channel",
@@ -260,8 +260,8 @@
         },
         {
           "label": "mic.2",
-          "person": null,
-          "name": "Ines",
+          "person": "01a13fb4-8379-7cc9-bd88-0c3b46e771ac",
+          "name": null,
           "seconds": null,
           "basis": "channel",
           "consent": null,

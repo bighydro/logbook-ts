@@ -104,9 +104,16 @@ export const ADDED_REFS = [
 export const REF_KINDS: readonly string[] = [...RESOLUTION_REFS, ...ADDED_REFS];
 /**
  * An observed thing's strongest identifier (an `entity-review/v1` `ref`) may also be a person's folded
- * `name` (RFC 0035), a spot's `centre` (`lat,lon`) or an asset's `subject` id.
+ * `name` (RFC 0035), a spot's `centre` (`lat,lon`), an asset's `subject` id, or a voice, a `speaker`
+ * (`<transcript line id>#<label>`; RFC 0038 §12, the reference since 0.7.0).
  */
-export const OBSERVED_REFS: readonly string[] = [...REF_KINDS, "name", "centre", "subject"];
+export const OBSERVED_REFS: readonly string[] = [
+  ...REF_KINDS,
+  "name",
+  "centre",
+  "subject",
+  "speaker",
+];
 export const DIFFERENT = "different";
 /** The dispositions of each kind that takes a status, in the reference's order. */
 export const DISPOSITIONS: Readonly<Record<string, readonly string[]>> = {
@@ -635,6 +642,17 @@ export function statusProblems(payload: Fields): string[] {
       problems.push(`${money}: no money on a status line (decision 10); the ledger holds it`);
     }
   }
+  // An org's portfolio (RFC 0037's amendment of 2026-10-15, §10.2): free text, empty to clear it.
+  if (has(payload, "portfolio")) {
+    if (typeof payload.portfolio !== "string") {
+      problems.push("portfolio must be the portfolio's name, free text, or empty to clear it");
+    }
+    if (kind !== "org") {
+      problems.push(
+        "portfolio: only an org's status line carries one (RFC 0037 §10.2): which portfolio holds a company is a position in money, on the org's tier-3 line",
+      );
+    }
+  }
   return problems;
 }
 
@@ -1001,7 +1019,8 @@ interface Identity {
  * standing line of each ref (last wins; a line of any schema counts; not retracted, and not named in
  * the `supersedes` of a resolution line that is not retracted itself), and the identity each ref
  * reaches through `alias_of`, at most four hops, nothing on a cycle. This is not `resolve.ts`'s
- * resolver, which keys on the `…/v1` schemas and lets a retracted superseder supersede.
+ * resolver, which keys on the `…/v1` schemas; since the reference's #321 both let a retracted
+ * superseder supersede nothing.
  */
 function resolutionWalk(lines: readonly Line[]): {
   standing: Map<string, { ref: Ref; line: Line }>;
@@ -1424,6 +1443,57 @@ export function statuses(lines: Iterable<Line>): Map<string, Status[]> {
   return found;
 }
 
+/**
+ * Each org's portfolio (RFC 0037's amendment of 2026-10-15, §10.2), by entity id: the `portfolio` of
+ * its latest status line in chain order that carries the field as text, its words collapsed. A
+ * retracted line counts for nothing, so the one before decides again; a line a later status
+ * supersedes still counts, since a status without the field leaves the portfolio as it stood; an
+ * empty field clears it. Read for an org only.
+ */
+export function portfolios(lines: Iterable<Line>): Map<string, string | null> {
+  const all = [...lines];
+  const retracted = retractedIds(all);
+  const last = new Map<string, { seq: number; portfolio: string | null }>();
+  for (const line of all) {
+    if (line.kind !== STATUS || retracted.has(line.id)) continue;
+    const payload = fieldsOf(line);
+    if (payload.schema !== STATUS_SCHEMA || kindOf(payload.entity) !== "org") continue;
+    const id = isObject(payload.entity) ? payload.entity.id : undefined;
+    const portfolio = payload.portfolio;
+    if (typeof id !== "string" || typeof portfolio !== "string") continue;
+    const before = last.get(id);
+    if (before !== undefined && before.seq > line.seq) continue;
+    const words = pySplit(portfolio).join(" ");
+    last.set(id, { seq: line.seq, portfolio: words === "" ? null : words });
+  }
+  return new Map([...last].map(([id, { portfolio }]) => [id, portfolio]));
+}
+
+/**
+ * The note that holds each status line's reason (§10.5), by the status line's id: the latest
+ * `note/v1` line labelled `status`, not retracted, whose `extra.status` names it, as the reference's
+ * `status list` gives it since 0.7.0.
+ */
+export function statusNotes(lines: Iterable<Line>): Map<string, string> {
+  const all = [...lines];
+  const retracted = retractedIds(all);
+  const found = new Map<string, { seq: number; id: string }>();
+  for (const line of all) {
+    if (line.kind !== "note" || retracted.has(line.id)) continue;
+    const payload = fieldsOf(line);
+    const labels = payload.labels;
+    const extra = payload.extra;
+    if (payload.schema !== "note/v1" || !Array.isArray(labels) || !labels.includes("status"))
+      continue;
+    const status = isObject(extra) ? extra.status : undefined;
+    if (typeof status !== "string") continue;
+    const before = found.get(status);
+    if (before === undefined || before.seq < line.seq)
+      found.set(status, { seq: line.seq, id: line.id });
+  }
+  return new Map([...found].map(([status, { id }]) => [status, id]));
+}
+
 /** A day the readers' rules count from: refused, naming it, when it is not one (the reference raises). */
 function dayOf(day: string): string {
   if (!isDay(day)) throw new EntityError(`${pyRepr(day)} is not a day, YYYY-MM-DD`);
@@ -1557,6 +1627,10 @@ export interface StatusRow {
   muted: Array<[string, string]>;
   /** The day the registry entry is closed with: the standing line's, never the file's. */
   until: string | null;
+  /** An org's portfolio (§10.2), null when none stands or for any other kind. */
+  portfolio: string | null;
+  /** The note that holds the current status's reason (`statusNotes`), null when none. */
+  note: string | null;
 }
 
 export interface StatusListing {
@@ -1576,9 +1650,11 @@ export interface StatusRowJson {
   reason: string | null;
   proposed_by: string | null;
   line: string | null;
+  note: string | null;
   stale: boolean;
   muted: Array<{ status: string; until: string }>;
   until: string | null;
+  portfolio: string | null;
 }
 
 export interface StatusListingJson {
@@ -1587,18 +1663,31 @@ export interface StatusListingJson {
   entities: StatusRowJson[];
 }
 
-/** The lines of the record whose `kind` is one of `kinds`, in file order; a row that is not a line is skipped. */
-function readLinesOfKinds(root: string, kinds: ReadonlySet<string>): Line[] {
+/**
+ * The lines of the record whose `kind` is one of `kinds` and that `keep` keeps, in file order; a row
+ * that is not a line is skipped.
+ */
+function readLinesOfKinds(
+  root: string,
+  kinds: ReadonlySet<string>,
+  keep: (line: Line) => boolean = () => true,
+): Line[] {
   const found: Line[] = [];
   for (const month of monthFiles(root)) {
     for (const { raw, row } of eachLine(month.file)) {
       const parsed = parseLine(raw, `${month.rel} line ${row}`);
       if ("error" in parsed) continue;
-      if (kinds.has(parsed.line.kind)) found.push(parsed.line);
+      if (kinds.has(parsed.line.kind) && keep(parsed.line)) found.push(parsed.line);
     }
   }
   return found;
 }
+
+/** A `note/v1` line labelled `status`, the only notes `status list` reads (`statusNotes`). */
+const isStatusNote = (line: Line): boolean => {
+  const labels = fieldsOf(line).labels;
+  return Array.isArray(labels) && labels.includes("status");
+};
 
 /**
  * Every canonical entity of `kind` with its current status and the readers' rules over it, the most
@@ -1626,9 +1715,15 @@ export function statusListing(
   const settings = readEntitySettings(root);
   const on = dayOf(today ?? localToday(now, timezone, dayStart));
   const local = localDays(timezone, dayStart);
-  const lines = readLinesOfKinds(root, new Set([ENTITY, RESOLUTION, RETRACTION, STATUS]));
+  const lines = readLinesOfKinds(
+    root,
+    new Set([ENTITY, RESOLUTION, RETRACTION, STATUS, "note"]),
+    (line) => line.kind !== "note" || isStatusNote(line),
+  );
   const found = known(lines, root);
   const histories = statuses(lines);
+  const portfolioOf = kind === "org" ? portfolios(lines) : new Map<string, string | null>();
+  const notes = statusNotes(lines);
   const rows: StatusRow[] = [];
   for (const entity of sortedEntities(found)) {
     if (entity.kind !== kind) continue;
@@ -1648,6 +1743,8 @@ export function statusListing(
       stale: current !== null && stale(current, on, local, settings.stale_days),
       muted: held,
       until: current !== null && closing ? statusDay(current, local) : null, // the line's, never the file's
+      portfolio: portfolioOf.get(entity.id) ?? null,
+      note: current === null ? null : (notes.get(current.line) ?? null),
     });
   }
   rows.sort((a, b) => {
@@ -1670,9 +1767,11 @@ export function statusRowJson(row: StatusRow): StatusRowJson {
     reason: row.current === null ? null : row.current.reason,
     proposed_by: row.current === null ? null : row.current.proposed_by,
     line: row.current === null ? null : row.current.line,
+    note: row.note,
     stale: row.stale,
     muted: row.muted.map(([status, until]) => ({ status, until })),
     until: row.until,
+    portfolio: row.portfolio,
   };
 }
 
@@ -1706,6 +1805,7 @@ export function statusListingText(listing: StatusListing): string {
     if (row.current.proposal !== null && who === "dream")
       who = `dream proposed ${row.current.proposal}`;
     const parts = [`${row.current.status} since ${row.since} (${who})`];
+    if (row.portfolio !== null) parts.push(`portfolio ${row.portfolio}`);
     if (row.until !== null) parts.push(`until ${row.until}`);
     if (row.stale) parts.push("stale");
     if (row.muted.length > 0) {

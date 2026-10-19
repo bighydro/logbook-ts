@@ -12,7 +12,7 @@ import {
   monthKey,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
-import { isOn, RFC0036, RFC0038 } from "./flags.js";
+import { isOn, RFC0036, RFC0038, RFC0040, RFC0041 } from "./flags.js";
 import { isGoal } from "./goals.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { pyStr } from "./pyrepr.js";
@@ -194,6 +194,8 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     supersededFlights,
     rfc0036: isOn(RFC0036),
     rfc0038: isOn(RFC0038),
+    rfc0040: isOn(RFC0040),
+    rfc0041: isOn(RFC0041),
     supersededByTranscript: judgements.supersededByTranscript,
     replacedBy: (line) => judgements.supersededSameKind.get(`${line.kind}\u0000${line.id}`),
     goalText: (goalId) => goalText(judgements, goalId),
@@ -318,10 +320,23 @@ function renderDay(
   return { day, text: `${text.join("\n")}\n`, timezone, rows: built.length, detail };
 }
 
-/** The day's keeper lines standing (RFC 0024 rule 4), the `memory` lane first, then the rest. */
+/**
+ * The day's keeper lines standing (RFC 0024 rule 4, and its amendment of 2026-10-14: `supersedes` is
+ * read), the `memory` lane first, then the rest. A keeper another keeper of the day names in
+ * `supersedes` is no hero, as the reference's `show` reads it at 0.7.0: even when that keeper is
+ * retracted (SPEC-QUESTIONS 109).
+ */
 function heroes(entries: Entry[], ctx: RenderContext): ShownHero[] {
+  const replaced = new Set<string>();
+  for (const e of entries) {
+    const earlier = e.line.kind === "keeper" ? payloadOf(e.line).supersedes : undefined;
+    if (typeof earlier === "string") replaced.add(earlier);
+  }
   const keepers = entries.filter(
-    (e) => e.line.kind === "keeper" && ctx.resolver.retractedBy(e.line.id) === undefined,
+    (e) =>
+      e.line.kind === "keeper" &&
+      ctx.resolver.retractedBy(e.line.id) === undefined &&
+      !replaced.has(e.line.id),
   );
   const hero = (e: Entry): ShownHero => {
     const p = payloadOf(e.line);
@@ -343,10 +358,18 @@ function heroLine(hero: ShownHero[]): string[] {
 /** The judgements the whole record holds, read in one pass over every file. */
 export interface Judgements {
   resolver: Resolver;
-  /** For a line a flight line supersedes, whatever its kind: that flight line's seq. */
+  /**
+   * For a line a flight line supersedes, whatever its kind: the seq of the last flight line that
+   * names it and is not retracted (a retracted one supersedes nothing, the reference's #321).
+   */
   supersededFlights: Map<string, number>;
-  /** Every id some line's payload names in `supersedes`, whatever the kind. */
-  superseded: Set<string>;
+  /**
+   * The lines superseded as SPEC §3.2 reads it since the reference's #321 (its docs/SPEC-QUESTIONS.md,
+   * 18 October 2026): a line is superseded while at least one line of its own kind that is not
+   * retracted names it in `supersedes`; a superseder superseded in turn still supersedes. Keyed by
+   * `<kind>\u0000<id>`; ask it through `isSuperseded`.
+   */
+  supersededByKind: Set<string>;
   /**
    * For a line of a kind that the reference marks when a later line of its own kind replaces it
    * (`goal`, `chapter`): that line's seq, the latest standing one when several do. A retracted line
@@ -376,8 +399,16 @@ export interface Judgements {
   lastLocation: string | undefined;
 }
 
+/** Whether a line is superseded: a line of its own kind that is not retracted names it (#321). */
+export function isSuperseded(
+  judgements: Pick<Judgements, "supersededByKind">,
+  line: Line,
+): boolean {
+  return judgements.supersededByKind.has(`${line.kind}\u0000${line.id}`);
+}
+
 /** The kinds whose lines the reference marks `superseded by #N` when a later line of the kind replaces them. */
-const SAME_KIND = new Set(["goal", "chapter"]);
+const SAME_KIND = new Set(["goal", "chapter", "scene-review"]);
 
 /**
  * The judgements the whole record holds — who a ref is, which lines are hidden, which lines
@@ -385,8 +416,6 @@ const SAME_KIND = new Set(["goal", "chapter"]);
  */
 export function readJudgements(files: MonthFile[]): Judgements {
   const judged: Line[] = [];
-  const supersededFlights = new Map<string, number>();
-  const superseded = new Set<string>();
   const replacing = new Map<string, Array<{ id: string; seq: number }>>();
   const goals = new Map<string, Line>();
   const chapters: Line[] = [];
@@ -416,12 +445,11 @@ export function readJudgements(files: MonthFile[]): Judgements {
       if (isChapter(line)) chapters.push(line);
       const earlier = payloadOf(line).supersedes;
       if (typeof earlier === "string") {
-        superseded.add(earlier);
-        if (line.kind === "flight") supersededFlights.set(earlier, line.seq);
-        if (SAME_KIND.has(line.kind) || line.kind === "transcript") {
-          const key = `${line.kind}\u0000${earlier}`;
-          replacing.set(key, [...(replacing.get(key) ?? []), { id: line.id, seq: line.seq }]);
-        }
+        // Who supersedes what is settled once the retractions are all read, below.
+        const key = `${line.kind}\u0000${earlier}`;
+        const by = replacing.get(key);
+        if (by === undefined) replacing.set(key, [{ id: line.id, seq: line.seq }]);
+        else by.push({ id: line.id, seq: line.seq });
       }
       if (typeof line.at !== "string") continue;
       const ms = Date.parse(line.at);
@@ -438,23 +466,29 @@ export function readJudgements(files: MonthFile[]): Judgements {
     }
   }
   const resolver = buildResolver(judged);
+  const supersededByKind = new Set<string>();
+  const supersededFlights = new Map<string, number>();
   const supersededSameKind = new Map<string, number>();
   const supersededByTranscript = new Map<string, number>();
   for (const [key, by] of replacing) {
     const earlier = key.slice(key.indexOf("\u0000") + 1);
     const kind = key.slice(0, key.indexOf("\u0000"));
+    // A retracted line supersedes nothing (the reference's #321): retracting every line that
+    // supersedes a line stands it again.
     const standing = by.filter((b) => resolver.retractedBy(b.id) === undefined);
     if (standing.length === 0) continue;
+    supersededByKind.add(key);
     const seq = Math.max(...standing.map((b) => b.seq));
-    // A transcript marks the line it replaces whatever its kind; a goal is marked only by a goal, a
-    // chapter by a chapter, so those are keyed by kind and id.
+    // A flight and a transcript mark the line they replace whatever its kind; a goal is marked
+    // only by a goal, a chapter by a chapter, so those are keyed by kind and id.
+    if (kind === "flight") supersededFlights.set(earlier, seq);
     if (kind === "transcript") supersededByTranscript.set(earlier, seq);
-    else supersededSameKind.set(`${kind}\u0000${earlier}`, seq);
+    else if (SAME_KIND.has(kind)) supersededSameKind.set(key, seq);
   }
   return {
     resolver,
     supersededFlights,
-    superseded,
+    supersededByKind,
     supersededSameKind,
     supersededByTranscript,
     goals,

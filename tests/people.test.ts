@@ -181,7 +181,9 @@ describe("three things the reference's people does that no fixture showed", () =
     payload: { schema: "retraction/v1", supersedes: id(seq), seq, reason: "no" },
   });
 
-  it("counts no transcript a line names in `supersedes`, even one a retracted line names", () => {
+  // Since the reference's #321 (0.7.0) a retracted line supersedes nothing, and a line of another
+  // kind none: `c`, whose one superseder is retracted, counts again (3 at 7bcf728, 4 at b82a11c).
+  it("counts no transcript a standing transcript supersedes; one only a retracted line names counts", () => {
     const root = writeRecord([
       ola, // 1
       transcript("2026-06-02T08:00:00Z", "a"), // 2
@@ -201,7 +203,7 @@ describe("three things the reference's people does that no fixture showed", () =
     ]);
     const people = readPeople(root, {});
     expect(renderPeople(people, {})).toBe(
-      "1 person · 2026-06-01 – 2026-06-06 · tier 2\n  Ola Nordmann  transcripts 3\n",
+      "1 person · 2026-06-01 – 2026-06-06 · tier 2\n  Ola Nordmann  transcripts 4\n",
     );
   });
 

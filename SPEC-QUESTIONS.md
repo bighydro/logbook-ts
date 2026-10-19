@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1200,3 +1200,78 @@ wherever a caller holds one.
     read or written, and a line with `speakers` and no `diarization`, which the RFC makes a MUST, shows its
     voices (95b, 95c). This implementation does the same, and so refuses nothing either. Should a writer
     refuse such a line, and a reader say so?
+
+## Found while catching up with the reference at 0.7.0 (openlogbook 0.7.0, tag v0.7.0 at b82a11c, 2026-10-18; its docs/SPEC-QUESTIONS.md, docs/rfcs/0034-the-signed-day.md amendment 4, rfcs/0006, 0024, 0030, 0037, 0038, 0040 and 0041)
+
+Read from the format's documents at b82a11c only, and from running the reference at that commit and at
+7bcf728 on synthetic records; no source was read.
+
+108. **A line superseded twice, answered (the reference's #321).** The reference decided on 18 October 2026
+    that a line is superseded while at least one line *of its kind* that is not retracted names it in
+    `supersedes`; a retracted superseder supersedes nothing, and a superseder superseded in turn still
+    supersedes. It proposes the sentence for SPEC §3.2. This implementation follows it wherever it asked the
+    old question: `show`'s marks and `people`'s transcripts and calendar entries (`isSuperseded`, keyed by
+    kind, so a note naming a transcript no longer hides it from `people`), a flight's mark (the last flight
+    that names the line and is not retracted, any kind of line still marked, 96) and the Day's flights, and
+    the resolver (a name whose correcting lines are all retracted stands again). This answers 97a, 98b, the
+    retracted flight of 95d and the retracted transcript of 106. Held by nineteen cases, the six rows of the
+    reference's table among them, against the reference (tests/superseded-cases.ts).
+
+109. **The hero and a retracted keeper's `supersedes`.** RFC 0024's amendment of 2026-10-14 reads
+    `supersedes` for keepers and takes the standing ones "as SPEC §3.2 defines *standing*". The reference's
+    `show` leaves out of its `hero` line a keeper another keeper of the day names in `supersedes`, and does so
+    when that keeper is retracted too, so a photo whose new note was unstarred has no hero at all; its Day
+    lists every keeper, superseded or not, under the row. This follows both, against 108. Should a
+    retracted keeper's `supersedes` count for nothing here as everywhere else, and should the Day list the
+    standing keepers only?
+
+110. **One flight per carrier, number and date in the Day.** The reference's Day lists one flight of the
+    same carrier, number and date, the line latest by seq, whether or not one names another in
+    `supersedes`, and keeps one of two flights whose times overlap; this implementation lists each flight
+    that no standing flight supersedes. It was so at 7bcf728 too and RFC 0013 does not say it; it is not
+    changed in this catch-up, and its case in tests/superseded-cases.ts gives the declared flight another
+    number. Which flights does the Day list?
+
+111. **`show` and the Day on a page that no longer digests.** On a record whose standing signature's
+    `page.sha256` is not the page's, the reference's Day says `, the page has changed since` and its `show`
+    does not; this implementation says it in both. It was so at 7bcf728 too, with or without stars on the
+    page, and is not changed here; tests/marks-cases.ts signs over the page as it stands. Which reader is
+    right?
+
+112. **Who spoke (RFC 0038 §3), as running the reference shows it.** The owner's voice, `from_me` with no
+    line or bound to the owner, is the owner's: `person` the record's `owner_id`, `name` null, `consent` the
+    line's or null. A voice bound to a person gives its `basis` as the line has it and `consent` the line's or
+    `unknown` (absent or not one of the three); a person without a label shows the voice's label in the Day
+    and the person's id in `people`. An unnamed voice has `person` and `name` null and a basis; the Day
+    counts it (`1 unnamed`) and never names it, `with` counts the unnamed people (distinct ids) and `people`
+    says `and N unnamed`; a voice whose line is an `alias_of` one that is unnamed is unnamed too. The Day says `recorded with consent: no` when a voice that is not the owner's was
+    bound with `no`, else `unknown` when one was bound without `yes`. A voice bound to a person is company at
+    a stay ahead of the participants, confidence 1 when asserted and the line's for `text`, one evidence with
+    a participant of the same person, never on the `system` channel; `people` counts the transcript for the
+    person with `spoke_s`, the seconds summed, and its head says `N voices not yet named · review speakers`,
+    `--json` carrying `unnamed` and `not_yet_named` when either is some. RFC 0038 §3.4 says most of this in
+    prose; should docs/people.md and docs/day.md fix the keys and sentences?
+
+113. **A status's note and an org's portfolio.** `status list --json` gives `note`, the latest `note/v1`
+    labelled `status`, not retracted, whose `extra.status` is the current status line, and `portfolio`, an
+    org's latest text `portfolio` on a status line not retracted, its words collapsed, empty clearing it,
+    a value that is not text passed by. RFC 0037 §9 says the note is "named by its `note` field": the status
+    line carries no such field in the reference's lines, the note names the status. Which way round is meant?
+
+114. **`star/v1` and `scene-review/v1` sentences.** `starProblems`, `starLineProblems` and
+    `sceneReviewProblems` are this implementation's, from the RFCs' tables and schemas; the reference's
+    validators of the two profiles, if it has them, were not run, so no sentence was compared. `show`'s rows and the
+    Day's ★ and `stars` are the reference's, compared on synthetic records: `stars` in the starred lines'
+    `seq` order. A star on a retracted line stays in `show` and leaves the Day; a star on a line another
+    line of its kind supersedes stays in both, though RFC 0041 rule 5 says a star names a line that is
+    *standing*: should a reader drop it? A star with no `line` prints `★ ? ?…`.
+
+115. **What `people` takes for an attendee.** The reference's `people` counts a calendar entry for an
+    attendee given as `{name, ref: {kind: email, value}}`, the shape its demo writes, and not one given as a
+    bare address or `{email, name}`, at 7bcf728 and at b82a11c alike; this implementation takes all three,
+    as SPEC §3.2 reads an attendee for `show`. Not changed here. Which shapes does `people` read?
+
+116. **`video/v1` and `attribution/v1` are not read here.** The reference's `show` prints its own rows for
+    both (`Home 01 · 1 h 07 min · 3.2 GB`, `scene 0:40–1:30 → 1994-06-01..1994-08-31`) and marks a superseded
+    attribution; this implementation prints them as kinds it does not know, so `show` differs on a record
+    that holds them. RFC 0040 gives no row for `show`; they are left for a catch-up that ports the RFC.

@@ -148,6 +148,7 @@ export {
   PUBLIC_MAIL_PROVIDERS,
   PUBLIC_SUFFIXES,
   pairKey,
+  portfolios,
   pySplit,
   pyStrip,
   REASON_REQUIRED,
@@ -185,6 +186,7 @@ export {
   statusListing,
   statusListingJson,
   statusListingText,
+  statusNotes,
   statusProblems,
   statusRowJson,
   statusTier,
@@ -296,6 +298,14 @@ export {
 } from "./reading.js";
 export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
 export {
+  offsetText,
+  SCENE_REF,
+  SCENE_REVIEW_KIND,
+  SCENE_REVIEW_SCHEMA,
+  sceneReviewProblems,
+  sceneReviewRow,
+} from "./sceneReviews.js";
+export {
   type Asset,
   DEFAULT_STAY_SETTINGS,
   type OwnerPolicy,
@@ -309,6 +319,7 @@ export {
 export {
   type DayDetail,
   type DayShown,
+  isSuperseded,
   type Judgements,
   readJudgements,
   type ShownHero,
@@ -354,7 +365,12 @@ export {
   spellDuration,
 } from "./sources.js";
 export {
+  type BoundVoice,
+  bindVoices,
+  boundSpeakerJson,
+  boundVoicesSuffix,
   lengthText,
+  type Owner,
   type SpeakerJson,
   speakersJson,
   type Voice,
@@ -363,6 +379,17 @@ export {
   voiceText,
   wholeNumber,
 } from "./speakers.js";
+export {
+  isStar,
+  STAR_KIND,
+  STAR_SCHEMA,
+  type StarJson,
+  standingStars,
+  starLineProblems,
+  starProblems,
+  starRow,
+  UNSTARRABLE,
+} from "./stars.js";
 export { collectStats, type KindStats, type Stats, statsText } from "./stats.js";
 export {
   aboardMatch,

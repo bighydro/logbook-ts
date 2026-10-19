@@ -14,7 +14,16 @@ import {
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
 import { mark, signedStateText } from "./signing.js";
-import { voicesSuffix } from "./speakers.js";
+import { boundVoicesSuffix } from "./speakers.js";
+
+/** A row's marks: the disposition the standing signature gives it, then ★ when the line is starred. */
+function marked(
+  marks: { dispositions: Record<string, string> | undefined | null; starred: Set<string> },
+  ...lineIds: Array<string | null | undefined>
+): string {
+  const star = lineIds.some((id) => typeof id === "string" && marks.starred.has(id));
+  return `${mark(marks.dispositions, ...lineIds)}${star ? "★ " : ""}`;
+}
 
 const DASH = "–";
 const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - [...s].length));
@@ -80,7 +89,10 @@ export function renderDay(day: Day): string {
   // signed day, the disposition's symbol prints before each line the signature gave one
   // (amendment 1): `marks` is the standing signature's map, line id → word.
   const lines: string[] = [`${day.day}  ${day.weekday} · ${signedStateText(day.signed)}`];
-  const marks = day.signed?.dispositions;
+  const dispositions = day.signed?.dispositions;
+  // A starred line (RFC 0041) is marked ★ after its disposition, wherever the Day lists it.
+  const starred = new Set((day.stars ?? []).map((s) => s.line));
+  const marks = { dispositions, starred };
   lines.push(header("night before", nightText(day.nights.before)));
   if (day.night !== undefined) lines.push(header("night", sleptText(day.night, tz)));
   lines.push(header("night after", nightText(day.nights.after)));
@@ -89,7 +101,7 @@ export function renderDay(day: Day): string {
     lines.push(
       header(
         "all day",
-        day.all_day.map((a) => `${mark(marks, a.line)}${a.title}${sourcesText(a)}`).join(", "),
+        day.all_day.map((a) => `${marked(marks, a.line)}${a.title}${sourcesText(a)}`).join(", "),
       ),
     );
   }
@@ -102,7 +114,7 @@ export function renderDay(day: Day): string {
       const when =
         e.end === null ? clock(e.start) : `${clock(e.start)}${DASH}${clockAcross(e.end)}`;
       lines.push(
-        under(indent, "event", `${mark(marks, e.line)}${e.title} ${when}${sourcesText(e)}`),
+        under(indent, "event", `${marked(marks, e.line)}${e.title} ${when}${sourcesText(e)}`),
       );
     }
     for (const t of a.transcripts)
@@ -110,31 +122,38 @@ export function renderDay(day: Day): string {
         under(
           indent,
           "transcript",
-          `${mark(marks, t.line)}${t.title}${voicesSuffix(t.speakers ?? [])}`,
+          `${marked(marks, t.line)}${t.title}${boundVoicesSuffix(t.speakers ?? [])}`,
         ),
       );
-    for (const n of a.notes) lines.push(under(indent, "note", `${mark(marks, n.line)}${n.text}`));
+    for (const n of a.notes) lines.push(under(indent, "note", `${marked(marks, n.line)}${n.text}`));
     for (const m of a.mail) {
       const text = `${m.subject} (${plural(m.messages, "message")})`;
-      lines.push(under(indent, "mail", `${mark(marks, ...m.lines)}${text}`));
+      lines.push(under(indent, "mail", `${marked(marks, ...m.lines)}${text}`));
     }
     for (const c of a.calls)
-      lines.push(under(indent, "call", `${mark(marks, c.line)}${callText(c)}`));
+      lines.push(under(indent, "call", `${marked(marks, c.line)}${callText(c)}`));
     for (const k of a.keepers)
-      lines.push(under(indent, "keeper", `${mark(marks, k.line)}${k.name} (${k.lane ?? "None"})`));
-    if (w !== undefined && (w.confirmed.length || w.proposed.length)) {
+      lines.push(
+        under(
+          indent,
+          "keeper",
+          `${mark(marks.dispositions, k.line)}${k.name} (${k.lane ?? "None"})`,
+        ),
+      );
+    if (w !== undefined && (w.confirmed.length || w.proposed.length || w.unnamed)) {
       const person = (p: { name: string; sources: string[] }) =>
         `${p.name} (${p.sources.join(", ")})`;
       const parts: string[] = [];
       if (w.confirmed.length) parts.push(w.confirmed.map(person).join(", "));
       if (w.proposed.length) parts.push(`proposed ${w.proposed.map(person).join(", ")}`);
+      if (w.unnamed) parts.push(`${w.unnamed} unnamed`);
       lines.push(under(indent, "with", parts.join(" · ")));
     }
   };
 
   const row = (indent: string, entry: TimelineEntry, inside = false): void => {
     if (entry.kind === "flight") {
-      const text = `${mark(marks, entry.line)}${flightText(entry)}`;
+      const text = `${marked(marks, entry.line)}${flightText(entry)}`;
       lines.push(`${indent}${span(entry.start, entry.end)}  ${pad("flight", 6)} ${text}`);
       return;
     }
@@ -152,7 +171,7 @@ export function renderDay(day: Day): string {
   if (day.unplaced.length) {
     lines.push("");
     for (const u of day.unplaced) {
-      const text = `${mark(marks, u.line)}${u.title}${voicesSuffix(u.speakers ?? [])}${sourcesText(u)}`;
+      const text = `${marked(marks, u.line)}${u.title}${boundVoicesSuffix(u.speakers ?? [])}${sourcesText(u)}`;
       lines.push(header("unplaced", `${span(u.at, u.end)}  ${pad(u.kind, 6)} ${text}`));
     }
   }

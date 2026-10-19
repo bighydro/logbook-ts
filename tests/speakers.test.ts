@@ -399,7 +399,7 @@ describe("the Day names a transcript's voices under the rfc0038 flag, as the ref
       speakers: [
         {
           label: "mic",
-          person: null,
+          person: "00000000-0000-4000-8000-000000000002",
           name: null,
           seconds: 201.7,
           basis: "channel",
@@ -493,8 +493,8 @@ describe("the Day names a transcript's voices under the rfc0038 flag, as the ref
           },
           {
             label: "S3",
-            person: null,
-            name: "Ines",
+            person: "00000000-0000-4000-8000-000000000002",
+            name: null,
             seconds: null,
             basis: "channel",
             consent: null,
@@ -508,8 +508,8 @@ describe("the Day names a transcript's voices under the rfc0038 flag, as the ref
         speakers: [
           {
             label: "mic",
-            person: null,
-            name: "Me",
+            person: "00000000-0000-4000-8000-000000000002",
+            name: null,
             seconds: null,
             basis: "channel",
             consent: null,

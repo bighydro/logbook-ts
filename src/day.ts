@@ -11,7 +11,7 @@ import {
   weekdayOf,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
-import { isOn, RFC0038 } from "./flags.js";
+import { isOn, RFC0038, RFC0041 } from "./flags.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { keeperPhoto, payloadOf, transcriptTitle } from "./render.js";
@@ -28,7 +28,8 @@ import {
 } from "./settings.js";
 import { type Judgements, readJudgements } from "./show.js";
 import { SIGNED_DAY_KIND, type SignedState, signedState, standingSignatures } from "./signing.js";
-import { type SpeakerJson, speakersJson } from "./speakers.js";
+import { bindVoices, boundSpeakerJson, type SpeakerJson } from "./speakers.js";
+import { type StarJson, standingStars } from "./stars.js";
 import {
   deriveSegments,
   judged,
@@ -129,6 +130,8 @@ export interface Person {
 export interface Company {
   confirmed: Person[];
   proposed: Person[];
+  /** The unnamed people whose voices were there (RFC 0038 §3.4), counted and never named; only when some were. */
+  unnamed?: number;
 }
 
 export interface WithinDay {
@@ -289,6 +292,8 @@ export interface Day {
   night?: NightLine;
   /** The day's standing signature (RFC 0034 rule 6), or null when the day is unsigned. */
   signed: SignedState | null;
+  /** The day's standing stars (RFC 0041), under the rfc0041 flag and only on a day that has one. */
+  stars?: StarJson[];
 }
 
 /** A line read for the day, with its instant and span in ms. */
@@ -316,6 +321,12 @@ interface Context extends PeopleContext {
   settings: StaySettings;
   /** RFC 0038 §2 under its flag: a transcript's voices, and a transcript heard again standing alone. */
   rfc0038: boolean;
+}
+
+/** A transcript's voices as `day --json` gives them, each with who it is (RFC 0038 §3); undefined without voices. */
+function speakersOf(line: Line, ctx: PeopleContext): SpeakerJson[] | undefined {
+  const voices = bindVoices(line, ctx.resolver, ctx.owner);
+  return voices.length === 0 ? undefined : voices.map(boundSpeakerJson);
 }
 
 const SOURCE_RANK: Record<string, number> = { calendar: 0, transcript: 1, note: 2, photo: 3 };
@@ -517,6 +528,15 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   const page = dayLines.filter((e) => e.line.kind !== SIGNED_DAY_KIND).map((e) => e.line);
   const signed = signedState(reader.signatures.get(day), timezone, page, day);
   const night = nightLine(entries.filter(standing), ctx);
+  // The day's standing stars (RFC 0041 rule 3), each on a line of the day that stands.
+  const stars = isOn(RFC0041)
+    ? [
+        ...standingStars(
+          dayLines.map((e) => e.line),
+          (id) => resolver.retractedBy(id) !== undefined,
+        ).values(),
+      ]
+    : [];
 
   return {
     day,
@@ -535,6 +555,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     sources: sources(dayStanding),
     ...(night === undefined ? {} : { night }),
     signed,
+    ...(stars.length === 0 ? {} : { stars }),
     received: [],
   };
 }
@@ -970,7 +991,7 @@ function buildTimeline(
       where += 1;
       switch (kind) {
         case "transcript": {
-          const speakers = ctx.rfc0038 ? speakersJson(p) : undefined;
+          const speakers = ctx.rfc0038 ? speakersOf(e.line, ctx) : undefined;
           row.attached.transcripts.push({
             title: transcriptTitle(p, UNTITLED),
             line: e.line.id,
@@ -1026,7 +1047,8 @@ function buildTimeline(
                 : kind === "mail"
                   ? (text(p.subject) ?? "(no subject)")
                   : (asRef(p.counterparty)?.value ?? "withheld");
-          const speakers = kind === "transcript" && ctx.rfc0038 ? speakersJson(p) : undefined;
+          const speakers =
+            kind === "transcript" && ctx.rfc0038 ? speakersOf(e.line, ctx) : undefined;
           unplaced.push({
             kind,
             at: e.line.at,
@@ -1111,6 +1133,8 @@ export function callText(call: AttachedCall): string {
 // Who was there
 
 export interface OwnerIdentity {
+  /** `owner_id` of logbook.json, when it is a string: the person the owner's own voice is. */
+  id?: string | undefined;
   ids: Set<string>;
   names: Set<string>;
 }
@@ -1137,7 +1161,7 @@ export function ownerIdentity(
     if (entity.label !== undefined) names.add(entity.label.toLowerCase());
   }
   for (const [id, label] of resolver.people()) if (ids.has(id)) names.add(label.toLowerCase());
-  return { ids, names };
+  return { id: typeof ownerId === "string" ? ownerId : undefined, ids, names };
 }
 
 /** One piece of evidence that someone was at a stay: a calendar entry's attendee, a transcript's participant, a note's `with`, a tagged face. */
@@ -1266,7 +1290,39 @@ export interface RowEvidence {
  * face the library tagged. The owner is never their own company.
  */
 export function company(stays: Stay[], p: RowEvidence, ctx: PeopleContext): Company {
-  return mergeCompany(evidenceOf(stays, p, ctx));
+  const merged = mergeCompany(evidenceOf(stays, p, ctx));
+  if (!isOn(RFC0038)) return merged;
+  // An unnamed voice confirms an unnamed person, counted and never named (RFC 0038 §3.4).
+  const unnamed = new Set<string>();
+  for (const t of p.transcripts)
+    for (const v of bindVoices(t.line, ctx.resolver, ctx.owner))
+      if (v.who === "unnamed" && v.channel !== "system" && v.person !== undefined)
+        unnamed.add(v.person);
+  return unnamed.size === 0 ? merged : { ...merged, unnamed: unnamed.size };
+}
+
+/**
+ * A voice of the transcript bound to a person (RFC 0038 §3.4, `with`): confirmed company, ahead of
+ * the participants, at the line's own confidence when it has one and surely when asserted. A voice
+ * of the `system` channel is the far end of a call, not company; the owner is never their own.
+ */
+function voiceCompany(t: Entry, title: string, ctx: PeopleContext): Evidence[] {
+  const found: Evidence[] = [];
+  for (const v of bindVoices(t.line, ctx.resolver, ctx.owner)) {
+    if (v.who !== "person" || v.person === undefined || v.channel === "system") continue;
+    if (found.some((f) => f.person === v.person)) continue;
+    found.push({
+      person: v.person,
+      name: v.personLabel ?? v.person,
+      source: "transcript",
+      reason: `spoke in ${title}`,
+      line: t.line.id,
+      entry: t,
+      confirms: true,
+      confidence: v.confidence ?? 1,
+    });
+  }
+  return found;
 }
 
 /** The evidence of who was at the stay, one entry per person per line, in the order the rules find it. */
@@ -1291,6 +1347,8 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
   for (const t of p.transcripts) {
     const payload = payloadOf(t.line);
     const title = transcriptTitle(payload, UNTITLED);
+    const voiced = isOn(RFC0038) ? voiceCompany(t, title, ctx) : [];
+    found.push(...voiced);
     if (!Array.isArray(payload.participants)) continue;
     for (const item of payload.participants) {
       const o = obj(item);
@@ -1312,7 +1370,8 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
       // it: a name or an address the record does not know names nobody.
       if (who === undefined && name !== undefined && !NOBODY.test(name.trim()))
         who = personByName(name, ctx);
-      if (who === undefined) continue;
+      // A participant whose voice was bound here already is that one evidence.
+      if (who === undefined || voiced.some((f) => who.id !== null && f.person === who.id)) continue;
       found.push({
         person: who.id,
         name: who.name,

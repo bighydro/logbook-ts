@@ -23,7 +23,12 @@ import {
 } from "../src/entities.js";
 import { FLAGS_ENV } from "../src/flags.js";
 import type { JsonValue } from "../src/types.js";
-import { dayStartRecord, entitiesRecord } from "./entities-record.js";
+import {
+  dayStartRecord,
+  entitiesRecord,
+  portfolioRecord,
+  statusNotesRecord,
+} from "./entities-record.js";
 import { cleanup, FIXTURES, readMetaFile, writeMeta } from "./helpers.js";
 
 /**
@@ -330,6 +335,61 @@ function variants(): Array<{ name: string; schema: string; payload: Fields }> {
     ["status: logbook_head a number", edit(passed, { logbook_head: 5 })],
     ["status: amount", edit(passed, { amount: -2500 })],
     ["status: every money key", edit(passed, { value: 1, price: 2, currency: "NOK", amount: 3 })],
+    // RFC 0037's amendment of 2026-10-15: `portfolio`, MAY for an org, MUST NOT otherwise.
+    ["status: an org's portfolio", edit(passed, { status: "hold", portfolio: "Fund I" })],
+    ["status: an org's portfolio cleared", edit(passed, { status: "hold", portfolio: "" })],
+    ["status: an org's portfolio blank", edit(passed, { status: "hold", portfolio: "  " })],
+    ["status: an org's portfolio a number", edit(passed, { status: "hold", portfolio: 5 })],
+    ["status: an org's portfolio null", edit(passed, { status: "hold", portfolio: null })],
+    ["status: an org's portfolio a list", edit(passed, { status: "hold", portfolio: ["Fund I"] })],
+    [
+      "status: an org's portfolio over two lines",
+      edit(passed, { status: "hold", portfolio: "Fund\nI" }),
+    ],
+    [
+      "status: an idea with a portfolio",
+      edit(passed, {
+        entity: { type: "idea", id: IDEA_ID, registry: "logbook" },
+        status: "spark",
+        proposal: undefined,
+        portfolio: "Fund I",
+      }),
+    ],
+    [
+      "status: an idea with an empty portfolio",
+      edit(passed, {
+        entity: { type: "idea", id: IDEA_ID, registry: "logbook" },
+        status: "spark",
+        proposal: undefined,
+        portfolio: "",
+      }),
+    ],
+    [
+      "status: a place with a portfolio",
+      edit(passed, {
+        entity: { type: "place", id: "Hytta", registry: "logbook" },
+        status: "let-go",
+        reason: "x",
+        proposal: undefined,
+        portfolio: "Fund I",
+      }),
+    ],
+    [
+      "status: an asset with a portfolio",
+      edit(passed, {
+        entity: { type: "asset", id: "solvind", registry: "logbook" },
+        status: "sold",
+        proposal: undefined,
+        portfolio: 5,
+      }),
+    ],
+    [
+      "status: a person with a portfolio",
+      edit(passed, {
+        entity: { type: "person", id: PERSON_ID, registry: "logbook" },
+        portfolio: "x",
+      }),
+    ],
     [
       "status: everything wrong at once",
       {
@@ -759,6 +819,21 @@ describe.skipIf(!ready)(
         ).toBe(json.out);
       }
     }, 300_000);
+
+    it("agrees on an org's portfolio and the note that holds a reason (RFC 0037's amendment of 2026-10-15)", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0037");
+      for (const [root, kind] of [
+        [portfolioRecord(), "org"],
+        [statusNotesRecord(), "idea"],
+      ] as const) {
+        const text = referenceRun(root, ["status", "list", kind]);
+        expect({ kind, status: text.status }, text.err).toEqual({ kind, status: 0 });
+        const listing = statusListing(root, kind);
+        expect(statusListingText(listing), kind).toBe(text.out);
+        const json = referenceRun(root, ["status", "list", kind, "--json"]);
+        expect(`${JSON.stringify(statusListingJson(listing), null, 2)}\n`, kind).toBe(json.out);
+      }
+    }, 120_000);
 
     it("refuses a kind that takes no status in the same sentence", () => {
       vi.stubEnv(FLAGS_ENV, "rfc0037");
