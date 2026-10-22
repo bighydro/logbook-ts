@@ -2,9 +2,12 @@
  * The record's policies: settings the owner keeps in `<root>/policy/`, never constants in the code,
  * read here as the reference's `policy` module reads them (openlogbook 0.6.1, and the `write` keys of
  * its PR 252). Nothing here writes: the reference writes a default file where none exists, this
- * implementation reads the same default in memory and leaves the folder as it found it.
+ * implementation reads the same default in memory and leaves the folder as it found it. The default of
+ * `crossing.json` is the reference's since its #348, ahead of the commit `REFERENCE` pins
+ * (SPEC-QUESTIONS 83).
  *
- * `crossing.json` (ADR 0016) maps a destination to the highest tier that may cross to it. An entry may
+ * `crossing.json` (ADR 0016) maps a destination to the highest tier that may cross to it; a record
+ * without the file reads as naming only `mcp`, at 1 (ADR 0016's amendment of 2026-10-21). An entry may
  * carry an `until` day (ADR 0022: a ceiling lent for a while, `{"max_tier": 2, "until": "2026-12-31"}`);
  * it holds through that day and from the next counts as `max_tier` 0, so nothing crosses until the
  * owner writes a new date or removes the line. The `mcp` entry may also name the write tools the owner
@@ -39,7 +42,6 @@ export class PolicyError extends LogbookError {
   override readonly name = "PolicyError";
 }
 
-export const DEFAULT_DESTINATION = "hermes";
 /** `logbook mcp`: an agent on this machine, reading through the ceiling. */
 export const MCP_DESTINATION = "mcp";
 export const MCP_DEFAULT_TIER = 1;
@@ -68,9 +70,12 @@ export const SIGNED_WITHIN = "signed_within_days";
 
 type Obj = { [key: string]: JsonValue };
 
-/** The policy as the reference writes it where none exists: hermes at 2, mcp at 1. */
+/**
+ * The policy as the reference writes it where none exists: the MCP door at 1 and no one else (ADR
+ * 0016, amended 2026-10-21; the reference's #348). `hermes`, like every destination but `mcp`, is an
+ * entry the owner writes; `ceiling` and `crossingEntry` refuse one the file does not name.
+ */
 export const DEFAULT_CROSSING_POLICY: Readonly<Obj> = Object.freeze({
-  [DEFAULT_DESTINATION]: { max_tier: 2 },
   [MCP_DESTINATION]: { max_tier: MCP_DEFAULT_TIER },
 });
 

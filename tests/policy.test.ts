@@ -5,6 +5,7 @@ import {
   type Ceiling,
   ceiling,
   ceilings,
+  crossingEntry,
   DEFAULT_CROSSING_POLICY,
   mcpCeiling,
   mcpDoor,
@@ -37,12 +38,20 @@ const file = (root: string, name = "crossing.json"): string => join(root, "polic
 const TODAY = "2026-10-13";
 
 describe("policy/crossing.json (ADR 0016, ADR 0022): the ceiling per destination", () => {
-  it("reads the default when the file does not exist: hermes at 2, mcp at 1", () => {
+  it("reads the default when the file does not exist: mcp at 1 and no one else (the reference's #348)", () => {
     const root = withPolicy(undefined);
     expect(readCrossingPolicy(root)).toEqual(DEFAULT_CROSSING_POLICY);
-    expect(DEFAULT_CROSSING_POLICY).toEqual({ hermes: { max_tier: 2 }, mcp: { max_tier: 1 } });
-    expect(ceiling(root, "hermes", TODAY)).toBe(2);
+    expect(DEFAULT_CROSSING_POLICY).toEqual({ mcp: { max_tier: 1 } });
+    expect(DEFAULT_CROSSING_POLICY).not.toHaveProperty("hermes");
+    expect(readCrossingPolicy(root)).not.toHaveProperty("hermes");
+    expect(ceilings(root, TODAY).map((c) => c.destination)).toEqual(["mcp"]);
     expect(mcpCeiling(root, TODAY)).toBe(1);
+    // A crossing to a destination the record does not name is refused in one sentence naming the
+    // entry to add; `hermes` is one the owner writes, like every other.
+    const refusal = `${file(root)} names no destination 'hermes' with a max_tier of 1, 2 or 3; add {"hermes": {"max_tier": 1}} to it to allow a crossing`;
+    expect(() => ceiling(root, "hermes", TODAY)).toThrow(PolicyError);
+    expect(() => ceiling(root, "hermes", TODAY)).toThrow(refusal);
+    expect(() => crossingEntry(root, "hermes", TODAY)).toThrow(refusal);
   });
 
   it("refuses a file that is not JSON or not an object, naming the file", () => {
@@ -72,6 +81,9 @@ describe("policy/crossing.json (ADR 0016, ADR 0022): the ceiling per destination
     });
     expect(found[2]).toMatchObject({ written: 3, until: "2026-10-12", expired: true, max_tier: 0 });
     expect(found[0]).toMatchObject({ until: null, expired: false, write: [], window_days: 60 });
+    // A file that names `hermes` keeps it: the default is only for a record without the file.
+    expect(found[0]).toMatchObject({ destination: "hermes", written: 2, max_tier: 2 });
+    expect(ceiling(root, "hermes", TODAY)).toBe(2);
     // Through its last day it holds; from the next it counts as max_tier 0.
     expect(ceiling(root, "old", "2026-10-12")).toBe(3);
     expect(ceiling(root, "old", "2026-10-13")).toBe(0);
