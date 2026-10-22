@@ -314,6 +314,8 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
         { text: "Ola came by in the evening.", evidence: [], supported: false, why: null },
       ],
       unsupported: 1,
+      proposals: [],
+      proposals_unknown: 0,
       supersedes: null,
       malformed: [],
     });
@@ -373,6 +375,136 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
       edit(DRAFT, { unit: "fortnight", language: "english" }, { source: "manual" }),
     );
     expect(read.malformed).toEqual(["language must be a BCP 47 tag, en or nb"]);
+  });
+});
+
+/** An event proposal of the example's day, every key the RFC's table names, each of its type. */
+const EVENT = {
+  kind: "event",
+  title: "At the boat in Vollen",
+  start: "2026-06-13T12:00:00Z",
+  end: "2026-06-13T16:00:00Z",
+  place: null,
+  people: [],
+  evidence: [id("a2"), id("a3")],
+};
+/** A kind no amendment names yet (RFC 0043 proposes `link`): what a newer writer might write. */
+const LINK = { kind: "link", from: id("a3"), to: id("a4") };
+const withProposals = (...proposals: JsonValue[]) => edit(DRAFT, { proposals });
+const EVENT_SHAPE =
+  "an event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start before end, nothing else";
+const NO_KIND = "a proposal is an object that names its kind";
+const malformedProposal = (n: number, why: string): string => `proposal ${n} is malformed: ${why}`;
+
+describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward compatibility of 2026-10-19)", () => {
+  it("a draft that proposes nothing has no proposals and none unknown", () => {
+    const read = readDraft(DRAFT, ON_DAY);
+    expect([read.proposals, read.proposals_unknown, read.malformed]).toEqual([[], 0, []]);
+  });
+
+  it("an unknown kind beside a valid event: the event is shown, one is counted, the line is not malformed", () => {
+    const read = readDraft(withProposals(EVENT, LINK), ON_DAY);
+    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    expect(read.proposals_unknown).toBe(1);
+    expect(read.malformed).toEqual([]);
+  });
+
+  it("numbers do not move: a proposal keeps its place in the array, the unknown ones counted in it", () => {
+    const read = readDraft(withProposals(LINK, { ...LINK, kind: "goal" }, EVENT), ON_DAY);
+    expect(read.proposals).toEqual([{ number: 3, ...EVENT }]);
+    expect(read.proposals_unknown).toBe(2);
+    expect(read.malformed).toEqual([]);
+  });
+
+  it("a malformed event is still malformed: the valid ones are shown and the line is said to be malformed", () => {
+    const bad = { ...EVENT, title: "" };
+    const read = readDraft(withProposals(EVENT, bad, LINK), ON_DAY);
+    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    expect(read.proposals_unknown).toBe(1);
+    expect(read.malformed).toEqual([malformedProposal(2, EVENT_SHAPE)]);
+  });
+
+  it("every way an event can be of the wrong shape, each malformed, the first one named", () => {
+    const { place: _place, ...noPlace } = EVENT;
+    const shapes: JsonValue[] = [
+      { ...EVENT, title: 5 },
+      { ...EVENT, title: "  " },
+      { ...EVENT, start: "2026-06-13 12:00:00" },
+      { ...EVENT, start: "2026-06-13T12:00:00+02:00" },
+      { ...EVENT, start: "2026-02-30T12:00:00Z" },
+      { ...EVENT, end: null },
+      { ...EVENT, start: "2026-06-13T16:00:00Z" },
+      { ...EVENT, start: "2026-06-13T17:00:00Z" },
+      { ...EVENT, place: 5 },
+      { ...EVENT, place: "" },
+      { ...EVENT, people: "Ola" },
+      { ...EVENT, people: [5] },
+      { ...EVENT, evidence: [] },
+      { ...EVENT, evidence: "x" },
+      { ...EVENT, colour: "blue" },
+      noPlace,
+    ];
+    for (const shape of shapes) {
+      const read = readDraft(withProposals(shape, { ...EVENT, title: "" }), ON_DAY);
+      expect({ shape, proposals: read.proposals, malformed: read.malformed }).toEqual({
+        shape,
+        proposals: [],
+        malformed: [malformedProposal(1, EVENT_SHAPE)],
+      });
+      expect(read.proposals_unknown).toBe(0);
+    }
+  });
+
+  it("an event with a place and people is shown with them", () => {
+    const named = { ...EVENT, place: "Vollen", people: [id(501)] };
+    expect(readDraft(withProposals(named)).proposals).toEqual([{ number: 1, ...named }]);
+  });
+
+  it("a proposal that is not an object, or names no kind, is malformed, not unknown", () => {
+    for (const bad of [
+      "event",
+      5,
+      null,
+      [EVENT],
+      {},
+      { ...LINK, kind: "" },
+      { ...LINK, kind: 5 },
+    ]) {
+      const read = readDraft(withProposals(LINK, bad as JsonValue), ON_DAY);
+      expect({ bad, malformed: read.malformed }).toEqual({
+        bad,
+        malformed: [malformedProposal(2, NO_KIND)],
+      });
+      expect(read.proposals_unknown).toBe(1);
+    }
+  });
+
+  it("proposals that are not a list are malformed; absent, there are none", () => {
+    for (const bad of ["event", 5, {}, null]) {
+      const read = readDraft(edit(DRAFT, { proposals: bad as JsonValue }), ON_DAY);
+      expect(read.malformed).toEqual(["proposals must be a list"]);
+      expect([read.proposals, read.proposals_unknown]).toEqual([[], 0]);
+    }
+    expect(readDraft(withProposals(), ON_DAY).malformed).toEqual([]);
+  });
+
+  it("the writer stays strict: draftProblems refuses a kind it does not know, as a writer does", () => {
+    expect(draftProblems(withProposals(EVENT))).toEqual([]);
+    expect(draftProblems(withProposals(EVENT, LINK))).toEqual([
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+    ]);
+    expect(draftProblems(withProposals({ ...EVENT, title: "" }, LINK, { kind: "goal" }))).toEqual([
+      malformedProposal(1, EVENT_SHAPE),
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+    ]);
+    // In the field table's order: `supersedes`, then `proposals`, then amendment 1's `read_policy`.
+    expect(
+      draftProblems(edit(DRAFT, { supersedes: 5, proposals: [LINK], read_policy: "x" })),
+    ).toEqual([
+      "supersedes must be the id of the earlier draft",
+      "proposal 1 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "read_policy must be { entry, max_tier, sha256 }: the policy entry read through, its ceiling then (0 to 3), and the sha256 of policy/crossing.json as read, 64 lowercase hex characters",
+    ]);
   });
 });
 

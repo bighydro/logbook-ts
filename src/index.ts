@@ -76,6 +76,7 @@ export { distanceText, durationText, healthText, renderDay, sleptText } from "./
 export {
   DRAFT_KIND,
   DRAFT_SCHEMA,
+  type DraftProposal,
   type DraftRead,
   type DraftSegment,
   draftKey,
@@ -83,6 +84,7 @@ export {
   draftRow,
   draftTierProblems,
   isDraft,
+  PROPOSAL_KINDS,
   readDraft,
   standingDrafts,
   UNITS,
@@ -432,6 +434,7 @@ export {
   NO_HOME,
   readTrips,
   renderTrips,
+  routeText,
   type Trip,
   type TripFlight,
   type TripPerson,

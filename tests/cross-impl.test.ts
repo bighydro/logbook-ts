@@ -661,7 +661,7 @@ describe.skipIf(!ready)(
       }
     }, 300_000);
 
-    it("read a day's draft alike: the malformed list, and each segment supported or not, and why", () => {
+    it("read a day's draft alike: the malformed list, each segment supported or not, and why, and the proposals", () => {
       // The day's lines get the ids 00000000-0000-4000-8000-00000000000N, N their seq.
       const lineId = (n: number): string =>
         `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -693,6 +693,16 @@ describe.skipIf(!ready)(
         { text: "One photo from the pontoon.", evidence: [lineId(2)] },
         { text: "Ola came by.", unsupported: true },
       ];
+      const event = {
+        kind: "event",
+        title: "At the boat",
+        start: "2026-06-13T10:00:00Z",
+        end: "2026-06-13T12:00:00Z",
+        place: null,
+        people: [],
+        evidence: [lineId(1), lineId(2)],
+      };
+      const link = { kind: "link", from: lineId(2), to: lineId(3) };
       const variants: Array<Record<string, unknown>> = [
         {},
         { segments: [good[0], { text: "x", evidence: [lineId(2)], unsupported: true }] },
@@ -716,8 +726,13 @@ describe.skipIf(!ready)(
         { read_head: undefined, read_count: "5", language: "english", supersedes: 5 },
         { read_head: "AB".repeat(32), read_count: -1, language: "en-GB", supersedes: "" },
         { read_count: true, language: "zh-Hant-TW", supersedes: null },
+        // draft/v1, forward compatibility (2026-10-19): a kind the reader does not know is counted,
+        // not malformed, and a known one keeps its number.
+        { proposals: [link] },
+        { proposals: [event, link] },
+        { proposals: [link, link, event] },
       ];
-      for (const variant of variants) {
+      const readBoth = (variant: Record<string, unknown>) => {
         const payload: Record<string, unknown> = {
           schema: "draft/v1",
           unit: "day",
@@ -756,6 +771,8 @@ describe.skipIf(!ready)(
               malformed: string[];
               segments: Array<Record<string, unknown>>;
               unsupported: number;
+              proposals?: unknown[] | null;
+              proposals_unknown: number;
             };
           }
         ).draft;
@@ -765,6 +782,15 @@ describe.skipIf(!ready)(
             .split("\n")[3] as string,
         );
         const ours = readDraft(line, new Set(dayLines.map((_, i) => lineId(i + 1))));
+        expect({ variant, unknown: ours.proposals_unknown, shown: ours.proposals.length }).toEqual({
+          variant,
+          unknown: theirs.proposals_unknown,
+          shown: theirs.proposals?.length ?? null,
+        });
+        return { ours, theirs };
+      };
+      for (const variant of variants) {
+        const { ours, theirs } = readBoth(variant);
         expect({ variant, malformed: ours.malformed }).toEqual({
           variant,
           malformed: theirs.malformed,
@@ -779,6 +805,10 @@ describe.skipIf(!ready)(
           })),
         );
       }
+      // A known kind of the wrong shape is still malformed in both; the sentence is each one's own
+      // (SPEC-QUESTIONS 117), so only that there is one is held alike.
+      const { ours, theirs } = readBoth({ proposals: [{ ...event, title: "" }, link] });
+      expect([ours.malformed.length > 0, theirs.malformed.length > 0]).toEqual([true, true]);
     }, 300_000);
   },
 );

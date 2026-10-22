@@ -8,15 +8,22 @@
  * and a tier that is the highest among the lines the model read, not only those it cites, so a reader
  * can hold it to no less than the lines a segment cites (`draftTierProblems`). The payload: `unit`
  * (`day`, `journey`, `event`, `week`, `month`, `year`, `chapter`, and amendment 1's `person`), the
- * `subject` in the unit's form, `read_head`, `read_count`, `language`, `segments`, and `supersedes`;
- * amendment 1 adds `window`, MUST on a person and absent elsewhere, and `read_policy`, SHOULD.
+ * `subject` in the unit's form, `read_head`, `read_count`, `language`, `segments`, `supersedes`, and
+ * the amendment of 2026-10-13's `proposals`, MAY; amendment 1 adds `window`, MUST on a person and
+ * absent elsewhere, and `read_policy`, SHOULD.
+ *
+ * A proposal is an object whose `kind` says what it proposes; `event` is the only kind the profile
+ * names. Its forward compatibility (the amendment of 2026-10-19): a reader shows the proposals of the
+ * kinds it knows, counts the others as `proposals_unknown`, and does not call the line malformed for
+ * them; a known kind of the wrong shape, or a proposal with no kind, is still malformed. Writers stay
+ * strict: `draftProblems`, the whole field table, refuses a kind it does not know.
  *
  * The reference reads a day's draft on the Day and prints its row in `show`, and checks five fields as
  * it reads (openlogbook 0.6.1, run on synthetic drafts): `read_head`, `read_count`, `language`,
  * `segments` and `supersedes`. Those sentences are its own, word for word, in its order, and like it
- * the check names the first malformed segment only; the rest of the field table (unit, subject,
- * source, window, read_policy) has no reference sentence yet and is checked here in its style
- * (SPEC-QUESTIONS 89). `readDraft` is the reader's view, the reference's `malformed` list and its
+ * the check names the first malformed segment only. The proposals and the rest of the field table
+ * (unit, subject, source, window, read_policy) have no reference sentence yet and are checked here in
+ * its style (SPEC-QUESTIONS 89, 117). `readDraft` is the reader's view, the reference's `malformed` list and its
  * reading of each segment; `draftRow` is the row `show` prints under the `rfc0036` flag. Nothing here
  * writes a draft, and the Day does not show one yet.
  */
@@ -104,11 +111,54 @@ function segmentIs(segment: unknown): "supported" | "unsupported" | "malformed" 
   return isIdList(segment.evidence) ? "supported" : "malformed";
 }
 
+/** The kinds of proposal this implementation knows (draft/v1, the amendment of 2026-10-13). */
+export const PROPOSAL_KINDS = ["event"] as const;
+/** An event proposal's keys, exactly these. */
+const EVENT_KEYS = ["kind", "title", "start", "end", "place", "people", "evidence"];
+const EVENT_SHAPE =
+  "an event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start before end, nothing else";
+const NO_KIND = "a proposal is an object that names its kind";
+/** RFC 3339 in UTC with `Z`, on a real calendar day. */
+const UTC = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?Z$/;
+const isUtc = (v: unknown): v is string => {
+  const m = typeof v === "string" ? UTC.exec(v) : null;
+  return m !== null && isDayString(m[1]);
+};
+
+/**
+ * A proposal as a reader takes it (forward compatibility, rules 3 and 4): an event of the table's
+ * shape; a kind it does not know, `kind` a non-empty string other than `event`; or malformed, an event
+ * of another shape, or not an object naming its kind at all.
+ */
+function proposalIs(proposal: unknown): "event" | "unknown" | "malformed" {
+  if (!isObject(proposal) || typeof proposal.kind !== "string" || proposal.kind === "") {
+    return "malformed";
+  }
+  if (!PROPOSAL_KINDS.includes(proposal.kind as (typeof PROPOSAL_KINDS)[number])) return "unknown";
+  const p = proposal;
+  const shaped =
+    Object.keys(p).length === EVENT_KEYS.length &&
+    EVENT_KEYS.every((key) => key in p) &&
+    isText(p.title) &&
+    isUtc(p.start) &&
+    isUtc(p.end) &&
+    Date.parse(p.start) < Date.parse(p.end) &&
+    (p.place === null || isText(p.place)) &&
+    Array.isArray(p.people) &&
+    p.people.every(isText) &&
+    isIdList(p.evidence);
+  return shaped ? "event" : "malformed";
+}
+
+const proposalsOf = (p: Fields): JsonValue[] => (Array.isArray(p.proposals) ? p.proposals : []);
+
 const isCount = (v: unknown): boolean => typeof v === "number" && Number.isInteger(v) && v >= 0;
 
 /**
  * What the reference's reader says is wrong with a draft, in its words and its order: `read_head`,
- * `read_count`, `language`, `segments` (the first malformed segment only) and `supersedes`.
+ * `read_count`, `language`, `segments` (the first malformed segment only) and `supersedes`; then, in
+ * this implementation's words, `proposals` (the first malformed proposal only). A proposal of a kind
+ * the reader does not know is not malformed.
  */
 function readerProblems(p: Fields): string[] {
   const problems: string[] = [];
@@ -131,6 +181,16 @@ function readerProblems(p: Fields): string[] {
   if ("supersedes" in p && !isText(p.supersedes)) {
     problems.push("supersedes must be the id of the earlier draft");
   }
+  if (p.proposals !== undefined && !Array.isArray(p.proposals)) {
+    problems.push("proposals must be a list");
+  } else {
+    const proposals = proposalsOf(p);
+    const first = proposals.findIndex((proposal) => proposalIs(proposal) === "malformed");
+    if (first !== -1) {
+      const named = isObject(proposals[first]) && proposals[first].kind === "event";
+      problems.push(`proposal ${first + 1} is malformed: ${named ? EVENT_SHAPE : NO_KIND}`);
+    }
+  }
   return problems;
 }
 
@@ -147,7 +207,8 @@ const isPolicy = (v: unknown): boolean =>
 /**
  * Why a line is not a `draft/v1` line as RFC 0036 and its amendment 1 define one, one sentence per
  * rule broken; empty when it is one. The envelope first, then `unit`, `subject` and `window`, then the
- * five fields the reference's reader checks, in its words, then `read_policy`. The tier is the lines'
+ * five fields the reference's reader checks, in its words, and `proposals`, then a proposal of a kind
+ * a writer may not write (the first only: writers stay strict), then `read_policy`. The tier is the lines'
  * the model read, so it is not checked here but against them (`draftTierProblems`).
  */
 export function draftProblems(line: Line): string[] {
@@ -176,6 +237,14 @@ export function draftProblems(line: Line): string[] {
     problems.push(`window is for a person draft only; the subject of a ${unit} draft bounds it`);
   }
   problems.push(...readerProblems(p));
+  const proposals = proposalsOf(p);
+  const unknown = proposals.findIndex((proposal) => proposalIs(proposal) === "unknown");
+  if (unknown !== -1) {
+    const kind = (proposals[unknown] as Fields).kind;
+    problems.push(
+      `proposal ${unknown + 1} is of a kind a writer may not write: kind must be ${oneOf(PROPOSAL_KINDS, kind)}`,
+    );
+  }
   if (p.read_policy !== undefined && !isPolicy(p.read_policy)) {
     problems.push(
       "read_policy must be { entry, max_tier, sha256 }: the policy entry read through, its ceiling then (0 to 3), and the sha256 of policy/crossing.json as read, 64 lowercase hex characters",
@@ -217,6 +286,18 @@ export interface DraftSegment {
   why: string | null;
 }
 
+/** An event proposal as a reader shows it: its number, its place in the array from 1, and its fields. */
+export interface DraftProposal {
+  number: number;
+  kind: "event";
+  title: string;
+  start: string;
+  end: string;
+  place: string | null;
+  people: string[];
+  evidence: string[];
+}
+
 /** A draft as a reader reads it: the line's fields, its segments read, and what the reference's reader says is malformed. */
 export interface DraftRead {
   line: string;
@@ -234,6 +315,10 @@ export interface DraftRead {
   segments: DraftSegment[];
   /** How many segments are shown unsupported: marked, malformed, or resting on a line not of the unit. */
   unsupported: number;
+  /** The proposals of a kind this reader knows and of their shape, numbered by their place in the array. */
+  proposals: DraftProposal[];
+  /** How many proposals are of a kind this reader does not know (forward compatibility). */
+  proposals_unknown: number;
   supersedes: string | null;
   malformed: string[];
 }
@@ -253,7 +338,9 @@ const textOf = (v: JsonValue | undefined): string =>
  * the record; without it the ids are not checked); one that names another is shown unsupported and
  * says why. A segment the writer marked `unsupported` is shown so. A malformed segment is treated as
  * unsupported and the line is said to be malformed; one that is not an object is not shown at all. All
- * as the reference's Day reads a day's draft (openlogbook 0.6.1, run).
+ * as the reference's Day reads a day's draft (openlogbook 0.6.1, run). The event proposals of their
+ * shape are shown, numbered by their place in the array; those of a kind this reader does not know are
+ * counted and nothing more (draft/v1, forward compatibility of 2026-10-19, from the RFC's text).
  */
 export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
   const p = fieldsOf(line);
@@ -277,6 +364,24 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
       segments.push({ text, evidence, supported: !off, why: off ? elsewhere : null });
     }
   }
+  const proposals: DraftProposal[] = [];
+  let unknown = 0;
+  proposalsOf(p).forEach((proposal, i) => {
+    const shape = proposalIs(proposal);
+    if (shape === "unknown") unknown += 1;
+    if (shape !== "event") return;
+    const e = proposal as Fields;
+    proposals.push({
+      number: i + 1,
+      kind: "event",
+      title: e.title as string,
+      start: e.start as string,
+      end: e.end as string,
+      place: e.place as string | null,
+      people: [...(e.people as string[])],
+      evidence: [...(e.evidence as string[])],
+    });
+  });
   const source = String(line.source);
   return {
     line: String(line.id),
@@ -292,6 +397,8 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
     language: p.language ?? null,
     segments,
     unsupported: segments.filter((s) => !s.supported).length,
+    proposals,
+    proposals_unknown: unknown,
     supersedes: isText(p.supersedes) ? p.supersedes : null,
     malformed: readerProblems(p),
   };

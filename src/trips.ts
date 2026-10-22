@@ -250,7 +250,8 @@ function flightOf(f: FlightLine): TripFlight {
 /**
  * The label of a night place on a route: the named place; the airport it is at (`CPH, Copenhagen`);
  * else its coordinates, `near <place>, x km` for the nearest named place within 5 km, else with the
- * city of the nearest large airport within 30 km in parentheses, else alone.
+ * city of the nearest large airport within 30 km in parentheses, else alone. This is the label the
+ * JSON keeps; the text drops an unnamed stay's coordinates where it can (`routeText`).
  */
 export function labelOf(stay: Stay, places: Place[]): string {
   if (stay.place !== undefined) return stay.place.name;
@@ -267,6 +268,33 @@ export function labelOf(stay: Stay, places: Place[]): string {
     return `${coords} near ${nearest.place.name}, ${roundTo(nearest.m / 1000, 1).toFixed(1)} km`;
   const near = nearestAirport(stay.lat, stay.lon, CITY_AIRPORT_KM);
   return near === undefined ? coords : `${coords} (${near.airport.city})`;
+}
+
+/** A label `labelOf` gave an unnamed stay: its coordinates, then `near <place>, x km` or `(<city>)`. */
+const UNNAMED = /^-?\d+\.\d{4},-?\d+\.\d{4} (?:(near .+, \d+\.\d km)|\((.+)\))$/;
+
+/** A route label as the text reads it: an unnamed stay without its coordinates, any other as it is. */
+const shortOf = (label: string): string => {
+  const m = UNNAMED.exec(label);
+  return m === null ? label : ((m[1] ?? m[2]) as string);
+};
+
+/**
+ * A trip's route as the reference's `trips` text prints it (bighydro/logbook fa41791, its #343, pinned
+ * here through a86787c): an
+ * unnamed stay is `near <place>, x km` or the nearest airport's city (`Zurich`), the coordinates kept
+ * only where nothing names it or where a neighbour on the route would read the same. The JSON keeps
+ * the labels.
+ */
+export function routeText(route: string[]): string {
+  const short = route.map(shortOf);
+  return route
+    .map((label, i) => {
+      const text = short[i] as string;
+      const alike = text === short[i - 1] || text === short[i + 1];
+      return text !== label && alike ? label : text;
+    })
+    .join(" → ");
 }
 
 const DASH = "–";
@@ -290,7 +318,7 @@ export function renderTrips(trips: Trips, assets: Asset[]): string {
       if (t.in_transit) parts.push(`${t.in_transit} in transit`);
       if (parts.length) nights += ` (${parts.join(", ")})`;
     }
-    const parts = [nights, `route ${t.route.join(" → ")}`];
+    const parts = [nights, `route ${routeText(t.route)}`];
     for (const f of t.flights_in) parts.push(`in ${flightText(f)}`);
     for (const f of t.flights_out) parts.push(`out ${flightText(f)}`);
     if (t.places.length) parts.push(`places ${t.places.join(", ")}`);
