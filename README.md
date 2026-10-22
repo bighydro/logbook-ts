@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (openlogbook 0.7.0, tag v0.7.0 at b82a11c, 2026-10-18, the commit [`REFERENCE`](./REFERENCE) pins) does, matched against the
+the reference implementation (its main at a86787c, 2026-10-21, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and nine commits past it, among them draft/v1's forward compatibility and the route text of `trips`) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,7 +133,9 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18), its RFC 0034
+matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-21 at
+a86787c on its main, which adds draft/v1's forward compatibility of 2026-10-19 and the route text of
+`trips`), its RFC 0034
 signed-day amendments 1–4, the draft RFCs 0036–0038, 0040 and 0041 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
@@ -150,7 +152,7 @@ with each: **implemented** (read, and validated where the profile is, held to th
 **verified only** (nothing here needs to change; tests hold that the readers already agree), or **not
 implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speakers-bound.test.ts`,
 `tests/marks.test.ts`, `tests/entities.test.ts`, `tests/signing.test.ts` and their cases in
-`tests/cross-impl.test.ts` and `tests/cross-impl-entities.test.ts`, run against the reference at b82a11c.
+`tests/cross-impl.test.ts` and `tests/cross-impl-entities.test.ts`, run against the reference at the commit `REFERENCE` names.
 
 | Document at v0.7.0 | Here | What |
 |---|---|---|
@@ -195,7 +197,7 @@ implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speaker
 | `story/v1` (0028), `received/v1` (0030) | `[]` only | chain | — | SPEC-QUESTIONS 69e, 77 |
 | `signed-day/v1` (0034, amendments 1–4) | yes: the standing signature, `signed` in `show` and `day`, `dispositions` kept and marked | chain, and `signedDayProblems` in the reference's words: the payload's shape, `confirmed` once each, `page.lines` not below the confirmed count, `dispositions` an object of confirmed ids to one of four words | — | nothing here signs; amendments 2, 3 and 4 are the writer's (`--confirm none`, `--at`, the MCP door; a re-sign keeping the standing signature's confirmations, `--confirm all`) and leave the line as it is; a re-sign the reference writes is read alike |
 | `goal/v1`, `review/v1` (0036) | draft (RFC 0036): `standingGoals`, `standingGoal`, `standingReviews` (a review counts for the goals that reword the one it names), `openGoals`; under the flag `show` prints a goal as `<text>  (year, from 2026-01-01)` and a review as `let go · month · <the goal's current text>` as the reference does since its #275, ` · superseded by #N` on a goal a later goal rewords; with the flag off, the text and the `key=value` row as before | draft (RFC 0036): `goalProblems`, `reviewProblems` (the field tables; tier 2 and `source` `manual`, MUST), `reviewRecordProblems` (the goal is a goal line not retracted, `at` not before its `from` nor five minutes after `recorded_at`), `reviewKey` `(goal, period, at)`; a goal has no key. The reference checks neither profile yet, so the sentences are this implementation's (SPEC-QUESTIONS 88) | — | the Day's `reviews` row is not read yet; the writers (`goal add`, `goal review`, amendment 1) are the reference's |
-| `draft/v1` (0036, and amendment 1's `person`, `window`, `read_policy` as PR 269 proposes them) | draft (RFC 0036): `readDraft`, a draft as the reference's Day reads it (each segment supported or not and why, `malformed`), `standingDrafts`; `show`'s row (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`) under the flag | draft (RFC 0036): `draftProblems`, the five fields the reference's reader checks in its words (`read_head`, `read_count`, `language`, `segments` with the segment rule, `supersedes`), and `unit`, `subject`, `source` `model:<name>`, `window`, `read_policy` in this implementation's (SPEC-QUESTIONS 89); `draftTierProblems`, never below a line it cites; `draftKey` | — | the Day's draft block is not shown yet; nothing here writes a draft |
+| `draft/v1` (0036, and amendment 1's `person`, `window`, `read_policy` as PR 269 proposes them, the event proposals of 2026-10-13 and their forward compatibility of 2026-10-19) | draft (RFC 0036): `readDraft`, a draft as the reference's Day reads it (each segment supported or not and why, `malformed`; the event proposals of their shape, numbered by their place, and `proposals_unknown`, the count of a kind it does not know, which never makes the line malformed), `standingDrafts`; `show`'s row (`draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`) under the flag | draft (RFC 0036): `draftProblems`, the five fields the reference's reader checks in its words (`read_head`, `read_count`, `language`, `segments` with the segment rule, `supersedes`), and `unit`, `subject`, `source` `model:<name>`, `window`, `read_policy`, `proposals` (and, as a writer, a kind it does not know) in this implementation's (SPEC-QUESTIONS 89, 117); `draftTierProblems`, never below a line it cites; `draftKey` | — | the Day's draft block is not shown yet; nothing here writes a draft |
 | `chapter/v1` (0036) | draft (RFC 0036): `standingChapters`, `chapterOf` (the standing chapter open on a day, and the clash of rule 4); `show`'s row, `<name>  <from> – <to>`, and the day's chapter in its heading (`unsigned · chapter Ashore, fixing things`, `, clashes with …`), under the flag | draft (RFC 0036): `chapterProblems`, `chapterKey` `(name, from)` (a closing line that supersedes the open one is not a duplicate), `chapterClashes`; sentences this implementation's | — | the Day's header does not name the chapter yet, nor its `chapter`, `reviews`, `goals` and `chapters` keys (SPEC-QUESTIONS 94) |
 | `entity/v1` (0037) | draft (RFC 0037): `standing`, `canonical` (every entity the lines name; a `resolution/v1` of type `company` read as an org, by RFC 0006's walk as the reference runs it), `bindings`, `registry` and `known` (the entries of `places.json` and `assets.json`, `until` as each holds it), `lookup`, the dedupe keys (`keyOf`, `registeredDomain`); `show` prints the line as the reference does, the generic `key=value` row, flag or not, and the Day counts it among the sources only, as the reference does | draft (RFC 0037), in the reference's words, ported from its source on the owner's instruction: `entityProblems`, and `tierProblems` (tier 2 for every kind, never citing a tier-3 line); `entityLineProblems` holds a whole line to what the reference's writers check | — | the reference's code differs from the RFC's text in places (SPEC-QUESTIONS 98); nothing here writes an entity |
 | `entity-review/v1` (0037), and `people-review/v1` (0035), read as one of type person | draft (RFC 0037): `reviews`, the standing noes, `reviewHolds`; `show`'s generic row | draft (RFC 0037): `entityReviewProblems`, a `speaker` ref among the observed kinds (RFC 0038 §12); its tier the highest it cites, never under 2 (`reviewTier`) | — | `review KIND` is the reference's |
@@ -538,7 +540,9 @@ Without a place of kind `home` nothing is away, and the command says so. A trip'
 order, consecutive nights at one place (or within 200 m of each other) as one: the named place, `aboard
 <asset>`, the airport's code and city when the stay is at one (`CPH, Copenhagen`), else the coordinates
 `near <place>, x km` for the nearest named place within 5 km, else the coordinates with the city of the
-nearest large airport within 30 km in parentheses, else the coordinates alone. Its **nights** say
+nearest large airport within 30 km in parentheses, else the coordinates alone; that is the label the JSON
+gives, and the text drops an unnamed stay's coordinates (`near <place>, x km`, `Zurich`) except where nothing
+names it or where a neighbour on the route would read the same (SPEC-QUESTIONS 118). Its **nights** say
 `aboard <asset>` when every night with a stay was aboard one asset, else count the nights aboard each and in
 transit. Its **places** are the named places stayed at, home aside and stops aside, from its first day to
 the day after; its **people** are those confirmed present at those days' stays — by a timed calendar entry
@@ -587,7 +591,7 @@ who does not exist, 12,772 lines, committed whole so the diff covers a record of
 making — and on the seed-7 demo record the test writes into a temp folder; `tests/fixtures/*/expected-trips/`,
 `expected-countries/` and `expected-nights/` are the reference's output for the whole record, a year
 and a range, captured by `tests/fixtures/capture-expected-trips.mjs` and never edited by hand. Every
-choice the prose left open is in SPEC-QUESTIONS.md 58–69.
+choice the prose left open is in SPEC-QUESTIONS.md 58–69, and the route's text in 118.
 
 ```bash
 node dist/bin.js trips tests/fixtures/trips-sample                       # three trips, one across the year boundary

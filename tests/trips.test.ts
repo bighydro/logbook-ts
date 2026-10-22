@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { readAssets } from "../src/settings.js";
 import { verifyLogbook } from "../src/store.js";
-import { readTrips, renderTrips, type Trip } from "../src/trips.js";
+import { readTrips, renderTrips, routeText, type Trip } from "../src/trips.js";
 import { cleanup, copySample, expectedWindows, FIXTURES, tempDir } from "./helpers.js";
 
 afterEach(cleanup);
@@ -47,6 +47,46 @@ describe("trips, as the reference's `logbook trips` prints them", () => {
       });
     }
   }
+});
+
+describe("a route as the reference prints it (bighydro/logbook fa41791, its #343; REFERENCE a86787c)", () => {
+  // The JSON keeps each label; the text drops an unnamed stay's coordinates unless a neighbour would
+  // read the same. The routes and what the reference printed for them are its own, run on synthetic
+  // records of a person in Oslo away for a few nights around Zurich.
+  const A = "47.3769,8.5417 (Zurich)";
+  const B = "47.3600,8.5300 (Zurich)";
+  const C = "47.3450,8.5200 (Zurich)";
+  const NEAR_A = "47.4090,8.6000 near Nordhof, 1.0 km";
+  const NEAR_B = "47.3910,8.6000 near Nordhof, 1.0 km";
+
+  it("names an unnamed stay by the airport's city, or as near a named place, without its coordinates", () => {
+    expect(routeText([A])).toBe("Zurich");
+    expect(routeText(["60.3900,5.3200 near Berth, 0.8 km", "aboard Solvind"])).toBe(
+      "near Berth, 0.8 km → aboard Solvind",
+    );
+    expect(routeText([NEAR_A, A])).toBe("near Nordhof, 1.0 km → Zurich");
+    expect(
+      routeText(["53.5700,10.0130 (Hamburg)", "CPH, Copenhagen", "55.6850,12.5500 (Copenhagen)"]),
+    ).toBe("Hamburg → CPH, Copenhagen → Copenhagen");
+  });
+
+  it("keeps the coordinates where nothing names the stay", () => {
+    expect(routeText(["76.0000,-40.0000"])).toBe("76.0000,-40.0000");
+    expect(routeText(["60.6000,9.1000", "Cabin"])).toBe("60.6000,9.1000 → Cabin");
+    // South and west of zero the coordinates carry a sign; the label is read the same.
+    expect(routeText(["-33.8700,-70.6500 (Santiago)", "-33.4000,-70.6000"])).toBe(
+      "Santiago → -33.4000,-70.6000",
+    );
+  });
+
+  it("keeps them where two stays side by side would read the same, and only there", () => {
+    expect(routeText([A, B])).toBe(`${A} → ${B}`);
+    expect(routeText([A, B, C])).toBe(`${A} → ${B} → ${C}`);
+    expect(routeText([NEAR_A, NEAR_B])).toBe(`${NEAR_A} → ${NEAR_B}`);
+    expect(routeText([A, B, NEAR_A])).toBe(`${A} → ${B} → near Nordhof, 1.0 km`);
+    expect(routeText(["Zurich", A])).toBe(`Zurich → ${A}`);
+    expect(routeText([A, "Chalet", B])).toBe("Zurich → Chalet → Zurich");
+  });
 });
 
 describe("what a trip is", () => {

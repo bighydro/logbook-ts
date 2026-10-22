@@ -1275,3 +1275,46 @@ Read from the format's documents at b82a11c only, and from running the reference
     both (`Home 01 · 1 h 07 min · 3.2 GB`, `scene 0:40–1:30 → 1994-06-01..1994-08-31`) and marks a superseded
     attribution; this implementation prints them as kinds it does not know, so `show` differs on a record
     that holds them. RFC 0040 gives no row for `show`; they are left for a catch-up that ports the RFC.
+
+## Found while following draft/v1's forward compatibility (openlogbook main at a86787c, 2026-10-21; rfcs/0036-draft-v1.md, its amendment of 2026-10-19, and changelog.d/draft-unknown-proposals.md)
+
+Read from those two files only; no source was read and the reference was not run here (CI's
+cross-implementation job runs it at a86787c).
+
+117. **A draft's proposals, read.** `readDraft` had not read `proposals` (the amendment of 2026-10-13) at
+    all; it now does, as the RFC's text says, and with the forward compatibility of 2026-10-19: an event
+    proposal of the table's shape is shown, numbered by its place in the array from 1, the unknown ones
+    counted in that place; a proposal whose `kind` is a non-empty string other than `event` is counted
+    as `proposals_unknown` and nothing more; one that is not an object, names no `kind`, or is an event
+    of another shape makes the line malformed. `draftProblems`, the writer's whole field table, refuses
+    an unknown kind (rule 6, writers stay strict). Open:
+    a. The sentences are this implementation's: `proposals must be a list`, `proposal N is malformed: an
+       event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start
+       before end, nothing else`, `proposal N is malformed: a proposal is an object that names its kind`,
+       and the writer's `proposal N is of a kind a writer may not write: kind must be one of event, not
+       'link'`, the first of each only, as the segment rule names the first malformed segment. The
+       cross-implementation test holds only that both readers call a malformed event malformed, and
+       `proposals_unknown` and how many proposals are shown alike. What are the reference's words?
+    b. The table says an event's `start` is on the day, its `place` a place of the unit's stays, its
+       `people` canonical person ids, its `evidence` lines of the unit. A writer drops a proposal that is
+       not; the RFC does not say what a reader does with one that a writer did not drop. This reader
+       checks the shape only. Should it hold a proposal to the unit, and is one that fails malformed,
+       or dropped as the writer would have?
+    c. `kind` of only blanks (`"  "`) is a non-empty string, so it is counted as unknown, by rule 3's
+       letter. Is it meant to be a proposal with no kind?
+    d. An empty `proposals` list is not malformed here, to the reader nor to `draftProblems`, though the
+       table says the key is absent when the model proposes nothing.
+    f. An event's `start` before its `end` is compared to the millisecond, so two instants written apart
+       in a finer fraction are taken as equal and the event as malformed.
+    e. The changelog fragment and the RFC date the amendment 19 October 2026; it landed on the reference's
+       main on 21 October (a86787c, its #342).
+
+118. **The route's text, learned from the reference's output at a86787c (fa41791, its #343).** Its changelog
+    says an unnamed stay is `near <place>, x km` or the nearest airport's city, "the coordinates only
+    where nothing names it or where two stays side by side would read the same", and the JSON keeps
+    the label. The fixtures show only the first half; the second was run on seven synthetic records
+    (a person in Oslo away around Zurich), and the reference compares each stay's short text with its
+    neighbours' short texts, a named place's being its name: two or three alike in a row all keep
+    their coordinates, one alike only with a named neighbour keeps them alone, two alike with
+    another stop between them both drop them. `routeText` does the same from the JSON's labels.
+    Should SPEC §3.2.6 say it, since the text is a reader's own?
