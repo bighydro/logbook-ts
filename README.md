@@ -215,7 +215,7 @@ implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speaker
 | `places.json` | yes, the settings' `radius_m` as the default reach | yes | — |
 | `assets.json` | yes, `mmsi`, `icao24`, `registration` included | yes | — |
 | `policy/owner.json` | yes | yes | — (the reference writes the empty file; this reads it as empty) |
-| `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory) |
+| `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory, `{mcp: {max_tier: 1}}` as the reference's #348 has it, ahead of `REFERENCE`: SPEC-QUESTIONS 83) |
 | `policy/crossing.json`, `signed_within_days` (RFC 0036) | draft (RFC 0036), under the flag: `crossingEntry`, and its composition with `max_tier` and `until`, `dayGate` and `lineCrosses` | yes, a positive whole number of days, in this implementation's words: the reference documents the key and does not read it yet (SPEC-QUESTIONS 90) | — |
 | `policy/import.json` | yes (`readDisabledSources`) | yes | — (as above); the Day's `readiness` that consumes it is not read yet, SPEC-QUESTIONS 79 |
 | `policy/circle.json` | — | — | — (`receive` is not ported) |

@@ -646,6 +646,12 @@ the RFC's words is written here. The RFC's example is synthetic and the fixtures
     `policy/import.json` and `policy/crossing.json` into the record the first time a reader needs
     one; a reader here writes nothing and reads the same default in memory. The spec should say
     that a reader MUST refuse a malformed settings file, and what a reader MAY write.
+    *Moved 2026-10-21.* The default of `policy/crossing.json` is `{"mcp": {"max_tier": 1}}` and
+    nothing else since the reference's #348 (d7f9884; ADR 0016's amendment of that day), learned
+    from its changelog fragment, the ADR and docs/; `hermes` is an entry the owner writes. This
+    implementation reads that default although `REFERENCE` still pins b82a11c, which writes
+    `{"hermes": {"max_tier": 2}, "mcp": {"max_tier": 1}}`: no cross-implementation test reads a
+    record without the file, and the catch-up that moves `REFERENCE` past #348 is its own PR.
 84. **The policy's write keys, read by a reader that cannot use them.** ADR 0022 and RFC 0034 amendment
     3 (PR 252, `feat/mcp-write-tools`, not merged at 2026-10-13) put two keys on the `mcp` entry of
     `policy/crossing.json`: `write`, the tools the owner allows through the MCP door by name
