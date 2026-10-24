@@ -245,6 +245,15 @@ export interface DaySpend {
   /** The merchants named, each once, in file order. */
   merchants: string[];
   lines: string[];
+  /** The receipts of the day's payments (a receipt's line and a payment source's of one payment), when any. */
+  receipts?: SpendReceipt[];
+}
+
+/** A receipt counted as its payment's evidence: the receipt's line, the mail it was read from, the payment's line. */
+export interface SpendReceipt {
+  line: string;
+  mail: string | null;
+  of: string;
 }
 
 export interface SourceCount {
@@ -550,7 +559,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     unplaced,
     stories: [],
     health: health(entries.filter(standing), ctx),
-    spend: spend(dayStanding),
+    spend: spend(dayStanding, receiptPairs(reader, dayStanding)),
     weather: null,
     sources: sources(dayStanding),
     ...(night === undefined ? {} : { night }),
@@ -1871,13 +1880,158 @@ function nightLine(entries: Entry[], ctx: Context): NightLine | undefined {
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
+/** A `transaction/v1` line (RFC 0021). */
+const isTransaction = (line: Line): boolean =>
+  line.kind === "transaction" && payloadOf(line).schema === "transaction/v1";
+
+/** The source `review receipts --accept` writes a receipt's line under. */
+const RECEIPTS_SOURCE = "receipts";
+/** A receipt and its payment are one when they lie this close in time, or closer. */
+const RECEIPT_WINDOW_MS = 2 * 86_400_000;
+
+/** Where Unicode's full case folding (Python's `casefold`) is not a letter's own lower case. */
+const FOLDS: Record<string, string> = {
+  ß: "ss",
+  ẞ: "ss",
+  ς: "σ",
+  ſ: "s",
+  ϐ: "β",
+  ϑ: "θ",
+  ϕ: "φ",
+  ϖ: "π",
+  ϰ: "κ",
+  ϱ: "ρ",
+  ϵ: "ε",
+  ﬀ: "ff",
+  ﬁ: "fi",
+  ﬂ: "fl",
+  ﬃ: "ffi",
+  ﬄ: "ffl",
+  ﬅ: "st",
+  ﬆ: "st",
+};
+
+/**
+ * A merchant's name as two are compared: case-folded letter by letter, as Python's `casefold` folds
+ * them (`ß` is `ss`, a final `ς` is `σ`, a dotless `ı` stays itself), then letters and digits only.
+ */
+const merchantKey = (name: string): string =>
+  [...name]
+    .map((c) => FOLDS[c] ?? c.toLowerCase())
+    .join("")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+
+/** A transaction as a pair is made of it; undefined when it can hold or be no receipt. */
+interface Payment {
+  line: Line;
+  ms: number;
+  /** The amount to the cent. */
+  cents: number;
+  currency: string;
+  merchant: string;
+}
+
+function paymentOf(line: Line): Payment | undefined {
+  const p = payloadOf(line);
+  const extra = p.extra;
+  if (
+    extra !== null &&
+    typeof extra === "object" &&
+    !Array.isArray(extra) &&
+    extra.deleted === true
+  )
+    return undefined;
+  const currency = text(p.currency);
+  const merchant = typeof p.merchant === "string" ? merchantKey(p.merchant) : "";
+  const ms = typeof line.at === "string" ? Date.parse(line.at) : Number.NaN;
+  if (typeof p.amount !== "number" || !Number.isFinite(p.amount) || currency === undefined)
+    return undefined;
+  if (merchant === "" || Number.isNaN(ms)) return undefined;
+  return { line, ms, cents: roundTo(p.amount, 2), currency, merchant };
+}
+
+/** The pairs of a reader's record, by the payment source's line id: the receipt each holds. */
+const pairsByReader = new WeakMap<DayReader, Map<string, Line>>();
+
+/**
+ * Which payment source's line holds which receipt, over the whole record, as the reference's readers
+ * pair them at its main of a6ee131 (its #406, run; docs/receipts.md, *When the ledger delivers it
+ * later*): a standing `transaction/v1` line of source `receipts` and one of any other source are one
+ * payment when they have the same currency and the same signed amount to the cent, lie at most two
+ * days apart, and name merchants of which one contains the other once case, spaces and punctuation
+ * are gone. One source line holds one receipt: the nearest pairs are made first, a tie to the earlier
+ * receipt. A deleted line, a corrected one and a line with no merchant hold none. Read once a reader,
+ * and only when a day it reads has a transaction (SPEC-QUESTIONS 126).
+ */
+function receiptPairs(reader: DayReader, dayLines: Entry[]): Map<string, Line> {
+  if (!dayLines.some((e) => isTransaction(e.line))) return new Map();
+  const known = pairsByReader.get(reader);
+  if (known !== undefined) return known;
+  const resolver = reader.judgements.resolver;
+  const all: Line[] = [];
+  for (const month of reader.files) {
+    for (const { raw, row } of eachLine(month.file)) {
+      // Only a row that names the kind can be one; the rest are not parsed again.
+      if (!raw.includes('"transaction"')) continue;
+      const parsed = parseLine(raw, `${month.rel} line ${row}`);
+      if ("error" in parsed || !isTransaction(parsed.line)) continue;
+      if (resolver.retractedBy(parsed.line.id) !== undefined) continue;
+      all.push(parsed.line);
+    }
+  }
+  const corrected = new Set<string>();
+  for (const line of all) {
+    const s = payloadOf(line).supersedes;
+    if (typeof s === "string") corrected.add(s);
+  }
+  const receipts: Payment[] = [];
+  const sources: Payment[] = [];
+  for (const line of all) {
+    if (corrected.has(line.id)) continue;
+    const payment = paymentOf(line);
+    if (payment === undefined) continue;
+    (line.source === RECEIPTS_SOURCE ? receipts : sources).push(payment);
+  }
+  const candidates: Array<{ receipt: Payment; source: Payment; gap: number }> = [];
+  for (const receipt of receipts) {
+    for (const source of sources) {
+      const gap = Math.abs(source.ms - receipt.ms);
+      if (gap > RECEIPT_WINDOW_MS) continue;
+      if (receipt.currency !== source.currency || receipt.cents !== source.cents) continue;
+      if (
+        !receipt.merchant.includes(source.merchant) &&
+        !source.merchant.includes(receipt.merchant)
+      )
+        continue;
+      candidates.push({ receipt, source, gap });
+    }
+  }
+  candidates.sort(
+    (a, b) =>
+      a.gap - b.gap ||
+      a.receipt.ms - b.receipt.ms ||
+      a.receipt.line.seq - b.receipt.line.seq ||
+      a.source.line.seq - b.source.line.seq,
+  );
+  const pairs = new Map<string, Line>();
+  const taken = new Set<string>();
+  for (const { receipt, source } of candidates) {
+    if (pairs.has(source.line.id) || taken.has(receipt.line.id)) continue;
+    pairs.set(source.line.id, receipt.line);
+    taken.add(receipt.line.id);
+  }
+  pairsByReader.set(reader, pairs);
+  return pairs;
+}
+
 /**
  * The day's spend from the `transaction/v1` lines standing on it, in file order: a correction that
  * `supersedes` a line stands in its place; a line the source marks deleted is listed and marked,
- * never counted or summed; the day is the local day of `at`, whatever the line's `date` says.
+ * never counted or summed; the day is the local day of `at`, whatever the line's `date` says. A
+ * receipt a payment source's line holds (`receiptPairs`) is that payment's evidence, never a second
+ * payment: it is left out wherever it falls, and named under `receipts` on the payment's day.
  */
-function spend(lines: Entry[]): DaySpend | null {
+function spend(lines: Entry[], pairs: Map<string, Line>): DaySpend | null {
   const all = lines
     .filter((e) => e.line.kind === "transaction" && payloadOf(e.line).schema === "transaction/v1")
     .sort((a, b) => a.line.seq - b.line.seq);
@@ -1886,9 +2040,11 @@ function spend(lines: Entry[]): DaySpend | null {
     const s = payloadOf(e.line).supersedes;
     if (typeof s === "string") corrected.add(s);
   }
-  const standing = all.filter((e) => !corrected.has(e.line.id));
+  const held = new Set([...pairs.values()].map((receipt) => receipt.id));
+  const standing = all.filter((e) => !corrected.has(e.line.id) && !held.has(e.line.id));
   if (standing.length === 0) return null;
   const out: DaySpend = { count: 0, deleted: 0, totals: {}, merchants: [], lines: [] };
+  const receipts: SpendReceipt[] = [];
   const sums = new Map<string, { spent: number; received: number }>();
   for (const e of standing) {
     const p = payloadOf(e.line);
@@ -1904,6 +2060,18 @@ function spend(lines: Entry[]): DaySpend | null {
       continue;
     }
     out.count += 1;
+    const receipt = pairs.get(e.line.id);
+    if (receipt !== undefined) {
+      const from = payloadOf(receipt).extra;
+      const mail =
+        from !== null &&
+        typeof from === "object" &&
+        !Array.isArray(from) &&
+        typeof from.from === "string"
+          ? from.from
+          : null;
+      receipts.push({ line: receipt.id, mail, of: e.line.id });
+    }
     const merchant = text(p.merchant);
     if (merchant !== undefined && !out.merchants.includes(merchant)) out.merchants.push(merchant);
     const currency = text(p.currency);
@@ -1915,11 +2083,18 @@ function spend(lines: Entry[]): DaySpend | null {
   }
   for (const currency of [...sums.keys()].sort()) {
     const sum = sums.get(currency) as { spent: number; received: number };
-    out.totals[currency] = { ...sum, net: sum.spent + sum.received };
+    // To the cent, as the reference rounds them (Python's `round`, run at a86787c and a6ee131).
+    out.totals[currency] = {
+      spent: roundTo(sum.spent, 2),
+      received: roundTo(sum.received, 2),
+      net: roundTo(sum.spent + sum.received, 2),
+    };
   }
+  if (receipts.length > 0) out.receipts = receipts;
   return out;
 }
 
+/** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
 function sources(lines: Entry[]): SourceCount[] {
   const counts = new Map<string, SourceCount & { firstMs: number; newestMs: number }>();
   for (const e of lines) {

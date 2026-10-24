@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (its main at 6ee01c2, 2026-10-22, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and twenty-nine commits past it, among them draft/v1's forward compatibility and amendment 2, the route text of `trips` and the dream that learns) does, matched against the
+the reference implementation (its main at a6ee131, 2026-10-24, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and sixty-two commits past it, among them draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, and a payment counted once with its receipt) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,10 +133,10 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-22 at
-6ee01c2 on its main, which adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
-2026-10-21, the route text of `trips`, and twenty PRs more, below), its RFC 0034
-signed-day amendments 1–4, the draft RFCs 0036–0038, 0040 and 0041 and the Day as they stand there. The
+matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-24 at
+a6ee131 on its main, which adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
+2026-10-21 and the route text of `trips`, among sixty-two commits past 0.7.0, in the tables below), its RFC 0034
+signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041 and 0046 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
 the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
@@ -144,6 +144,23 @@ as the reference does; *verify* means the chain (SPEC §3, every profile hashes 
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+### Coverage at a6ee131 (the reference's main of 24 October 2026)
+
+What changed between 6ee01c2 and a6ee131 (thirty-three commits; SPEC.md, `conformance/` and `schema/`
+did not change), in the same three words. Held by `tests/drafts.test.ts`, `tests/receipts.test.ts`,
+`tests/heard.test.ts` and their cases in `tests/cross-impl.test.ts`.
+
+| Change at a6ee131 | Here | What |
+|---|---|---|
+| Keep and sign (#374): what can be kept of a day's draft is numbered | implemented, read | `keep` on a link (its own number) and on a sentence learned, decided, about an idea or the photo (after every proposal); `kept`, the line that kept one, is the Day's reading of the record, not read here (SPEC-QUESTIONS 119, 127) |
+| A signature never confirms the draft line (#374) | verified only | the writer's; a signature that names it reads alike in both (SPEC-QUESTIONS 128) |
+| A payment and its receipt counted once (#406) | implemented | the Day's spend pairs a receipt with the payment, `spend.receipts`, `1 with its receipt`, and rounds its totals to the cent (SPEC-QUESTIONS 126) |
+| RFC 0046, what you heard (#355): `heard/v1` | implemented, read | under the new `rfc0046` flag: `show`'s row; the Day reads the line as any other. `sync heard`, `show heard` and search are not ported |
+| A dream sentence that puts a number beside a name is held (#373) | verified only | the writer's: the line holds `held: a number beside a name` as an unsupported segment, read as any segment |
+| Beeper's own bots marked as machine text (#396) | not implemented | the readers' rule is older (SPEC-QUESTIONS 130); a line so marked is still a person's here |
+| The timeline and place classes (#361), the week page and closing the week (#376, #403), the Day page's morning (#377), the Library built ahead, its search and its never hanging (#382, #383, #384, #363, #387), gifts and the companies (#353), who was there's answers (#371), import pickup (#398), a transcript's attachment (#397), the Notion export (#390, #402), share refusing a sealed day (#370), the flight with no end on the Day page (#375), a reader never rebuilding the index (#385), RFC 0047 (#380), RFC 0043's verbs (#369), the World's slider (#379) | not implemented | pages, writers, exports and adapters not ported here |
+| Tests, CI and dependencies (#381, #400, #408, #366, #367), docs (#365, #372) | not applicable | |
 
 ### Coverage at 6ee01c2 (the reference's main of 22 October 2026)
 

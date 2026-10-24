@@ -49,6 +49,7 @@ export {
   readDay,
   type SegmentEntry,
   type SourceCount,
+  type SpendReceipt,
   type TimelineEntry,
   type UnplacedEntry,
 } from "./day.js";
@@ -232,6 +233,7 @@ export {
   standingGoals,
   standingReviews,
 } from "./goals.js";
+export { HEARD_KIND, HEARD_SCHEMA, heardRow } from "./heard.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { duplicates, type Retracted, standingLines } from "./lineRules.js";
 export {

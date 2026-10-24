@@ -337,6 +337,8 @@ export interface DraftSegment {
   part: string | null;
   /** On an `ideas` segment, the idea it moved, from `extra.ideas`; absent when none is named. */
   entity?: string;
+  /** On a sentence that can be kept (learned, decided, an idea, the photo), its number; absent otherwise. */
+  keep?: number;
 }
 
 /** An event proposal as a reader shows it: its number, its place in the array from 1, its fields, and its evidence read. */
@@ -356,6 +358,8 @@ export interface DraftProposal {
 /** A link proposal as a reader shows it (amendment 2), numbered by its place among all the proposals. */
 export interface DraftLink {
   number: number;
+  /** The number it is kept by (`day sign --keep`): its own. */
+  keep: number;
   kind: "link";
   entity: string;
   text: string;
@@ -439,6 +443,26 @@ function partsOf(segments: DraftSegment[], extra: Fields): void {
   }
 }
 
+/** The parts whose sentence can be kept (`day sign --keep`): learned, decided, an idea, the photo of the day. */
+const KEPT_PARTS = ["learned", "decision", "ideas", "photo"];
+
+/**
+ * What can be kept is numbered after the proposals, as the reference's Day numbers it at its main of
+ * a6ee131 (run; docs/signed-day.md, *Keep and sign*): a link keeps its own number, and each sentence
+ * of a keepable part, in order, the next numbers after every entry of `proposals` (the unknown and the
+ * malformed among them), whether or not it is supported. `kept`, the line that kept it, is the Day's
+ * reading of the record, not the line's (SPEC-QUESTIONS 119).
+ */
+function keepsOf(segments: DraftSegment[], proposals: number): void {
+  let next = proposals;
+  for (const segment of segments) {
+    if (segment.part !== null && KEPT_PARTS.includes(segment.part)) {
+      next += 1;
+      segment.keep = next;
+    }
+  }
+}
+
 const textOf = (v: JsonValue | undefined): string =>
   typeof v === "string"
     ? v.trim() === ""
@@ -488,6 +512,7 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
     }
   }
   partsOf(segments, extra);
+  keepsOf(segments, Array.isArray(p.proposals) ? p.proposals.length : 0);
   const proposals: DraftProposal[] = [];
   const links: DraftLink[] = [];
   let unknown = 0;
@@ -512,6 +537,7 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
       const evidence = [...(e.evidence as string[])];
       links.push({
         number: i + 1,
+        keep: i + 1,
         kind: "link",
         entity: e.entity as string,
         text: e.text as string,
