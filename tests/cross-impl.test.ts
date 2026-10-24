@@ -59,6 +59,7 @@ import {
 } from "./machine-cases.js";
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
 import { NOTE_TEXTS, DAY as NOTES_DAY, notesRecord } from "./note-text-cases.js";
+import { DAY as OCTOBER_DAY, octoberRecord } from "./october-cases.js";
 import { REFLECTION_CASES, DAY as REFLECTION_DAY, reflectionRows } from "./reflection-cases.js";
 import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
@@ -1148,6 +1149,38 @@ describe.skipIf(!ready)(
     }
   },
 );
+
+describe.skipIf(!ready)("the lines the reference writes since 21 October read alike", () => {
+  // tests/october-cases.ts: the notes of keep-and-sign (the reference's #374) and a mail line with
+  // Gmail's tab and the list headers (its #341). Nothing here was changed for them; `show`, the Day,
+  // `days` and `people` of both implementations agree on them, text and JSON.
+  it("show, the Day, days and people agree", () => {
+    vi.stubEnv(FLAGS_ENV, "rfc0036");
+    const root = writeRecord(octoberRecord());
+    expect(showDay(root, { day: OCTOBER_DAY }).text).toBe(reference(root, ["show", OCTOBER_DAY]));
+    const text = reference(root, ["day", OCTOBER_DAY, "--no-dream"]);
+    const json = JSON.parse(
+      reference(root, ["day", OCTOBER_DAY, "--json", "--no-dream"]),
+    ) as unknown;
+    const day = readDay(root, { day: OCTOBER_DAY });
+    expect(renderDay(day)).toBe(comparableDayText(text));
+    expect(JSON.parse(JSON.stringify(day))).toEqual(comparableDayJson(json));
+    const window = ["--from", OCTOBER_DAY, "--to", OCTOBER_DAY];
+    const rows = readDayRows(root, { from: OCTOBER_DAY, to: OCTOBER_DAY });
+    expect(renderDayRows(rows)).toBe(reference(root, ["days", ...window]));
+    expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+      reference(root, ["days", ...window, "--json"])
+        .split("\n")
+        .filter((line) => line !== "")
+        .map((line) => JSON.parse(line) as unknown),
+    );
+    const people = readPeople(root, {});
+    expect(renderPeople(people, {})).toBe(reference(root, ["people"]));
+    expect(JSON.parse(JSON.stringify(people))).toEqual(
+      JSON.parse(reference(root, ["people", "--json"])),
+    );
+  }, 120_000);
+});
 
 describe.skipIf(!ready)(
   "the machine mark: neither implementation takes an agent for a person",
