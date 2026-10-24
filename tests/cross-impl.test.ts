@@ -23,10 +23,12 @@ import { renderNights, rollupNights } from "../src/nights.js";
 import { readPeople, renderPeople } from "../src/people.js";
 import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
+import { signedDayProblems } from "../src/signing.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
 import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
+import type { Line } from "../src/types.js";
 import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
 import { HEARD_ROWS, heardDay } from "./heard-cases.js";
 import {
@@ -1292,6 +1294,97 @@ describe.skipIf(!ready)(
       // `--confirm all` is a fresh reading: the whole page not retracted.
       sign("--confirm", "all", "--at", "2026-10-04T10:00:00Z");
       expect(agree()).toMatchObject({ confirmed: 3 });
+      expect(verifyLogbook(root).valid).toBe(true);
+    }, 300_000);
+
+    // RFC 0043 §6 rule 3, the reference's #374: a signature never confirms the dream's draft line.
+    // Its `day sign` leaves the draft out of `confirmed`, `--confirm all` included, and refuses a
+    // `--confirm` that names it; the page digest still covers it. Nothing here signs: the readers
+    // read the signature it writes alike, and the signature holds to `signedDayProblems`.
+    it("a signature never confirms the dream's draft: the reference leaves it out, both read it alike", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0036");
+      const root = writeBareRecord([
+        {
+          at: "2026-10-03T16:00:00Z",
+          end: "2026-10-03T18:00:00Z",
+          source: "sim-cal",
+          kind: "event",
+          tier: 1,
+          payload: { schema: "event/v1", title: "Middag", raw_id: "middag" },
+        },
+        {
+          at: "2026-10-03T16:00:00Z",
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text: "god mat" },
+        },
+        {
+          at: "2026-10-03T19:00:00Z",
+          source: "model:qwen2.5-7b-instruct",
+          kind: "draft",
+          tier: 2,
+          payload: {
+            schema: "draft/v1",
+            unit: "day",
+            subject: "2026-10-03",
+            read_head: "a".repeat(64),
+            read_count: 2,
+            language: "en",
+            segments: [{ text: "Dinner.", evidence: ["00000000-0000-4000-8000-000000000001"] }],
+            extra: { evening: true, read_until: "2026-10-03T19:00:00Z" },
+          },
+        },
+      ]);
+      mkdirSync(join(root, "policy"), { recursive: true });
+      writeFileSync(
+        join(root, "policy", "crossing.json"),
+        `${JSON.stringify({ dream: { max_tier: 2 }, mcp: { max_tier: 1 } })}\n`,
+        "utf-8",
+      );
+      const head = (): unknown => readMetaFile(root).head;
+      const before = head();
+      const refused = referenceAll(root, [
+        "day",
+        "sign",
+        "2026-10-03",
+        "--confirm",
+        "1,3",
+        "--at",
+        "2026-10-03T20:00:00Z",
+      ]);
+      expect(refused.status).not.toBe(0);
+      expect(head()).toBe(before);
+      reference(root, [
+        "day",
+        "sign",
+        "2026-10-03",
+        "--confirm",
+        "all",
+        "--at",
+        "2026-10-03T20:00:00Z",
+      ]);
+      const json = JSON.parse(reference(root, ["day", "2026-10-03", "--json"])) as {
+        signed: { confirmed: number };
+      };
+      expect(json.signed.confirmed).toBe(2);
+      expect(JSON.parse(JSON.stringify(readDay(root, { day: "2026-10-03" }).signed))).toEqual(
+        json.signed,
+      );
+      for (const day of ["2026-10-03", "2026-10-04"])
+        expect(showDay(root, { day }).text, day).toBe(reference(root, ["show", day]));
+      const lines = readFileSync(join(root, "logbook", "2026", "10.jsonl"), "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Line);
+      const signature = lines.find((line) => line.kind === "signed-day") as Line;
+      expect(signature.payload?.confirmed).toEqual([
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+      ]);
+      // The page as shown is the three lines, the draft among them; the signature confirms two.
+      const page = lines.filter((line) => line.kind !== "signed-day");
+      expect(signature.payload?.page).toMatchObject({ lines: 3 });
+      expect(signedDayProblems(signature, readMetaFile(root).owner_id as string, page)).toEqual([]);
       expect(verifyLogbook(root).valid).toBe(true);
     }, 300_000);
   },
