@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125, and at a6ee131 (2026-10-24; docs/receipts.md, docs/signed-day.md, rfcs/0046-what-you-heard.md) for 126–130.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1415,4 +1415,55 @@ Each entry says where its docs and its output part, or what is left open; nothin
     ambiguous (with Ines Berg in the record, `with Ines` names nobody). A typographic apostrophe is not a
     name's character (`with Per’s boat` names Per Hansen, `with Per's boat` nobody). Should the rule say
     so?
+
+## Found while catching up with the reference at its main of 24 October (a6ee131; docs/receipts.md, docs/ledger.md, docs/signed-day.md *Keep and sign*, docs/dream.md, rfcs/0046-what-you-heard.md, docs/heard.md, docs/adapters/agents.md)
+
+Learned by running the reference at a6ee131, and at 6ee01c2 beside it to tell what moved, on synthetic
+records, beside its docs; no source was read. Nothing here is decided.
+
+126. **A payment and its receipt, paired.** docs/receipts.md says every reader that sums the ledger pairs a
+    receipt's line with the payment source's line "by the rule above (the currency, the signed amount,
+    within two days, the merchant)", and that writing the rule into RFC 0021 is an open proposal. The
+    reference's Day, run on 17 records (tests/receipts-cases.ts), pairs a line of source `receipts` (its
+    `provider` aside) with a line of any other source of the same currency and amount to the cent
+    (`-12.904` with `-12.896`), at most 48 hours apart to the second, whose merchants, case-folded (`ß`
+    as `ss`) with every character that is not a letter or a digit gone (`_` too, accents kept), contain
+    one another; the nearest pairs first, a tie to the earlier receipt, across days. A deleted or a
+    corrected line, and one with no merchant or a merchant of punctuation only, pairs with nothing. This
+    implementation does the same, over the whole record. Open: "within two days" is written as days and
+    read as 48 hours between the two lines' `at`, and whether a line's `date` (RFC 0021) moves it was not
+    run; and the Day rounds a currency's totals to the cent (it did at a86787c too; this implementation
+    did not until now), which no document says. Should RFC 0021 name the pairing, so that every reader
+    that sums the ledger reads it alike?
+
+127. **What can be kept, numbered.** docs/signed-day.md, *Keep and sign*: "each sentence learned, decided,
+    about an idea, and the photo of the day is numbered after the last proposal". The reference numbers
+    after every entry of `proposals`, a proposal of an unknown kind and a malformed one included, and gives
+    a number to a sentence it shows unsupported, malformed or held (`held: a number beside a name`) as
+    well, though its text row prints `keep N` only beside a supported one (what `day sign --keep` does with
+    such a number was not run). This implementation numbers as the reference's JSON does. Should an
+    unsupported sentence have a number?
+
+128. **A signature that confirms the draft.** docs/signed-day.md and the reference's #374: "a signature never
+    confirms the dream's draft line", and the writer refuses to. A `signed-day/v1` line written otherwise,
+    whose `confirmed` names the day's draft, is read by the reference at a6ee131 as it was at 6ee01c2: `show`
+    prints `2 lines confirmed of 2`, the Day's `signed.confirmed` counts it, `verify` calls the record valid.
+    This implementation reads it the same. Is such a line malformed, or the draft's confirmation simply
+    not counted?
+
+129. **A `heard/v1` row of another schema, and the generic row's `text`.** RFC 0046 gives `show` no row. The
+    reference prints `heard/v1` as tests/heard-cases.ts holds it, and a `heard` line of any other schema
+    as its generic row, which prints a payload's `text` even when it is an object (the SPEC §1.1 reference
+    of the RFC's line, `{'bytes': 52811, …}`); this implementation's generic row takes `text` only as a
+    string, so the two differ on such a line, and did before a6ee131 on any payload whose `text` is an
+    object. Not changed here (older than this catch-up). Should the generic row print an object?
+
+130. **What the reference's readers took no new rule for in this window, and still differ here.** Found
+    while probing, each the same at 6ee01c2 and at a6ee131, so older than this catch-up and not changed
+    here: a line marked `extra.machine: true`, a one-on-one chat with an `extra.counterpart` of kind
+    `agent`, and a transcript participant with `machine: true` are nobody's in the reference's `people`
+    and Day (its Telegram adapters wrote such lines before; Beeper's do since its #396), and are people
+    here; a flight with no `end` is printed at its departure padded to a span's width there
+    (`20:00        flight XY 1`) and unpadded here. Should the spec's company rule (§3.2.5) name the
+    machine mark?
 
