@@ -14,6 +14,7 @@ import { checkDayStart } from "./dayStart.js";
 import { isOn, RFC0038, RFC0041 } from "./flags.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
+import { isMachineParticipant } from "./machine.js";
 import { keeperPhoto, payloadOf, transcriptTitle } from "./render.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import {
@@ -1352,7 +1353,8 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
     if (!Array.isArray(payload.participants)) continue;
     for (const item of payload.participants) {
       const o = obj(item);
-      if (o === undefined) continue;
+      // An agent among the participants is never company (the machine mark).
+      if (o === undefined || isMachineParticipant(o)) continue;
       const refs: Ref[] = [];
       const email = text(o.email);
       const phone = text(o.phone);

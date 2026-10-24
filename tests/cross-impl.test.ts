@@ -49,6 +49,12 @@ import {
   writeMeta,
   writeRecord,
 } from "./helpers.js";
+import {
+  EXPECTED_PEOPLE,
+  EXPECTED_WITH,
+  DAY as MACHINE_DAY,
+  machineRecord,
+} from "./machine-cases.js";
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
 import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
@@ -1090,6 +1096,47 @@ describe.skipIf(!ready)(
         ).toEqual(c.expected);
       }, 120_000);
     }
+  },
+);
+
+describe.skipIf(!ready)(
+  "the machine mark: neither implementation takes an agent for a person",
+  () => {
+    // tests/machine-cases.ts: a bot bridged by Beeper (the reference's #396), one through Telegram's
+    // export, an assistant among a call's participants, and marks that are not the literal one. The
+    // reference's `people`, Day, `days` and `show` beside ours, text and JSON, and its output the one
+    // held there.
+    it("people, the Day, days and show agree, and the reference's output is the one held", () => {
+      const root = writeRecord(machineRecord());
+      const people = reference(root, ["people"]);
+      expect(people, "the reference moved; tests/machine-cases.ts holds its output").toBe(
+        EXPECTED_PEOPLE,
+      );
+      const ours = readPeople(root, {});
+      expect(renderPeople(ours, {})).toBe(people);
+      expect(JSON.parse(JSON.stringify(ours))).toEqual(
+        JSON.parse(reference(root, ["people", "--json"])),
+      );
+      const text = reference(root, ["day", MACHINE_DAY]);
+      expect(text.split("\n").filter((row) => row.startsWith("      with "))).toEqual([
+        EXPECTED_WITH,
+      ]);
+      const day = readDay(root, { day: MACHINE_DAY });
+      expect(renderDay(day)).toBe(comparableDayText(text));
+      expect(JSON.parse(JSON.stringify(day))).toEqual(
+        comparableDayJson(JSON.parse(reference(root, ["day", MACHINE_DAY, "--json"]))),
+      );
+      const window = ["--from", MACHINE_DAY, "--to", MACHINE_DAY];
+      const rows = readDayRows(root, { from: MACHINE_DAY, to: MACHINE_DAY });
+      expect(renderDayRows(rows)).toBe(reference(root, ["days", ...window]));
+      expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+        reference(root, ["days", ...window, "--json"])
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => JSON.parse(line) as unknown),
+      );
+      expect(showDay(root, { day: MACHINE_DAY }).text).toBe(reference(root, ["show", MACHINE_DAY]));
+    }, 120_000);
   },
 );
 

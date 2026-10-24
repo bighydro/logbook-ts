@@ -3,6 +3,7 @@ import { addDays, localOf, localToMs, monthKey } from "./clock.js";
 import { isOn, RFC0038 } from "./flags.js";
 import { coordinates, distanceM, roundTo } from "./geo.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
+import { isMachineLine, isMachineParticipant } from "./machine.js";
 import { type Opened, openWindow, type ReadingStats, type RowUnit, readDays } from "./reading.js";
 import { payloadOf } from "./render.js";
 import { asRef, type Ref } from "./resolve.js";
@@ -227,7 +228,8 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
       const day = localOf(ms, opened.timezone).day;
       switch (line.kind) {
         case "message": {
-          if (p.schema !== "message/v1") break;
+          // An agent's line, or a line of a conversation with one, is no one's (the machine mark).
+          if (p.schema !== "message/v1" || isMachineLine(p)) break;
           const chat = obj(p.chat);
           const direct = typeof p.chat === "string" || chat?.type === "direct";
           const chatId = text(chat?.id);
@@ -317,7 +319,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
           }
           for (const item of Array.isArray(p.participants) ? p.participants : []) {
             const o = obj(item);
-            if (o === undefined) continue;
+            if (o === undefined || isMachineParticipant(o)) continue;
             let who: string | undefined;
             for (const [kind, key] of [
               ["email", "email"],
