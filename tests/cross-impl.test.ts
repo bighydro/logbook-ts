@@ -28,6 +28,7 @@ import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
 import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
+import { HEARD_ROWS, heardDay } from "./heard-cases.js";
 import {
   cleanup,
   comparableDayJson,
@@ -1089,6 +1090,34 @@ describe.skipIf(!ready)(
         ).toEqual(c.expected);
       }, 120_000);
     }
+  },
+);
+
+describe.skipIf(!ready)(
+  "RFC 0046, under the rfc0046 flag: the reference and logbook-ts print what was heard alike",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // `show` of both implementations on a day with a `heard/v1` line of each payload of
+    // tests/heard-cases.ts, and the reference's rows the ones held there. Its Day lists the lines
+    // among the day's sources and nothing more, and so does this one's.
+    it("show prints the row of every heard/v1 payload alike, and the Day reads the line as any other", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0046");
+      const root = writeRecord(heardDay());
+      const show = reference(root, ["show", "2026-06-13"]);
+      expect(showDay(root, { day: "2026-06-13" }).text).toBe(show);
+      expect(
+        show.split("\n").slice(3, 3 + HEARD_ROWS.length),
+        "the reference moved; tests/heard-cases.ts holds its output",
+      ).toEqual(HEARD_ROWS.map(([, row]) => `  08:40  heard      heard          ${row}`));
+      const text = reference(root, ["day", "2026-06-13"]);
+      const json = JSON.parse(reference(root, ["day", "2026-06-13", "--json"])) as unknown;
+      const ours = readDay(root, { day: "2026-06-13" });
+      expect(renderDay(ours)).toBe(comparableDayText(text));
+      expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+    }, 120_000);
   },
 );
 

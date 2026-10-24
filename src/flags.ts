@@ -37,12 +37,16 @@
  * `rfc0041` (RFC 0041, `star/v1`, draft, 2026-10-14): `show`'s row of a star (`★ event 019cadd3… ·
  * <note>`), the Day's ★ on each starred line it lists and its `stars` under `--json`, as the
  * reference prints them.
+ *
+ * `rfc0046` (RFC 0046, *What you heard*, `heard/v1`, draft, 2026-10-21): `show`'s row of the words of
+ * an episode or a video the owner played (`Anchors that hold — The Harbour Hour · feed · en · 700
+ * words`), as the reference prints it. Nothing else reads the line here.
  */
 
 import { LogbookError } from "./store.js";
 
 /** Every flag this implementation knows. */
-export const FLAGS = ["rfc0036", "rfc0037", "rfc0038", "rfc0040", "rfc0041"] as const;
+export const FLAGS = ["rfc0036", "rfc0037", "rfc0038", "rfc0040", "rfc0041", "rfc0046"] as const;
 export type Flag = (typeof FLAGS)[number];
 /** RFC 0036: goals, reviews, drafts and chapters; `day_start`; `signed_within_days`. */
 export const RFC0036: Flag = "rfc0036";
@@ -54,6 +58,8 @@ export const RFC0038: Flag = "rfc0038";
 export const RFC0040: Flag = "rfc0040";
 /** RFC 0041: stars, `star/v1`, in `show` and the Day. */
 export const RFC0041: Flag = "rfc0041";
+/** RFC 0046: what the owner heard, `heard/v1`, in `show`. */
+export const RFC0046: Flag = "rfc0046";
 /** The environment variable that turns flags on. */
 export const FLAGS_ENV = "LOGBOOK_TS_FLAGS";
 

@@ -12,7 +12,7 @@ import {
   monthKey,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
-import { isOn, RFC0036, RFC0038, RFC0040, RFC0041 } from "./flags.js";
+import { isOn, RFC0036, RFC0038, RFC0040, RFC0041, RFC0046 } from "./flags.js";
 import { isGoal } from "./goals.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { pyStr } from "./pyrepr.js";
@@ -196,6 +196,7 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     rfc0038: isOn(RFC0038),
     rfc0040: isOn(RFC0040),
     rfc0041: isOn(RFC0041),
+    rfc0046: isOn(RFC0046),
     supersededByTranscript: judgements.supersededByTranscript,
     replacedBy: (line) => judgements.supersededSameKind.get(`${line.kind}\u0000${line.id}`),
     goalText: (goalId) => goalText(judgements, goalId),
