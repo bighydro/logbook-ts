@@ -36,12 +36,13 @@ function wordsOf(v: JsonValue | undefined): bigint {
 }
 
 /**
- * The row `show` prints for a `heard/v1` line: the title (empty when there is none), ` — <by>` when
+ * The row `show` prints for a `heard/v1` line: the title (empty when there is none or it is false,
+ * 0 or empty), ` — <by>` when
  * `by` is a text, then the text source (`?` when none), the language (`und` when none) and the length
  * in words, the thousands grouped, as the reference prints it at d053f78 (run).
  */
 export function heardRow(p: Payload): string {
-  const title = p.title === undefined || p.title === null ? "" : pyStr(p.title);
+  const title = truthy(p.title) ? pyStr(p.title as JsonValue) : "";
   const by = typeof p.by === "string" && p.by !== "" ? ` — ${p.by}` : "";
   const source = truthy(p.text_source) ? pyStr(p.text_source) : "?";
   const language = truthy(p.language) ? pyStr(p.language) : "und";

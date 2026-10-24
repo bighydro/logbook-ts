@@ -1,5 +1,5 @@
 import { draftRow } from "./drafts.js";
-import { pyRstrip } from "./entities.js";
+import { pyRstrip, pyStrip } from "./entities.js";
 import { HEARD_SCHEMA, heardRow } from "./heard.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
@@ -282,7 +282,7 @@ function note(p: Payload, ctx: RenderContext): string {
   // Python's `str()` of the text, nothing for none (as the reference prints it at d053f78), its end
   // stripped, so a trailing blank line is no line.
   const rows = splitLines(pyRstrip(truthy(p.text) ? pyStr(p.text as JsonValue) : ""));
-  while (rows.length && (rows[0] as string).trim() === "") rows.shift();
+  while (rows.length && pyStrip(rows[0] as string) === "") rows.shift();
   const first = rows[0] ?? "";
   const more = rows.length - 1;
   return more > 0 ? `${first} … (+${plural(more, "line")})` : first;

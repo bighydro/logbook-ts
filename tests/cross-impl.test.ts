@@ -774,6 +774,9 @@ describe.skipIf(!ready)(
         { extra: { evening: true, read_until: "2026-06-13T18:00:00Z" } },
         { extra: { evening: true, read_until: "2026-06-13T18:00:00.5Z" } },
         { extra: { evening: true, read_until: "2026-06-13T20:00:00+02:00" } },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00Z\n" } },
+        { extra: { evening: true, read_until: "٢٠٢٦-06-13T18:00:00Z" } },
+        { proposals: [{ ...link, evidence: ["  "] }] },
         { extra: { evening: true } },
         { extra: { evening: false } },
         { extra: { evening: 1, read_until: "2026-06-13T18:00:00Z" } },
@@ -1145,12 +1148,19 @@ describe.skipIf(!ready)(
         const ours = readDay(root, { day: REFLECTION_DAY });
         expect(renderDay(ours)).toBe(comparableDayText(text));
         expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+        // The keys in the reference's order, `reflection` among them, as `day --json` prints them.
+        expect(Object.keys(JSON.parse(JSON.stringify(ours)))).toEqual(
+          Object.keys(comparableDayJson(json) as object),
+        );
       }, 120_000);
     }
   },
 );
 
 describe.skipIf(!ready)("the lines the reference writes since 21 October read alike", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
   // tests/october-cases.ts: the notes of keep-and-sign (the reference's #374) and a mail line with
   // Gmail's tab and the list headers (its #341). Nothing here was changed for them; `show`, the Day,
   // `days` and `people` of both implementations agree on them, text and JSON.
@@ -1254,6 +1264,9 @@ describe.skipIf(!ready)(
 describe.skipIf(!ready)(
   "a re-sign keeps the standing signature's confirmations (RFC 0034 amendment 4): the reference writes, both read alike",
   () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
     // The reference signs a synthetic day, then signs it again four ways; after each, `show` of the
     // day and of the next (where a re-sign is written) and the Day's `signed` must be the same in
     // both implementations, and the confirmed set what amendment 4 says it is.

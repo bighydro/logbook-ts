@@ -565,6 +565,17 @@ describe("draft/v1 amendment 2 (2026-10-21): a link, the evening, as the referen
     // Any entity id the line names, not only a canonical id's form; any evidence id but an empty one.
     const loose = { ...A_LINK, entity: "crew", evidence: [id("a4"), id("a4")] };
     expect(readDraft(withProposals(loose), ON_DAY).links).toEqual([shownLink(1, loose)]);
+    const spaces = { ...A_LINK, evidence: ["  "] };
+    expect(readDraft(withProposals(spaces), ON_DAY)).toMatchObject({
+      links: [
+        {
+          ...shownLink(1, spaces),
+          supported: false,
+          why: "evidence names a line that is not on the day",
+        },
+      ],
+      malformed: [],
+    });
   });
 
   it("a link resting on a line not of the unit is shown unsupported, and says why, as an event is", () => {
@@ -643,7 +654,13 @@ describe("draft/v1 amendment 2 (2026-10-21): a link, the evening, as the referen
       [],
     ]);
     // The reference's form is a pattern: a fraction is one, and the calendar is not checked.
-    for (const at of ["2026-06-13T18:00:00.5Z", "2026-02-30T18:00:00Z", "2026-06-13T25:61:60Z"]) {
+    // Its digits are any decimal digit, as Python's `\d` takes them.
+    for (const at of [
+      "2026-06-13T18:00:00.5Z",
+      "2026-02-30T18:00:00Z",
+      "2026-06-13T25:61:60Z",
+      "٢٠٢٦-06-13T18:00:00Z",
+    ]) {
       expect(readDraft(withExtra({ evening: true, read_until: at })).malformed).toEqual([]);
     }
     expect(readDraft(DRAFT).evening).toBe(false);

@@ -24,8 +24,8 @@
  * it reads (openlogbook 0.6.1, run on synthetic drafts): `read_head`, `read_count`, `language`,
  * `segments` and `supersedes`. Those sentences are its own, word for word, in its order, and like it
  * the check names the first malformed segment only. The proposals and the rest of the field table
- * (unit, subject, source, window, read_policy) have no reference sentence yet and are checked here in
- * its style (SPEC-QUESTIONS 89); the proposals' and `extra`'s sentences are the reference's, from its
+ * (unit, subject, source, window, read_policy) have no reference sentence and are checked here in its
+ * style (SPEC-QUESTIONS 89); the proposals' and `extra`'s sentences are the reference's, from its
  * output at d053f78 (SPEC-QUESTIONS 117a, 119). `readDraft` is the reader's view, the reference's `malformed` list and its
  * reading of each segment; `draftRow` is the row `show` prints under the `rfc0036` flag. Nothing here
  * writes a draft, and the Day does not show one yet.
@@ -185,14 +185,17 @@ const proposalsOf = (p: Fields): JsonValue[] => (Array.isArray(p.proposals) ? p.
 
 const isCount = (v: unknown): boolean => typeof v === "number" && Number.isInteger(v) && v >= 0;
 
-/** `extra.read_until`'s form as the reference holds it: a pattern, the calendar not checked. */
-const READ_UNTIL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+/**
+ * `extra.read_until`'s form as the reference holds it: a pattern, the calendar not checked, its digits
+ * any decimal digit, as Python's `\d` takes them (`٢٠٢٦` passes); nothing after the `Z`.
+ */
+const READ_UNTIL = /^\p{Nd}{4}-\p{Nd}{2}-\p{Nd}{2}T\p{Nd}{2}:\p{Nd}{2}:\p{Nd}{2}(\.\p{Nd}+)?Z$/u;
 
 /**
  * What the reference's reader says is wrong with a draft, in its words and its order: `read_head`,
- * `read_count`, `language`, `segments` (the first malformed segment only) and `supersedes`; then, in
- * this implementation's words, `proposals` (the first malformed proposal only). A proposal of a kind
- * the reader does not know is not malformed.
+ * `read_count`, `language`, `segments` (the first malformed segment only), `supersedes`, `proposals`
+ * (the first malformed proposal only), then `extra` (amendment 2's `evening` and `read_until`). A
+ * proposal of a kind the reader does not know is not malformed.
  */
 function readerProblems(p: Fields): string[] {
   const problems: string[] = [];

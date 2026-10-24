@@ -15,6 +15,7 @@
  */
 
 import { localIso } from "./clock.js";
+import { pyStrip } from "./entities.js";
 import { pyStr } from "./pyrepr.js";
 import { splitLines, truthy } from "./render.js";
 import type { JsonValue, Line } from "./types.js";
@@ -102,7 +103,7 @@ function wrapParagraph(paragraph: string, columns: number): string[] {
   while (chunks.length > 0) {
     const current: string[] = [];
     let length = 0;
-    if (lines.length > 0 && (chunks[chunks.length - 1] as string).trim() === "") chunks.pop();
+    if (lines.length > 0 && pyStrip(chunks[chunks.length - 1] as string) === "") chunks.pop();
     while (chunks.length > 0) {
       const next = width(chunks[chunks.length - 1] as string);
       if (length + next > columns) break;
@@ -110,7 +111,7 @@ function wrapParagraph(paragraph: string, columns: number): string[] {
       length += next;
     }
     if (chunks.length > 0 && current.length === 0) current.push(chunks.pop() as string);
-    if (current.length > 0 && (current[current.length - 1] as string).trim() === "") {
+    if (current.length > 0 && pyStrip(current[current.length - 1] as string) === "") {
       current.pop();
     }
     if (current.length > 0) lines.push(current.join(""));

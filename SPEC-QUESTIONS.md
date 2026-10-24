@@ -1365,8 +1365,12 @@ output disagree, or where neither says; nothing is decided here.
     other draft". The reader holds it to a pattern only: `2026-02-30T18:00:00Z` and
     `2026-06-13T25:61:60Z` pass, `2026-06-13T18:00:00.Z` and any offset, `+00:00` included, are refused;
     and on a draft that is not an evening's it checks nothing and still gives the value under
-    `read_until` (`yesterday`). `readDraft` does the same. Should a reader check the calendar, and is a
-    `read_until` without `extra.evening` malformed?
+    `read_until` (`yesterday`); its digits are any decimal digit Python's `\d` takes
+    (`٢٠٢٦-06-13T18:00:00Z` passes), and nothing may follow the `Z`, a line break included. `readDraft`
+    does the same. Should a reader check the calendar and hold the digits to ASCII, and is a
+    `read_until` without `extra.evening` malformed? `draftProblems`, the writer's table here, takes such
+    a `read_until` too, and `draftTierProblems` holds the tier to the segments' evidence only, not to the
+    lines a proposal cites: both are left as the readers have them until the amendment says.
 
 122. **A segment's keys beyond the shape rule.** RFC 0036's evidence rule, and draft/v1's segment rule,
     say "a segment is {text, evidence} or {text, unsupported: true}, nothing else", and the

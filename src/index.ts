@@ -232,6 +232,7 @@ export {
   standingGoals,
   standingReviews,
 } from "./goals.js";
+export { HEARD_KIND, HEARD_SCHEMA, heardRow, isHeard } from "./heard.js";
 export { canonicalize, JcsError } from "./jcs.js";
 export { duplicates, type Retracted, standingLines } from "./lineRules.js";
 export {
@@ -242,6 +243,7 @@ export {
   parseLine,
   type Row,
 } from "./lines.js";
+export { isMachineLine, isMachineParticipant } from "./machine.js";
 export {
   type LongestTrip,
   type Nights,
@@ -299,7 +301,14 @@ export {
   type WindowOptions,
   type WindowRow,
 } from "./reading.js";
-export { asRef, buildResolver, type Ref, type Resolver } from "./resolve.js";
+export {
+  type DayReflection,
+  isReflection,
+  latestReflection,
+  REFLECTION_LABEL,
+  wrapText,
+} from "./reflection.js";
+export { asRef, buildResolver, personName, type Ref, type Resolver } from "./resolve.js";
 export {
   offsetText,
   SCENE_REF,

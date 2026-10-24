@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { readDay } from "../src/day.js";
+import { noteText, readDay } from "../src/day.js";
+import { pyRstrip, pyStrip } from "../src/entities.js";
 import { showDay } from "../src/show.js";
 import { cleanup, writeRecord } from "./helpers.js";
 import { DAY, NOTE_TEXTS, notesRecord } from "./note-text-cases.js";
@@ -18,5 +19,22 @@ describe("a note's text, as the reference prints it at d053f78 (run)", () => {
     const day = readDay(writeRecord(notesRecord()), { day: DAY });
     const stay = day.timeline[0] as { attached: { notes: Array<{ text: string }> } };
     expect(stay.attached.notes.map((n) => n.text)).toEqual(NOTE_TEXTS.map(([, , text]) => text));
+  });
+});
+
+describe("Python's strip, in a scan: a long run of spaces costs its length, not its square", () => {
+  it("a note of 200,000 spaces between two words reads in well under a second", () => {
+    const text = `a${" ".repeat(200_000)}b ${" ".repeat(200_000)}`;
+    const started = performance.now();
+    expect(pyStrip(text)).toBe(`a${" ".repeat(200_000)}b`);
+    expect(pyRstrip(text)).toBe(`a${" ".repeat(200_000)}b`);
+    expect(noteText(text)).toBe(`a${" ".repeat(70)}…`);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  it("strips Python's whitespace and no other: \\x1c–\\x1f and \\x85 go, a BOM stays", () => {
+    expect(pyStrip("\x1c\x1f\x85 a 　")).toBe("a");
+    expect(pyStrip("﻿a﻿")).toBe("﻿a﻿");
+    expect(pyRstrip(" a \x1f")).toBe(" a");
   });
 });
