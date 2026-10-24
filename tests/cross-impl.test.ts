@@ -813,6 +813,22 @@ describe.skipIf(!ready)(
         { extra: { evening: false, read_until: "x" } },
         { extra: { read_until: "x" } },
         { extra: "x" },
+        // What can be kept, numbered after every proposal (the reference at a6ee131).
+        {
+          segments: five,
+          extra: { parts: ["learned", "decision", "story", "ideas", "photo"] },
+          proposals: [event, link, goal],
+        },
+        {
+          segments: [{ text: "held: a number beside a name", unsupported: true }, ...five.slice(1)],
+          extra: { parts: ["learned", "day", "photo", "photo", "decision"] },
+          proposals: [{ ...link, text: "" }],
+        },
+        {
+          segments: five,
+          extra: { parts: ["learned", "learned", "ideas", "decision", "photo"] },
+          proposals: "x",
+        },
         { extra: null },
         {
           extra: {
@@ -917,7 +933,7 @@ describe.skipIf(!ready)(
         expect(ours.unsupported).toBe(theirs.unsupported);
         expect({ variant, segments: ours.segments }).toEqual({
           variant,
-          segments: theirs.segments,
+          segments: theirs.segments.map(lineOnly),
         });
         expect({ variant, proposals: ours.proposals, links: ours.links }).toEqual({
           variant,
