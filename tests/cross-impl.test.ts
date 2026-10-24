@@ -56,6 +56,8 @@ import {
   machineRecord,
 } from "./machine-cases.js";
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
+import { NOTE_TEXTS, DAY as NOTES_DAY, notesRecord } from "./note-text-cases.js";
+import { REFLECTION_CASES, DAY as REFLECTION_DAY, reflectionRows } from "./reflection-cases.js";
 import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
 
@@ -1094,6 +1096,52 @@ describe.skipIf(!ready)(
           { show, day: text, stars: json.stars ?? null },
           "the reference moved; tests/marks-cases.ts holds its output",
         ).toEqual(c.expected);
+      }, 120_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)("a note's text: the reference and logbook-ts print it alike", () => {
+  // tests/note-text-cases.ts: a note of each text, blank, padded, not a string, of many lines;
+  // `show` and the Day of both implementations, and the reference's the ones held there.
+  it("show and the Day, text and JSON, on a note of each text", () => {
+    const root = writeRecord(notesRecord());
+    const show = reference(root, ["show", NOTES_DAY]);
+    expect(
+      show
+        .split("\n")
+        .slice(2, 2 + NOTE_TEXTS.length)
+        .map((row) => row.slice(35)),
+      "the reference moved; tests/note-text-cases.ts holds its output",
+    ).toEqual(NOTE_TEXTS.map(([, row]) => row));
+    expect(showDay(root, { day: NOTES_DAY }).text).toBe(show);
+    const text = reference(root, ["day", NOTES_DAY]);
+    const json = JSON.parse(reference(root, ["day", NOTES_DAY, "--json"])) as unknown;
+    const ours = readDay(root, { day: NOTES_DAY });
+    expect(renderDay(ours)).toBe(comparableDayText(text));
+    expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+  }, 120_000);
+});
+
+describe.skipIf(!ready)(
+  "the Day's reflection: the reference and logbook-ts show the same one alike",
+  () => {
+    // Each record of tests/reflection-cases.ts: the reference's Day beside ours, text and JSON whole,
+    // and its reflection the one held there.
+    for (const c of REFLECTION_CASES) {
+      it(c.name, () => {
+        const root = writeRecord(c.lines);
+        const text = reference(root, ["day", REFLECTION_DAY]);
+        const json = JSON.parse(reference(root, ["day", REFLECTION_DAY, "--json"])) as {
+          reflection?: unknown;
+        };
+        expect(
+          { rows: reflectionRows(text), json: json.reflection ?? null },
+          "the reference moved; tests/reflection-cases.ts holds its output",
+        ).toEqual(c.expected);
+        const ours = readDay(root, { day: REFLECTION_DAY });
+        expect(renderDay(ours)).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
       }, 120_000);
     }
   },

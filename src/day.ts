@@ -11,12 +11,14 @@ import {
   weekdayOf,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
+import { pyStrip } from "./entities.js";
 import { isOn, RFC0038, RFC0041 } from "./flags.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { isMachineParticipant } from "./machine.js";
+import { pyStr } from "./pyrepr.js";
 import { type DayReflection, latestReflection } from "./reflection.js";
-import { keeperPhoto, payloadOf, transcriptTitle } from "./render.js";
+import { keeperPhoto, payloadOf, splitLines, transcriptTitle, truthy } from "./render.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import {
   type Asset,
@@ -877,9 +879,15 @@ const emptyAttached = (): Attached => ({
   keepers: [],
 });
 
-/** A note's first line, cut to 72 characters with an ellipsis. */
-export function noteText(body: string): string {
-  const first = body.split(/\r\n|\r|\n/)[0] ?? "";
+/**
+ * A note's first line, cut to 72 characters with an ellipsis, as the reference's Day prints it at
+ * d053f78: Python's `str()` of the text (nothing for none), stripped, the first of Python's lines,
+ * `(empty)` when nothing is left.
+ */
+export function noteText(text: JsonValue | undefined): string {
+  const body = truthy(text) ? pyStr(text as JsonValue) : "";
+  const first = splitLines(pyStrip(body))[0] ?? "";
+  if (first === "") return "(empty)";
   const chars = Array.from(first);
   return chars.length > NOTE_WIDTH ? `${chars.slice(0, NOTE_WIDTH - 1).join("")}…` : first;
 }
@@ -1007,7 +1015,7 @@ function buildTimeline(
           break;
         }
         case "note":
-          row.attached.notes.push({ text: noteText(text(p.text) ?? ""), line: e.line.id });
+          row.attached.notes.push({ text: noteText(p.text), line: e.line.id });
           row.notes.push(e);
           break;
         case "mail": {
@@ -1049,7 +1057,7 @@ function buildTimeline(
             kind === "transcript"
               ? transcriptTitle(p, UNTITLED)
               : kind === "note"
-                ? noteText(text(p.text) ?? "")
+                ? noteText(p.text)
                 : kind === "mail"
                   ? (text(p.subject) ?? "(no subject)")
                   : (asRef(p.counterparty)?.value ?? "withheld");

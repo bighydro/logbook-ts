@@ -16,7 +16,7 @@
 
 import { localIso } from "./clock.js";
 import { pyStr } from "./pyrepr.js";
-import { splitLines } from "./render.js";
+import { splitLines, truthy } from "./render.js";
 import type { JsonValue, Line } from "./types.js";
 
 export const REFLECTION_LABEL = "reflection";
@@ -41,16 +41,6 @@ export function isReflection(line: Line): boolean {
     p.labels.includes(REFLECTION_LABEL)
   );
 }
-
-/** Python's truth of a JSON value. */
-const truthy = (v: JsonValue | undefined): boolean =>
-  v !== undefined &&
-  v !== null &&
-  v !== false &&
-  v !== 0 &&
-  v !== "" &&
-  !(Array.isArray(v) && v.length === 0) &&
-  !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
 
 /**
  * The day's reflection among its standing lines (each with its instant), or undefined when it has

@@ -1,4 +1,5 @@
 import { draftRow } from "./drafts.js";
+import { pyRstrip } from "./entities.js";
 import { HEARD_SCHEMA, heardRow } from "./heard.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
@@ -173,7 +174,7 @@ export function transcriptTitle(p: Payload, fallback: string): string {
 }
 
 /** Python's truth of a JSON value: null, false, 0, "", [] and {} are false. */
-function truthy(value: JsonValue | undefined): boolean {
+export function truthy(value: JsonValue | undefined): boolean {
   if (value === undefined || value === null || value === false || value === 0 || value === "")
     return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -277,9 +278,10 @@ function event(p: Payload, ctx: RenderContext): string {
 }
 
 function note(p: Payload, ctx: RenderContext): string {
-  const body = typeof p.text === "string" ? p.text : "";
-  if (ctx.raw) return body;
-  const rows = splitLines(body);
+  if (ctx.raw) return typeof p.text === "string" ? p.text : "";
+  // Python's `str()` of the text, nothing for none (as the reference prints it at d053f78), its end
+  // stripped, so a trailing blank line is no line.
+  const rows = splitLines(pyRstrip(truthy(p.text) ? pyStr(p.text as JsonValue) : ""));
   while (rows.length && (rows[0] as string).trim() === "") rows.shift();
   const first = rows[0] ?? "";
   const more = rows.length - 1;
