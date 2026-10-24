@@ -30,5 +30,12 @@ describe("heard/v1 (RFC 0046): show's row, as the reference prints it at a6ee131
     vi.stubEnv(FLAGS_ENV, "");
     const off = showDay(root, { day: "2026-10-03" }).text;
     expect(off).not.toContain("7,012 words");
+    expect(off).toContain("  08:00  heard      heard          Episode 12: the east berth\n");
+  });
+
+  it("a word count of -0 is 0, as JSON's -0 is the integer 0 to the reference", () => {
+    expect(heardRow(heardPayload({ words: -0 }) as never)).toBe(
+      "Episode 12: the east berth — Havnepodden · feed · nb · 0 words",
+    );
   });
 });

@@ -42,6 +42,18 @@ function tx(
 /** A receipt `review receipts --accept` wrote. */
 const R = (at: string, amount: number, merchant?: string, more = {}, currency = "CHF") =>
   tx(at, "receipts", amount, merchant, more, currency);
+/** The owner's retraction of the line of this seq (`writeBareRecord` numbers lines from 1). */
+const retract = (seq: number, at: string): Draft => ({
+  at,
+  source: "manual",
+  kind: "retraction",
+  payload: {
+    schema: "retraction/v1",
+    supersedes: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+    seq,
+    reason: "test",
+  },
+});
 /** The payment as a payment source delivered it. */
 const G = (at: string, amount: number, merchant?: string, more = {}, currency = "CHF") =>
   tx(at, "google-takeout", amount, merchant, more, currency);
@@ -810,6 +822,104 @@ export const RECEIPT_CASES: ReceiptCase[] = [
               line: "00000000-0000-4000-8000-000000000002",
               mail: "00000000-0000-4000-8000-000000000999",
               of: "00000000-0000-4000-8000-000000000005",
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
+    name: "a Greek final sigma, and a dotless i",
+    lines: [
+      R(`${T}08:00:00Z`, -12.9, "ΜΑΡΚΟΣ-ΤΑΒΕΡΝΑ"),
+      G(`${T}10:00:00Z`, -12.9, "ΜΑΡΚΟΣΤΑΒΕΡΝΑ"),
+      R("2026-09-10T08:00:00Z", -5, "Kahvecı"),
+      G("2026-09-10T09:00:00Z", -5, "KAHVECI"),
+    ],
+    expected: {
+      "2026-09-03": {
+        text: "spend         CHF -12.90 · 1 transaction · 1 with its receipt · ΜΑΡΚΟΣΤΑΒΕΡΝΑ",
+        json: {
+          count: 1,
+          deleted: 0,
+          totals: { CHF: { spent: -12.9, received: 0, net: -12.9 } },
+          merchants: ["ΜΑΡΚΟΣΤΑΒΕΡΝΑ"],
+          lines: ["00000000-0000-4000-8000-000000000002"],
+          receipts: [
+            {
+              line: "00000000-0000-4000-8000-000000000001",
+              mail: "00000000-0000-4000-8000-000000000999",
+              of: "00000000-0000-4000-8000-000000000002",
+            },
+          ],
+        },
+      },
+      "2026-09-10": {
+        text: "spend         CHF -10.00 · 2 transactions · Kahvecı, KAHVECI",
+        json: {
+          count: 2,
+          deleted: 0,
+          totals: { CHF: { spent: -10, received: 0, net: -10 } },
+          merchants: ["Kahvecı", "KAHVECI"],
+          lines: ["00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000004"],
+        },
+      },
+    },
+  },
+  {
+    name: "a retracted payment holds nothing, and a retracted receipt is nothing",
+    lines: [
+      R(`${T}08:00:00Z`, -12.9, "Fjordkaffe"),
+      G(`${T}10:00:00Z`, -12.9, "Fjordkaffe"),
+      retract(2, `${T}12:00:00Z`),
+      R("2026-09-10T08:00:00Z", -5, "Kiosk"),
+      G("2026-09-10T10:00:00Z", -5, "Kiosk"),
+      retract(4, "2026-09-10T12:00:00Z"),
+    ],
+    expected: {
+      "2026-09-03": {
+        text: "spend         CHF -12.90 · 1 transaction · Fjordkaffe",
+        json: {
+          count: 1,
+          deleted: 0,
+          totals: { CHF: { spent: -12.9, received: 0, net: -12.9 } },
+          merchants: ["Fjordkaffe"],
+          lines: ["00000000-0000-4000-8000-000000000001"],
+        },
+      },
+      "2026-09-10": {
+        text: "spend         CHF -5.00 · 1 transaction · Kiosk",
+        json: {
+          count: 1,
+          deleted: 0,
+          totals: { CHF: { spent: -5, received: 0, net: -5 } },
+          merchants: ["Kiosk"],
+          lines: ["00000000-0000-4000-8000-000000000005"],
+        },
+      },
+    },
+  },
+  {
+    name: "two payments as near to one receipt, one before and one after",
+    lines: [
+      G(`${T}11:00:00Z`, -12.9, "Fjordkaffe"),
+      G(`${T}09:00:00Z`, -12.9, "Fjordkaffe"),
+      R(`${T}10:00:00Z`, -12.9, "Fjordkaffe"),
+    ],
+    expected: {
+      "2026-09-03": {
+        text: "spend         CHF -25.80 · 2 transactions · 1 with its receipt · Fjordkaffe",
+        json: {
+          count: 2,
+          deleted: 0,
+          totals: { CHF: { spent: -25.8, received: 0, net: -25.8 } },
+          merchants: ["Fjordkaffe"],
+          lines: ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"],
+          receipts: [
+            {
+              line: "00000000-0000-4000-8000-000000000003",
+              mail: "00000000-0000-4000-8000-000000000999",
+              of: "00000000-0000-4000-8000-000000000001",
             },
           ],
         },

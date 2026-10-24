@@ -1880,7 +1880,7 @@ function nightLine(entries: Entry[], ctx: Context): NightLine | undefined {
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
+/** A `transaction/v1` line (RFC 0021). */
 const isTransaction = (line: Line): boolean =>
   line.kind === "transaction" && payloadOf(line).schema === "transaction/v1";
 
@@ -1889,11 +1889,36 @@ const RECEIPTS_SOURCE = "receipts";
 /** A receipt and its payment are one when they lie this close in time, or closer. */
 const RECEIPT_WINDOW_MS = 2 * 86_400_000;
 
-/** A merchant's name as two are compared: case-folded, letters and digits only. */
+/** Where Unicode's full case folding (Python's `casefold`) is not a letter's own lower case. */
+const FOLDS: Record<string, string> = {
+  ß: "ss",
+  ẞ: "ss",
+  ς: "σ",
+  ſ: "s",
+  ϐ: "β",
+  ϑ: "θ",
+  ϕ: "φ",
+  ϖ: "π",
+  ϰ: "κ",
+  ϱ: "ρ",
+  ϵ: "ε",
+  ﬀ: "ff",
+  ﬁ: "fi",
+  ﬂ: "fl",
+  ﬃ: "ffi",
+  ﬄ: "ffl",
+  ﬅ: "st",
+  ﬆ: "st",
+};
+
+/**
+ * A merchant's name as two are compared: case-folded letter by letter, as Python's `casefold` folds
+ * them (`ß` is `ss`, a final `ς` is `σ`, a dotless `ı` stays itself), then letters and digits only.
+ */
 const merchantKey = (name: string): string =>
-  name
-    .toUpperCase()
-    .toLowerCase()
+  [...name]
+    .map((c) => FOLDS[c] ?? c.toLowerCase())
+    .join("")
     .replace(/[^\p{L}\p{N}]/gu, "");
 
 /** A transaction as a pair is made of it; undefined when it can hold or be no receipt. */
@@ -1946,6 +1971,8 @@ function receiptPairs(reader: DayReader, dayLines: Entry[]): Map<string, Line> {
   const all: Line[] = [];
   for (const month of reader.files) {
     for (const { raw, row } of eachLine(month.file)) {
+      // Only a row that names the kind can be one; the rest are not parsed again.
+      if (!raw.includes('"transaction"')) continue;
       const parsed = parseLine(raw, `${month.rel} line ${row}`);
       if ("error" in parsed || !isTransaction(parsed.line)) continue;
       if (resolver.retractedBy(parsed.line.id) !== undefined) continue;
@@ -2067,6 +2094,7 @@ function spend(lines: Entry[], pairs: Map<string, Line>): DaySpend | null {
   return out;
 }
 
+/** Every source with a line standing on the day: how many, its first and newest. Most lines first, then by name. */
 function sources(lines: Entry[]): SourceCount[] {
   const counts = new Map<string, SourceCount & { firstMs: number; newestMs: number }>();
   for (const e of lines) {

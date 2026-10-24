@@ -166,10 +166,12 @@ jobs:
     #
     # Since 2026-10-24 `REFERENCE` is a6ee1317, the reference's main of that day, thirty-three commits
     # past 6ee01c20 (the catch-up of 2026-10-22, #27) and sixty-two past its release 0.7.0
-    # (b82a11c4); of them #374 changes what is compared here: what can be kept of a day's draft is
-    # numbered (`keep`). The draft cases and tests/with-cases.ts (who a note says was there, SPEC
-    # §3.2.5 rule 3) run the reference beside ours as well. The file holds the hash alone, as the
-    # steps below read it. The cases of
+    # (b82a11c4); of them three change what is compared here: #374, what can be kept of a day's
+    # draft is numbered (`keep`); #406, a payment and its receipt counted once on the Day
+    # (tests/receipts-cases.ts); and #355, `show`'s row of `heard/v1` under the rfc0046 flag
+    # (tests/heard-cases.ts). The draft cases and tests/with-cases.ts (who a note says was there,
+    # SPEC §3.2.5 rule 3) run the reference beside ours as well. The file holds the hash alone, as
+    # the steps below read it. The cases of
     # tests/superseded-cases.ts, speakers-cases.ts and marks-cases.ts, and a day the reference signs and
     # signs again, run the reference beside ours as well.
     #

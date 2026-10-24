@@ -1424,11 +1424,14 @@ records, beside its docs; no source was read. Nothing here is decided.
 126. **A payment and its receipt, paired.** docs/receipts.md says every reader that sums the ledger pairs a
     receipt's line with the payment source's line "by the rule above (the currency, the signed amount,
     within two days, the merchant)", and that writing the rule into RFC 0021 is an open proposal. The
-    reference's Day, run on 17 records (tests/receipts-cases.ts), pairs a line of source `receipts` (its
+    reference's Day, run on 20 records (tests/receipts-cases.ts), pairs a line of source `receipts` (its
     `provider` aside) with a line of any other source of the same currency and amount to the cent
-    (`-12.904` with `-12.896`), at most 48 hours apart to the second, whose merchants, case-folded (`ß`
-    as `ss`) with every character that is not a letter or a digit gone (`_` too, accents kept), contain
-    one another; the nearest pairs first, a tie to the earlier receipt, across days. A deleted or a
+    (`-12.904` with `-12.896`), at most 48 hours apart to the second, whose merchants, case-folded as
+    Python's `casefold` folds them (`ß` as `ss`, a final `ς` as `σ`, a dotless `ı` kept; this
+    implementation folds letter by letter with a table of the folds that are not a letter's lower case)
+    with every character that is not a letter or a digit gone (`_` too, accents kept), contain
+    one another; the nearest pairs first, a tie to the earlier receipt (two payments as near to one
+    receipt: the first written), across days; a retracted line pairs with nothing. A deleted or a
     corrected line, and one with no merchant or a merchant of punctuation only, pairs with nothing. This
     implementation does the same, over the whole record. Open: "within two days" is written as days and
     read as 48 hours between the two lines' `at`, and whether a line's `date` (RFC 0021) moves it was not

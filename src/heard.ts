@@ -37,6 +37,7 @@ export function heardRow(p: Payload): string {
   const source = truthy(p.text_source) ? pyStr(p.text_source) : "?";
   const language = truthy(p.language) ? pyStr(p.language) : "und";
   const w = p.words;
-  const words = typeof w === "number" && Number.isInteger(w) && w >= 0 ? w : 0;
+  // `-0` is JSON's 0 to the reference (Python reads it as the integer 0).
+  const words = typeof w === "number" && Number.isInteger(w) && w > 0 ? w : 0;
   return `${title}${by} · ${source} · ${language} · ${words.toLocaleString("en-US")} word${words === 1 ? "" : "s"}`;
 }
