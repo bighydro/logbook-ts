@@ -271,6 +271,9 @@ function spendText(spend: DaySpend): string {
     .map((c) => `${c} ${money((spend.totals[c] as { net: number }).net)}`);
   parts.push(plural(spend.count, "transaction"));
   if (spend.deleted) parts.push(`${spend.deleted} deleted`);
+  const receipts = spend.receipts?.length ?? 0;
+  if (receipts === 1) parts.push("1 with its receipt");
+  else if (receipts > 1) parts.push(`${receipts} with their receipts`);
   if (spend.merchants.length) {
     const rest = spend.merchants.length - MERCHANTS_SHOWN;
     parts.push(

@@ -49,6 +49,7 @@ import {
   writeRecord,
 } from "./helpers.js";
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
+import { RECEIPT_CASES } from "./receipts-cases.js";
 import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
 import { caseDay, WITH_CASES, withRecord } from "./with-cases.js";
@@ -967,6 +968,35 @@ describe.skipIf(!ready)(
         expect(ours.malformed).toHaveLength(1);
       }
     }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "a payment and its receipt counted once (the reference's #406): the reference and logbook-ts agree",
+  () => {
+    for (const c of RECEIPT_CASES) {
+      it(c.name, () => {
+        const root = writeBareRecord(c.lines);
+        for (const day of Object.keys(c.expected)) {
+          const theirs = JSON.parse(reference(root, ["day", day, "--json"])) as { spend: unknown };
+          const text = reference(root, ["day", day]);
+          const ours = readDay(root, { day });
+          expect({ day, spend: JSON.parse(JSON.stringify(ours.spend)) }).toEqual({
+            day,
+            spend: theirs.spend,
+          });
+          const row = (t: string) => t.split("\n").find((l) => l.startsWith("  spend ")) ?? "";
+          expect({ day, row: row(renderDay(ours)) }).toEqual({
+            day,
+            row: row(comparableDayText(text)),
+          });
+          expect(
+            { day, json: theirs.spend, text: row(text).trim() },
+            "the reference moved; tests/receipts-cases.ts holds its output",
+          ).toEqual({ day, ...(c.expected[day] as { json: unknown; text: string }) });
+        }
+      }, 120_000);
+    }
   },
 );
 
