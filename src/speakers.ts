@@ -20,7 +20,7 @@
  * line). Only a standing transcript's voices are read: its callers pass no other.
  */
 
-import type { Resolver } from "./resolve.js";
+import { personName, type Resolver } from "./resolve.js";
 import type { JsonValue, Line, Payload } from "./types.js";
 
 /** One voice as the reader reads it. */
@@ -132,7 +132,8 @@ export function bindVoices(transcript: Line, resolver: Resolver, owner: Owner): 
       ...voice,
       who: unnamed ? "unnamed" : "person",
       person: entity.id,
-      personLabel: entity.label,
+      // The person's name as `people` gives it, the first label given them, whichever ref gave it.
+      personLabel: personName(resolver, entity.id) ?? entity.label,
       basis,
       consent: given ?? "unknown",
       confidence,

@@ -2,8 +2,9 @@
  * Who spoke (RFC 0038 §3, RFC 0006's amendment of 2026-10-15): a transcript's voices bound to people
  * by `resolution/v1` lines whose ref is a `speaker`, `<transcript line id>#<label>`. Synthetic records
  * of Ines Nordmann's dinner on 3 October 2026, read by tests/speakers-bound.test.ts against the
- * reference's output at b82a11c (0.7.0), captured by running it on each record (`expected`, never
- * edited by hand), and by tests/cross-impl.test.ts against the reference itself.
+ * reference's output at b82a11c (0.7.0), the last case at d053f78, captured by running it on each
+ * record (`expected`, never edited by hand), and by tests/cross-impl.test.ts against the reference
+ * itself.
  */
 
 import { writeFileSync } from "node:fs";
@@ -991,6 +992,94 @@ export const SPEAKER_CASES: SpeakerCase[] = [
       people:
         "1 person · 2026-10-03 – 2026-10-04 · tier 2 · and 1 unnamed\n  Ola Nordmann  transcripts 1 · 1 day · 1 night · last real contact 2026-10-03 (meeting) · Home\n",
       counts: { spoke_s: { "Ola Nordmann": 0 }, unnamed: 1, not_yet_named: 0 },
+    },
+  },
+  {
+    name: "at a stay: a voice is named as people names the person, by the first label given it, the binding's own or another ref's",
+    lines: [
+      ...home,
+      email("ola@example.org", OLA, "Ola Nordmann"),
+      email("kari@example.org", KARI, "Kari Nordmann"),
+      transcript("Middag", [voice("S1", 600), voice("S2", 300), voice("S3", 100)]),
+      speaker(T + 2, "S1", OLA),
+      speaker(T + 2, "S2", KARI, { label: "Kari N." }),
+      speaker(T + 2, "S3", MINTED, { label: "Per Nordmann" }),
+      email("per@example.org", MINTED, "Per Q. Nordmann"),
+    ],
+    places: true,
+    expected: {
+      rows: [
+        "transcript   Middag · Ola Nordmann 10 min · Kari Nordmann 5 min · Per Nordmann 2 min · recorded with consent: unknown",
+        "with         Ola Nordmann (transcript), Kari Nordmann (transcript), Per Nordmann (transcript)",
+      ],
+      speakers: {
+        "00000000-0000-4000-8000-000000000024": [
+          {
+            label: "S1",
+            person: "019cadd3-6bc0-7dcd-9133-000000000301",
+            name: "Ola Nordmann",
+            seconds: 600,
+            basis: "voice",
+            consent: "unknown",
+            owner: false,
+          },
+          {
+            label: "S2",
+            person: "019cadd3-6bc0-7dcd-9133-000000000302",
+            name: "Kari Nordmann",
+            seconds: 300,
+            basis: "voice",
+            consent: "unknown",
+            owner: false,
+          },
+          {
+            label: "S3",
+            person: "019cadd3-6bc0-7dcd-9133-000000000303",
+            name: "Per Nordmann",
+            seconds: 100,
+            basis: "voice",
+            consent: "unknown",
+            owner: false,
+          },
+        ],
+      },
+      with: [
+        {
+          confirmed: [
+            {
+              person: "019cadd3-6bc0-7dcd-9133-000000000301",
+              name: "Ola Nordmann",
+              status: "confirmed",
+              confidence: 1,
+              sources: ["transcript"],
+              reasons: ["spoke in Middag"],
+              lines: ["00000000-0000-4000-8000-000000000024"],
+            },
+            {
+              person: "019cadd3-6bc0-7dcd-9133-000000000302",
+              name: "Kari Nordmann",
+              status: "confirmed",
+              confidence: 1,
+              sources: ["transcript"],
+              reasons: ["spoke in Middag"],
+              lines: ["00000000-0000-4000-8000-000000000024"],
+            },
+            {
+              person: "019cadd3-6bc0-7dcd-9133-000000000303",
+              name: "Per Nordmann",
+              status: "confirmed",
+              confidence: 1,
+              sources: ["transcript"],
+              reasons: ["spoke in Middag"],
+              lines: ["00000000-0000-4000-8000-000000000024"],
+            },
+          ],
+          proposed: [],
+        },
+      ],
+      people:
+        "3 people · 2026-10-01 – 2026-10-04 · tier 2\n  Kari Nordmann  transcripts 1 · 1 day · 1 night · last real contact 2026-10-03 (meeting) · Home\n  Ola Nordmann   transcripts 1 · 1 day · 1 night · last real contact 2026-10-03 (meeting) · Home\n  Per Nordmann   transcripts 1 · 1 day · 1 night · last real contact 2026-10-03 (meeting) · Home\n",
+      counts: { spoke_s: { "Kari Nordmann": 300, "Ola Nordmann": 600, "Per Nordmann": 100 } },
     },
   },
 ];

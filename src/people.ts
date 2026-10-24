@@ -6,7 +6,7 @@ import { eachLine, monthFiles, parseLine } from "./lines.js";
 import { isMachineLine, isMachineParticipant } from "./machine.js";
 import { type Opened, openWindow, type ReadingStats, type RowUnit, readDays } from "./reading.js";
 import { payloadOf } from "./render.js";
-import { asRef, type Ref } from "./resolve.js";
+import { asRef, personName, type Ref } from "./resolve.js";
 import type { Asset, Place } from "./settings.js";
 import { isSuperseded } from "./show.js";
 import { bindVoices } from "./speakers.js";
@@ -409,11 +409,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
   for (const acc of accounts.values()) {
     if (acc.channels.size === 0 && acc.days.size === 0) continue;
     const named = resolver.refsOf(acc.id);
-    const minted = named.find(
-      (r) =>
-        asRef(r.line.payload.alias_of) === undefined && text(r.line.payload.label) !== undefined,
-    );
-    const name = text(minted?.line.payload.label) ?? resolver.people().get(acc.id) ?? acc.id;
+    const name = personName(resolver, acc.id) ?? acc.id;
     let tier = acc.evidenceTier;
     for (const r of named) tier = Math.max(tier, r.line.tier);
     const channels: Partial<Record<ChannelName, Channel>> = {};
