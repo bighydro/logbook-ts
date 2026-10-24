@@ -134,7 +134,7 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
 matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18) as its main stands on
-**24 October 2026** (95d007c, pinned since that day; the catch-up of 21 October pinned a86787c), its RFC 0034
+**24 October 2026** (a6ee131, pinned since that day; the catch-up of 21 October pinned a86787c), its RFC 0034
 signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041 and 0046 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
@@ -146,14 +146,14 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 
 ### Coverage at the main of 24 October
 
-What changed in the format's documents and the reference's readers between a86787c and 95d007c (46
-commits; the reference's output was read at d053f78, the commit before the last), and what this
+What changed in the format's documents and the reference's readers between a86787c and a6ee131 (53
+commits; the reference's output was read at d053f78, eight commits before), and what this
 implementation does with each, in the words of the table below. Every claim is
 held by the case files `tests/heard-cases.ts`, `machine-cases.ts`, `reflection-cases.ts`,
 `note-text-cases.ts`, `october-cases.ts`, the last case of `speakers-cases.ts`, `tests/drafts.test.ts`,
 and their tests in `tests/cross-impl.test.ts`, run against the reference at the commit `REFERENCE` names.
 
-| Document or change at 95d007c | Here | What |
+| Document or change at a6ee131 | Here | What |
 |---|---|---|
 | rfcs/0036-draft-v1.md, amendment 2 (2026-10-21): the `link` proposal, `extra.evening` (#358) | implemented | `readDraft`: `links` (numbered among all the proposals, `supported` and `why`), `evening`, `read_until`, and the malformed sentences in the reference's words; `show`'s row counts the proposals (SPEC-QUESTIONS 117a, 119–122) |
 | rfcs/0036-draft-v1.md, amendment 2: what is kept (`kept`, `keep`, `since you signed`); dream-day/4's parts, lenses, `closing`, `marked`, `dropped` | not implemented | the Day's draft block, which is not shown here (below) |
@@ -168,7 +168,8 @@ and their tests in `tests/cross-impl.test.ts`, run against the reference at the 
 | logbook.json's `demo` (#338) and `phone` (#345); policy/owner.json's `handles` | read and kept | every key a reader does not own is kept; `tests/fixtures/demo-seed1` is the demo as it writes it now |
 | docs/adr/0016-tier-crossing-policy.md, amendment 2026-10-21: a new record names no one (#348) | implemented | in the catch-up of 21 October, ahead of `REFERENCE` then |
 | #385, a reader never rebuilds the index under a writer | not applicable | nothing here reads or writes an index |
-| docs/attachments.md, a transcript's file from the export, `doctor --attachments` (#397) | not applicable | a writer's and `doctor`'s; nothing here imports a transcript |
+| docs/attachments.md, a transcript's file from the export, `doctor --attachments` (#397); `import pickup` (#398) | not applicable | writers and `doctor`; nothing here imports |
+| #361 (the timeline page, place classes), #403 (close the week), #402 (the Notion export), #406 (a payment and its receipt once), #400 and #408 (the watchdog's tests) | not applicable | the Library, the reference's writers and exports; the readers compared here agree at a6ee131 |
 | rfcs/0005 (the refs a crossing resolves), 0042 (Hold), 0043 (the Day page), 0044 (local days, draft), 0045 (people's mail), 0047 (the Library's doors); docs/adr/0025 | not implemented | crossings, the Library, Hold and local days are not ported |
 
 ### Coverage at v0.7.0

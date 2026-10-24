@@ -164,12 +164,13 @@ jobs:
     # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
     # reference beside ours on payload variants, on synthetic records and on that record.
     #
-    # Since 2026-10-24 `REFERENCE` is 95d007c7, the reference's main of that day, 46 commits past
+    # Since 2026-10-24 `REFERENCE` is a6ee1317, the reference's main of that day, 53 commits past
     # a86787ca (the catch-up of 2026-10-21, draft/v1's forward compatibility); of them these change
     # what is compared here: #358 (3c94a92), draft/v1's amendment 2, a proposal of kind `link` and
     # `extra.evening`; #338 (92d8059) and #348 (d7f9884), the demo record's `demo` mark and its
-    # policy files; and #355 (e9cd695), the `heard/v1` row of `show`; the last, #397 (95d007c), is a
-    # writer's and doctor's and changes nothing compared here. The file holds the hash alone,
+    # policy files; and #355 (e9cd695), the `heard/v1` row of `show`; the last eight, #397 (95d007c)
+    # to #403 (a6ee131), are the writers', the Library's and doctor's, and change nothing compared
+    # here. The file holds the hash alone,
     # as the steps below read it. The cases of tests/superseded-cases.ts, speakers-cases.ts,
     # marks-cases.ts, heard-cases.ts, machine-cases.ts, reflection-cases.ts, note-text-cases.ts and
     # october-cases.ts, the drafts of tests/cross-impl.test.ts, a day the reference signs and signs
