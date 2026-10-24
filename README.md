@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (its main at a86787c, 2026-10-21, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and nine commits past it, among them draft/v1's forward compatibility and the route text of `trips`) does, matched against the
+the reference implementation (its main at 6ee01c2, 2026-10-22, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and twenty-nine commits past it, among them draft/v1's forward compatibility and amendment 2, the route text of `trips` and the dream that learns) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,9 +133,9 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-21 at
-a86787c on its main, which adds draft/v1's forward compatibility of 2026-10-19 and the route text of
-`trips`), its RFC 0034
+matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-22 at
+6ee01c2 on its main, which adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
+2026-10-21, the route text of `trips`, and twenty PRs more, below), its RFC 0034
 signed-day amendments 1–4, the draft RFCs 0036–0038, 0040 and 0041 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
@@ -144,6 +144,27 @@ as the reference does; *verify* means the chain (SPEC §3, every profile hashes 
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+### Coverage at 6ee01c2 (the reference's main of 22 October 2026)
+
+What changed between a86787c and 6ee01c2 (twenty PRs; SPEC.md, `conformance/` and `schema/` did not
+change), and what this implementation does with each, in the same three words as the table below it.
+Held by `tests/drafts.test.ts`, `tests/with-notes.test.ts` and their cases in `tests/cross-impl.test.ts`.
+
+| Change at 6ee01c2 | Here | What |
+|---|---|---|
+| rfcs/0036-draft-v1.md, amendment 2 (#358): the `link` proposal, `extra.evening`, what is kept | implemented, read | `readDraft`: a link of its shape under `links`, numbered among all the proposals, its evidence read on the unit; a link of another shape malformed in the reference's words; `evening` and `read_until` and their two sentences. `draftRow` counts `N proposed events · N proposed links`. What is kept (`kept`, `confirmed`) is read from the record by the Day, which shows no draft here (SPEC-QUESTIONS 119) |
+| docs/dream.md, dream-day/4 (#358): the story, lenses, learned, decision, ideas, the photo of the day | implemented, read | each segment's `part` from `extra.parts`, an idea's `entity` from `extra.ideas`, `marked`, `dropped`, `dropped_links`, `dropped_segments`; not the story's closing line, the lenses of `policy/questions.json` or `since_signed` (SPEC-QUESTIONS 119, 124) |
+| rfcs/0036-draft-v1.md, the month and the chapter (#359) | verified only | the units and their subjects were already read; no writer here |
+| docs/rfcs/0027-reflection.md, lenses (`ask`) | not implemented | `policy/questions.json` is not read here |
+| SPEC §3.2.5 rule 3, who a note says was there, and the notes of who was there (#351) | implemented | `with <Name>`, the names capitalised and joined by `and`, `og` or `&`, by rule 2's name match, as the reference reads it; `not-with:`, `lives-with:` and `lives-in:` notes name nobody (SPEC-QUESTIONS 125). The rest of #351 (`logbook with --from`, `people not-with`, `lives-with`, `lives-in`, `city`, `review with`) are writers and readers not ported |
+| A new record's policy file (#348; docs/adr/0016, amended 2026-10-21) | verified only | already read so (this repo's #26); `tests/fixtures/demo-seed1` and `demo-sample` are re-made with it |
+| `logbook demo` marks its record (#338) | verified only | `"demo"` in `logbook.json` is read past; the two demo fixtures are re-made |
+| A voice's name keeps its tier (#364) | verified only | only a reading below a tier (a site, a vault, a trip bundle, a gated Day) changes, and none is ported; the ungated Day, `show` and `people` read alike, run on the voice cases at tier 3 |
+| `search` marks a superseded hit, `--standing` (#362) | not implemented | no `search` here |
+| `export crossing`'s resolutions of mail and transcripts (#346), people's mail (#360, RFC 0045), `export letter` (#354), `export share` of a sealed day and `export site` without drafts (#364) | not implemented | no exporter here |
+| `show plan` (#357), `review receipts` (#356), the map (#352), the Day page's shapes (#344), the phone's writes (#345), mail's tab and list headers (#341), `doctor`, `setup`, `init` (#338), RFC 0044 (#350), ADR 0025 (#349) | not implemented | readers, writers and pages not ported, or a draft or proposal that changes no reader yet |
+| docs only (#271, #347) | not applicable | |
 
 ### Coverage at v0.7.0
 

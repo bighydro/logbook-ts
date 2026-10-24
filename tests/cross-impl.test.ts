@@ -17,7 +17,7 @@ import { readDay } from "../src/day.js";
 import { readDayStart } from "../src/dayStart.js";
 import { readDayRows, renderDayRows } from "../src/days.js";
 import { renderDay } from "../src/dayText.js";
-import { readDraft } from "../src/drafts.js";
+import { draftRow, readDraft } from "../src/drafts.js";
 import { FLAGS_ENV } from "../src/flags.js";
 import { renderNights, rollupNights } from "../src/nights.js";
 import { readPeople, renderPeople } from "../src/people.js";
@@ -51,6 +51,7 @@ import {
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
 import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
+import { caseDay, WITH_CASES, withRecord } from "./with-cases.js";
 
 /**
  * The two implementations must print the same day. This test runs the reference implementation
@@ -661,7 +662,7 @@ describe.skipIf(!ready)(
       }
     }, 300_000);
 
-    it("read a day's draft alike: the malformed list, each segment supported or not, and why, and the proposals", () => {
+    it("read a day's draft alike: the malformed list, each segment supported or not, and why, its part, the proposals and links, the evening, and the show row", () => {
       // The day's lines get the ids 00000000-0000-4000-8000-00000000000N, N their seq.
       const lineId = (n: number): string =>
         `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -702,7 +703,21 @@ describe.skipIf(!ready)(
         people: [],
         evidence: [lineId(1), lineId(2)],
       };
-      const link = { kind: "link", from: lineId(2), to: lineId(3) };
+      // A kind no amendment names: since draft/v1 amendment 2 (2026-10-21) `link` is a known one.
+      const goal = { kind: "goal", from: lineId(2), to: lineId(3) };
+      const link = {
+        kind: "link",
+        entity: "019cadd3-6bc0-7dcd-9133-000000000401",
+        text: "Crew list",
+        evidence: [lineId(3)],
+      };
+      const five = [
+        { text: "S1", evidence: [lineId(1)] },
+        { text: "S2", evidence: [lineId(3)] },
+        { text: "S3", evidence: [lineId(2)] },
+        { text: "S4", evidence: [lineId(3)] },
+        { text: "S5", unsupported: true },
+      ];
       const variants: Array<Record<string, unknown>> = [
         {},
         { segments: [good[0], { text: "x", evidence: [lineId(2)], unsupported: true }] },
@@ -728,9 +743,85 @@ describe.skipIf(!ready)(
         { read_count: true, language: "zh-Hant-TW", supersedes: null },
         // draft/v1, forward compatibility (2026-10-19): a kind the reader does not know is counted,
         // not malformed, and a known one keeps its number.
+        { proposals: [goal] },
+        { proposals: [event, goal] },
+        { proposals: [goal, goal, event] },
+        { proposals: [{ kind: "  " }, event] },
+        { proposals: [{ ...event, title: "" }, event] },
+        { proposals: [5, {}, event] },
+        { proposals: null },
+        // An event: `place` may be left out, an id any non-empty string, the instants compared to
+        // the last digit; evidence off the day is shown unsupported.
+        {
+          proposals: [
+            {
+              kind: "event",
+              title: "t",
+              start: event.start,
+              end: event.end,
+              people: ["  "],
+              evidence: [lineId(1)],
+            },
+          ],
+        },
+        {
+          proposals: [
+            { ...event, start: "2026-06-13T10:00:00.1234Z", end: "2026-06-13T10:00:00.1235Z" },
+          ],
+        },
+        { proposals: [{ ...event, end: "2026-06-13T10:00:00Z" }] },
+        { proposals: [{ ...event, people: [""] }] },
+        { proposals: [{ ...event, evidence: [lineId(1), lineId(9)] }] },
+        // draft/v1 amendment 2 (2026-10-21): links, numbered among all the proposals.
         { proposals: [link] },
-        { proposals: [event, link] },
-        { proposals: [link, link, event] },
+        { proposals: [{ ...link, note: "from the note" }] },
+        { proposals: [event, link, goal] },
+        { proposals: [link, { ...link, text: "Two" }, event], supersedes: lineId(2) },
+        { proposals: [{ ...link, entity: "crew", evidence: ["  ", lineId(3)] }] },
+        { proposals: [{ ...link, evidence: [lineId(9)] }] },
+        { proposals: [{ kind: "link", from: lineId(2), to: lineId(3) }, link] },
+        { proposals: [{ ...link, text: "  " }] },
+        { proposals: [{ ...link, note: null }] },
+        { proposals: [{ ...link, evidence: [""] }] },
+        { proposals: [{ ...event, kind: "Link" }] },
+        // dream-day/4: each segment's part and an idea's entity, the evening, and what was dropped.
+        {
+          segments: five,
+          extra: { parts: ["story", "decision", "photo", "lens:money", "ideas"] },
+        },
+        { segments: five, extra: { parts: ["day", "threads", "questions", "people", "promises"] } },
+        { segments: five, extra: { parts: ["month", "lens:", "lens:a b", 5, "Story"] } },
+        { segments: five, extra: { parts: ["story", "learned"] } },
+        {
+          segments: five,
+          extra: {
+            parts: ["ideas", "ideas", "story", "ideas", "ideas"],
+            ideas: [
+              { segment: 0, entity: "E0" },
+              { segment: 1, entity: "E1" },
+              { segment: 3, entity: "E3" },
+              { segment: 4, entity: "first" },
+              { segment: 4, entity: "E4" },
+              { segment: 5, entity: 5 },
+              { segment: "2", entity: "E2" },
+            ],
+          },
+        },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00Z" } },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00+00:00" } },
+        { extra: { evening: true } },
+        { extra: { evening: false, read_until: "x" } },
+        { extra: { read_until: "x" } },
+        { extra: "x" },
+        { extra: null },
+        {
+          extra: {
+            marked: { "a number beside a person": 2 },
+            dropped: [1],
+            dropped_links: { a: "b" },
+            dropped_segments: null,
+          },
+        },
       ];
       const readBoth = (variant: Record<string, unknown>) => {
         const payload: Record<string, unknown> = {
@@ -771,11 +862,22 @@ describe.skipIf(!ready)(
               malformed: string[];
               segments: Array<Record<string, unknown>>;
               unsupported: number;
-              proposals?: unknown[] | null;
+              proposals?: Array<Record<string, unknown>> | null;
               proposals_unknown: number;
+              links: Array<Record<string, unknown>>;
+              evening: boolean;
+              read_until: string | null;
+              marked: unknown;
+              dropped: unknown;
+              dropped_links: unknown;
+              dropped_segments: unknown;
             };
           }
         ).draft;
+        // The row `show` prints for the draft, on the day it was written.
+        const shown = referenceAll(root, ["show", "2026-06-14"]);
+        expect(shown.status).toBe(0);
+        const theirRow = shown.out.split("\n").find((r) => r.includes("draft of "));
         const line = JSON.parse(
           readFileSync(join(root, "logbook", "2026", "06.jsonl"), "utf-8")
             .trim()
@@ -787,8 +889,25 @@ describe.skipIf(!ready)(
           unknown: theirs.proposals_unknown,
           shown: theirs.proposals?.length ?? null,
         });
+        expect({ variant, row: draftRow(line.payload) }).toEqual({
+          variant,
+          row: theirRow?.slice(theirRow.indexOf("draft of ")),
+        });
         return { ours, theirs };
       };
+      // What the reference's Day reads beside the line, which `readDraft` does not (SPEC-QUESTIONS 119).
+      const beside = ["start_local", "end_local", "where", "confirmed", "kept"];
+      // An event's people the Day names (`{id, name}`); the line gives their ids.
+      const lineOnly = (shown: Record<string, unknown>) =>
+        Object.fromEntries(
+          Object.entries(shown)
+            .filter(([key]) => !beside.includes(key))
+            .map(([key, value]) =>
+              key === "people" && Array.isArray(value)
+                ? [key, value.map((p: { id: unknown }) => p.id)]
+                : [key, value],
+            ),
+        );
       for (const variant of variants) {
         const { ours, theirs } = readBoth(variant);
         expect({ variant, malformed: ours.malformed }).toEqual({
@@ -796,19 +915,79 @@ describe.skipIf(!ready)(
           malformed: theirs.malformed,
         });
         expect(ours.unsupported).toBe(theirs.unsupported);
-        expect(ours.segments).toEqual(
-          theirs.segments.map(({ text, evidence, supported, why }) => ({
-            text,
-            evidence,
-            supported,
-            why,
-          })),
-        );
+        expect({ variant, segments: ours.segments }).toEqual({
+          variant,
+          segments: theirs.segments,
+        });
+        expect({ variant, proposals: ours.proposals, links: ours.links }).toEqual({
+          variant,
+          proposals: (theirs.proposals ?? []).map(lineOnly),
+          links: theirs.links.map(lineOnly),
+        });
+        const { evening, read_until, marked, dropped, dropped_links, dropped_segments } = ours;
+        expect({
+          variant,
+          extra: { evening, read_until, marked, dropped, dropped_links, dropped_segments },
+        }).toEqual({
+          variant,
+          extra: {
+            evening: theirs.evening,
+            read_until: theirs.read_until,
+            marked: theirs.marked,
+            dropped: theirs.dropped,
+            dropped_links: theirs.dropped_links,
+            dropped_segments: theirs.dropped_segments,
+          },
+        });
       }
-      // A known kind of the wrong shape is still malformed in both; the sentence is each one's own
-      // (SPEC-QUESTIONS 117), so only that there is one is held alike.
-      const { ours, theirs } = readBoth({ proposals: [{ ...event, title: "" }, link] });
-      expect([ours.malformed.length > 0, theirs.malformed.length > 0]).toEqual([true, true]);
+      // A known kind of the wrong shape is still malformed in both, in the same words since the
+      // reference's main at 6ee01c2 (SPEC-QUESTIONS 117, answered).
+      for (const proposals of [
+        [{ ...event, title: "" }, goal],
+        [{ ...link, text: "" }, event],
+      ]) {
+        const { ours, theirs } = readBoth({ proposals });
+        expect(ours.malformed).toEqual(theirs.malformed);
+        expect(ours.malformed).toHaveLength(1);
+      }
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "who a note says was there (SPEC §3.2.5 rule 3): the reference and logbook-ts agree",
+  () => {
+    it("every case of tests/with-cases.ts, a day each: the names of `days --json`, and the Day's with row", () => {
+      const root = withRecord();
+      const theirs = new Map<string, string[]>();
+      for (const row of reference(root, ["days", "--json"]).trim().split("\n")) {
+        const { day, people } = JSON.parse(row) as { day: string; people: { names: string[] } };
+        theirs.set(day, people.names);
+      }
+      const ours = new Map(readDayRows(root, {}).rows.map((r) => [r.day, r.people.names]));
+      for (const [i, c] of WITH_CASES.entries()) {
+        const day = caseDay(i);
+        expect({ text: c.text, names: ours.get(day) }).toEqual({
+          text: c.text,
+          names: theirs.get(day),
+        });
+        expect(
+          { text: c.text, names: theirs.get(day) },
+          "the reference moved; tests/with-cases.ts holds its output",
+        ).toEqual({ text: c.text, names: c.expected });
+      }
+      // Five days read as text: the with row the Day prints from the note. (Not the whole Day: a
+      // stay whose next point lies past the Day's window ends at 24:00 in the reference and at its last
+      // point here, SPEC-QUESTIONS 123.)
+      const withRows = (text: string): string[] =>
+        text.split("\n").filter((row) => row.trimStart().startsWith("with "));
+      for (const i of [0, 1, 20, 39, 53]) {
+        const day = caseDay(i);
+        expect({ day, rows: withRows(renderDay(readDay(root, { day }))) }).toEqual({
+          day,
+          rows: withRows(comparableDayText(reference(root, ["day", day]))),
+        });
+      }
     }, 300_000);
   },
 );
