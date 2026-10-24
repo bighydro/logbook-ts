@@ -13,6 +13,7 @@ import {
   type TimelineEntry,
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
+import { wrapText } from "./reflection.js";
 import { mark, signedStateText } from "./signing.js";
 import { boundVoicesSuffix } from "./speakers.js";
 
@@ -106,6 +107,13 @@ export function renderDay(day: Day): string {
     );
   }
   lines.push("");
+  // The owner's reflection in a section of its own, wrapped at 76 columns under its row.
+  if (day.reflection !== undefined) {
+    const r = day.reflection;
+    lines.push(header("reflection", `${localOf(Date.parse(r.at), tz).clock} · ${r.source}`));
+    for (const row of wrapText(r.text)) lines.push(row === "" ? "" : `${" ".repeat(16)}${row}`);
+    lines.push("");
+  }
 
   const under = (indent: string, label: string, value: string): string =>
     `${indent}${pad(label, 12)} ${value}`;

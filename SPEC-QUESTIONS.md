@@ -1378,3 +1378,11 @@ output disagree, or where neither says; nothing is decided here.
     `text`, `evidence` and `unsupported` only, agrees; it gives no `part`. Which keys may a segment
     carry, and where does a reader find its part?
 
+123. **The Day's reflection: "the latest standing one".** docs/day.md says the Day carries "the latest
+    standing one" of the reflections, and the reference's other readers count a line superseded while
+    a line of its kind that is not retracted names it in `supersedes` (its #321). Its Day passes over a
+    retracted reflection, but not a superseded one: a reflection written later that names an earlier
+    one in `supersedes`, with an earlier `at`, leaves the earlier one shown, the latest by `at` (then by
+    `seq`), and so does a plain note naming it. `latestReflection` does the same. Is a reflection that
+    another names in `supersedes` meant to stand on the Day?
+

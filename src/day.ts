@@ -15,6 +15,7 @@ import { isOn, RFC0038, RFC0041 } from "./flags.js";
 import { coordinates, distanceM, mean, roundHalfEven, roundTo } from "./geo.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { isMachineParticipant } from "./machine.js";
+import { type DayReflection, latestReflection } from "./reflection.js";
 import { keeperPhoto, payloadOf, transcriptTitle } from "./render.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import {
@@ -295,6 +296,8 @@ export interface Day {
   signed: SignedState | null;
   /** The day's standing stars (RFC 0041), under the rfc0041 flag and only on a day that has one. */
   stars?: StarJson[];
+  /** The day's latest reflection, a note labelled `reflection`; only on a day that has one. */
+  reflection?: DayReflection;
 }
 
 /** A line read for the day, with its instant and span in ms. */
@@ -529,6 +532,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   const page = dayLines.filter((e) => e.line.kind !== SIGNED_DAY_KIND).map((e) => e.line);
   const signed = signedState(reader.signatures.get(day), timezone, page, day);
   const night = nightLine(entries.filter(standing), ctx);
+  const reflection = latestReflection(dayStanding, timezone);
   // The day's standing stars (RFC 0041 rule 3), each on a line of the day that stands.
   const stars = isOn(RFC0041)
     ? [
@@ -557,6 +561,7 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     ...(night === undefined ? {} : { night }),
     signed,
     ...(stars.length === 0 ? {} : { stars }),
+    ...(reflection === undefined ? {} : { reflection }),
     received: [],
   };
 }
