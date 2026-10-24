@@ -7,5 +7,6 @@
   "head": "3ee025e7a9fbdbbbf5b91de0ec3bfac7ca27c22d53255aecd615e75fbca0c609",
   "owner_emails": [
     "ines.nordmann@example.org"
-  ]
+  ],
+  "demo": "made by `logbook demo`; nothing in it is real"
 }

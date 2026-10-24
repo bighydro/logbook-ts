@@ -298,25 +298,41 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
           evidence: [id("a1"), id("a2")],
           supported: true,
           why: null,
+          part: null,
         },
         {
           text: "One photo from the pontoon, the new mooring lines on.",
           evidence: [id("a3")],
           supported: true,
           why: null,
+          part: null,
         },
         {
           text: "You wrote that the engine sounded right for the first time since May.",
           evidence: [id("a4")],
           supported: true,
           why: null,
+          part: null,
         },
-        { text: "Ola came by in the evening.", evidence: [], supported: false, why: null },
+        {
+          text: "Ola came by in the evening.",
+          evidence: [],
+          supported: false,
+          why: null,
+          part: null,
+        },
       ],
       unsupported: 1,
       proposals: [],
+      links: [],
       proposals_unknown: 0,
       supersedes: null,
+      evening: false,
+      read_until: null,
+      marked: {},
+      dropped: {},
+      dropped_links: {},
+      dropped_segments: {},
       malformed: [],
     });
   });
@@ -330,6 +346,7 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
           evidence: [id("a1"), other],
           supported: false,
           why: "evidence names a line that is not on the day",
+          part: null,
         },
       ]);
       expect(read.unsupported).toBe(1);
@@ -361,10 +378,10 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
       ON_DAY,
     );
     expect(read.segments).toEqual([
-      { text: "a", evidence: [id("a1")], supported: true, why: null },
-      { text: "(no text)", evidence: [], supported: false, why: SHAPE },
-      { text: "5", evidence: [], supported: false, why: SHAPE },
-      { text: "c", evidence: [], supported: false, why: null },
+      { text: "a", evidence: [id("a1")], supported: true, why: null, part: null },
+      { text: "(no text)", evidence: [], supported: false, why: SHAPE, part: null },
+      { text: "5", evidence: [], supported: false, why: SHAPE, part: null },
+      { text: "c", evidence: [], supported: false, why: null, part: null },
     ]);
     expect(read.unsupported).toBe(3);
     expect(read.malformed).toEqual([malformedSegment(2)]);
@@ -388,61 +405,101 @@ const EVENT = {
   people: [],
   evidence: [id("a2"), id("a3")],
 };
-/** A kind no amendment names yet (RFC 0043 proposes `link`): what a newer writer might write. */
-const LINK = { kind: "link", from: id("a3"), to: id("a4") };
+/** How a reader shows that event: numbered, its evidence on the day. */
+const shownEvent = (number: number, event: Record<string, JsonValue> = EVENT) => ({
+  number,
+  ...event,
+  supported: true,
+  why: null,
+});
+/** A link proposal (draft/v1 amendment 2, 2026-10-21): a line of the day that belongs to an idea. */
+const IDEA = id(401);
+const LINK = { kind: "link", entity: IDEA, text: "Crew list", evidence: [id("a4")] };
+const shownLink = (number: number, link: Record<string, JsonValue> = LINK) => ({
+  number,
+  kind: "link",
+  entity: link.entity,
+  text: link.text,
+  note: link.note ?? null,
+  evidence: link.evidence,
+  supported: true,
+  why: null,
+});
+/** A kind no amendment names yet: what a newer writer might write. */
+const GOAL = { kind: "goal", from: id("a3"), to: id("a4") };
 const withProposals = (...proposals: JsonValue[]) => edit(DRAFT, { proposals });
+/** The reference's sentences (6ee01c2, run): one for a link, one for every other malformed proposal. */
 const EVENT_SHAPE =
-  "an event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start before end, nothing else";
-const NO_KIND = "a proposal is an object that names its kind";
+  "a proposal is {kind: event, title, start, end, place, people, evidence}: start before end, both UTC with a Z, people and evidence lists of ids, evidence not empty";
+const LINK_SHAPE =
+  "a link is {kind: link, entity, text, evidence, note?}: entity an entity id, text what it says, evidence a non-empty list of line ids, note a string when given";
 const malformedProposal = (n: number, why: string): string => `proposal ${n} is malformed: ${why}`;
 
-describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward compatibility of 2026-10-19)", () => {
-  it("a draft that proposes nothing has no proposals and none unknown", () => {
+describe("a draft's proposals (draft/v1, amendment of 2026-10-13, forward compatibility of 2026-10-19, amendment 2 of 2026-10-21; the reference at 6ee01c2, run)", () => {
+  it("a draft that proposes nothing has no proposals, no links and none unknown", () => {
     const read = readDraft(DRAFT, ON_DAY);
-    expect([read.proposals, read.proposals_unknown, read.malformed]).toEqual([[], 0, []]);
+    expect([read.proposals, read.links, read.proposals_unknown, read.malformed]).toEqual([
+      [],
+      [],
+      0,
+      [],
+    ]);
   });
 
   it("an unknown kind beside a valid event: the event is shown, one is counted, the line is not malformed", () => {
-    const read = readDraft(withProposals(EVENT, LINK), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    const read = readDraft(withProposals(EVENT, GOAL), ON_DAY);
+    expect(read.proposals).toEqual([shownEvent(1)]);
     expect(read.proposals_unknown).toBe(1);
     expect(read.malformed).toEqual([]);
   });
 
   it("numbers do not move: a proposal keeps its place in the array, the unknown ones counted in it", () => {
-    const read = readDraft(withProposals(LINK, { ...LINK, kind: "goal" }, EVENT), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 3, ...EVENT }]);
+    const read = readDraft(withProposals(GOAL, { ...GOAL, kind: "task" }, EVENT), ON_DAY);
+    expect(read.proposals).toEqual([shownEvent(3)]);
     expect(read.proposals_unknown).toBe(2);
     expect(read.malformed).toEqual([]);
   });
 
+  it("a kind is matched as written: `Link` is a kind the reader does not know", () => {
+    const read = readDraft(withProposals(EVENT, { ...LINK, kind: "Link" }), ON_DAY);
+    expect([read.proposals, read.links, read.proposals_unknown]).toEqual([[shownEvent(1)], [], 1]);
+  });
+
   it("a malformed event is still malformed: the valid ones are shown and the line is said to be malformed", () => {
     const bad = { ...EVENT, title: "" };
-    const read = readDraft(withProposals(EVENT, bad, LINK), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    const read = readDraft(withProposals(EVENT, bad, GOAL), ON_DAY);
+    expect(read.proposals).toEqual([shownEvent(1)]);
     expect(read.proposals_unknown).toBe(1);
     expect(read.malformed).toEqual([malformedProposal(2, EVENT_SHAPE)]);
+    const first = readDraft(withProposals(bad, EVENT), ON_DAY);
+    expect([first.proposals, first.malformed]).toEqual([
+      [shownEvent(2)],
+      [malformedProposal(1, EVENT_SHAPE)],
+    ]);
   });
 
   it("every way an event can be of the wrong shape, each malformed, the first one named", () => {
-    const { place: _place, ...noPlace } = EVENT;
     const shapes: JsonValue[] = [
       { ...EVENT, title: 5 },
       { ...EVENT, title: "  " },
       { ...EVENT, start: "2026-06-13 12:00:00" },
       { ...EVENT, start: "2026-06-13T12:00:00+02:00" },
+      { ...EVENT, start: "2026-06-13T12:00:00+00:00" },
+      // The reference's `day` stops on this one (SPEC-QUESTIONS 121); here it is malformed.
       { ...EVENT, start: "2026-02-30T12:00:00Z" },
       { ...EVENT, end: null },
       { ...EVENT, start: "2026-06-13T16:00:00Z" },
       { ...EVENT, start: "2026-06-13T17:00:00Z" },
       { ...EVENT, place: 5 },
       { ...EVENT, place: "" },
+      { ...EVENT, place: "  " },
       { ...EVENT, people: "Ola" },
       { ...EVENT, people: [5] },
+      { ...EVENT, people: [""] },
       { ...EVENT, evidence: [] },
       { ...EVENT, evidence: "x" },
+      { ...EVENT, evidence: [""] },
       { ...EVENT, colour: "blue" },
-      noPlace,
     ];
     for (const shape of shapes) {
       const read = readDraft(withProposals(shape, { ...EVENT, title: "" }), ON_DAY);
@@ -455,27 +512,64 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
     }
   });
 
-  it("an event with a place and people is shown with them", () => {
-    const named = { ...EVENT, place: "Vollen", people: [id(501)] };
-    expect(readDraft(withProposals(named)).proposals).toEqual([{ number: 1, ...named }]);
+  it("an event may leave `place` out, read as null, and names an id as any non-empty string", () => {
+    const { place: _place, ...noPlace } = EVENT;
+    expect(readDraft(withProposals(noPlace), ON_DAY)).toMatchObject({
+      proposals: [shownEvent(1)],
+      malformed: [],
+    });
+    const blanks = { ...EVENT, people: ["  "] };
+    expect(readDraft(withProposals(blanks), ON_DAY).proposals).toEqual([shownEvent(1, blanks)]);
   });
 
-  it("a proposal that is not an object, or names no kind, is malformed, not unknown", () => {
+  it("start before end to the last digit of the fraction, not to the millisecond", () => {
+    const close = {
+      ...EVENT,
+      start: "2026-06-13T12:00:00.1234Z",
+      end: "2026-06-13T12:00:00.1235Z",
+    };
+    expect(readDraft(withProposals(close), ON_DAY).proposals).toEqual([shownEvent(1, close)]);
+    const coarse = { ...EVENT, start: "2026-06-13T12:00:00.5Z", end: "2026-06-13T12:00:00.50Z" };
+    expect(readDraft(withProposals(coarse), ON_DAY).malformed).toEqual([
+      malformedProposal(1, EVENT_SHAPE),
+    ]);
+  });
+
+  it("an event whose evidence names a line not on the day is shown unsupported, and says why", () => {
+    for (const evidence of [[id(301)], [id("a2"), id(301)], ["  "]]) {
+      const off = { ...EVENT, evidence };
+      expect(readDraft(withProposals(off), ON_DAY).proposals).toEqual([
+        {
+          ...shownEvent(1, off),
+          supported: false,
+          why: "evidence names a line that is not on the day",
+        },
+      ]);
+    }
+  });
+
+  it("an event with a place and people is shown with them", () => {
+    const named = { ...EVENT, place: "Vollen", people: [id(501)] };
+    expect(readDraft(withProposals(named)).proposals).toEqual([shownEvent(1, named)]);
+  });
+
+  it("a proposal that is not an object, or names no kind, is malformed in the event's words", () => {
     for (const bad of [
       "event",
       5,
       null,
       [EVENT],
       {},
-      { ...LINK, kind: "" },
-      { ...LINK, kind: 5 },
+      { ...GOAL, kind: "" },
+      { ...GOAL, kind: "  " },
+      { ...GOAL, kind: 5 },
     ]) {
-      const read = readDraft(withProposals(LINK, bad as JsonValue), ON_DAY);
+      const read = readDraft(withProposals(GOAL, bad as JsonValue, EVENT), ON_DAY);
       expect({ bad, malformed: read.malformed }).toEqual({
         bad,
-        malformed: [malformedProposal(2, NO_KIND)],
+        malformed: [malformedProposal(2, EVENT_SHAPE)],
       });
-      expect(read.proposals_unknown).toBe(1);
+      expect([read.proposals, read.proposals_unknown]).toEqual([[shownEvent(3)], 1]);
     }
   });
 
@@ -483,27 +577,334 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
     for (const bad of ["event", 5, {}, null]) {
       const read = readDraft(edit(DRAFT, { proposals: bad as JsonValue }), ON_DAY);
       expect(read.malformed).toEqual(["proposals must be a list"]);
-      expect([read.proposals, read.proposals_unknown]).toEqual([[], 0]);
+      expect([read.proposals, read.links, read.proposals_unknown]).toEqual([[], [], 0]);
     }
     expect(readDraft(withProposals(), ON_DAY).malformed).toEqual([]);
   });
 
   it("the writer stays strict: draftProblems refuses a kind it does not know, as a writer does", () => {
     expect(draftProblems(withProposals(EVENT))).toEqual([]);
-    expect(draftProblems(withProposals(EVENT, LINK))).toEqual([
-      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+    expect(draftProblems(withProposals(EVENT, LINK))).toEqual([]);
+    expect(draftProblems(withProposals(EVENT, GOAL))).toEqual([
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, link, not 'goal'",
     ]);
-    expect(draftProblems(withProposals({ ...EVENT, title: "" }, LINK, { kind: "goal" }))).toEqual([
+    expect(draftProblems(withProposals({ ...EVENT, title: "" }, GOAL, { kind: "task" }))).toEqual([
       malformedProposal(1, EVENT_SHAPE),
-      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, link, not 'goal'",
     ]);
     // In the field table's order: `supersedes`, then `proposals`, then amendment 1's `read_policy`.
     expect(
-      draftProblems(edit(DRAFT, { supersedes: 5, proposals: [LINK], read_policy: "x" })),
+      draftProblems(edit(DRAFT, { supersedes: 5, proposals: [GOAL], read_policy: "x" })),
     ).toEqual([
       "supersedes must be the id of the earlier draft",
-      "proposal 1 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "proposal 1 is of a kind a writer may not write: kind must be one of event, link, not 'goal'",
       "read_policy must be { entry, max_tier, sha256 }: the policy entry read through, its ceiling then (0 to 3), and the sha256 of policy/crossing.json as read, 64 lowercase hex characters",
+    ]);
+  });
+});
+
+describe("a draft's links (draft/v1 amendment 2, 2026-10-21; the reference at 6ee01c2, run)", () => {
+  it("a link is known: shown under links, numbered by its place among all the proposals, never counted unknown", () => {
+    const read = readDraft(withProposals(LINK, { ...LINK, text: "Two" }, EVENT, GOAL), ON_DAY);
+    expect(read.links).toEqual([shownLink(1), shownLink(2, { ...LINK, text: "Two" })]);
+    expect(read.proposals).toEqual([shownEvent(3)]);
+    expect([read.proposals_unknown, read.malformed]).toEqual([1, []]);
+  });
+
+  it("a note, when given, is shown; absent, it is null", () => {
+    const noted = { ...LINK, note: "from the evening's note" };
+    expect(readDraft(withProposals(noted), ON_DAY).links).toEqual([shownLink(1, noted)]);
+  });
+
+  it("the entity is any non-blank string, and evidence ids any non-empty string, repeated or not", () => {
+    for (const link of [
+      { ...LINK, entity: "crew" },
+      { ...LINK, evidence: [id("a4"), id("a4")] },
+    ]) {
+      expect(readDraft(withProposals(link), ON_DAY).links).toEqual([shownLink(1, link)]);
+    }
+  });
+
+  it("a link whose evidence names a line not on the day is shown unsupported, and says why", () => {
+    for (const evidence of [[id(301)], [id("a4"), id(301)], ["  "]]) {
+      const off = { ...LINK, evidence };
+      expect(readDraft(withProposals(off), ON_DAY).links).toEqual([
+        {
+          ...shownLink(1, off),
+          supported: false,
+          why: "evidence names a line that is not on the day",
+        },
+      ]);
+    }
+  });
+
+  it("every way a link can be of the wrong shape, each malformed in the link's words, the first one named", () => {
+    const { entity: _entity, ...noEntity } = LINK;
+    const shapes: JsonValue[] = [
+      // The shape a stand-in for an unknown kind had here before amendment 2 named `link`.
+      { kind: "link", from: id("a3"), to: id("a4") },
+      { ...LINK, ref: "x" },
+      noEntity,
+      { ...LINK, entity: 5 },
+      { ...LINK, entity: "" },
+      { ...LINK, entity: "  " },
+      { ...LINK, text: "" },
+      { ...LINK, text: "  " },
+      { ...LINK, text: 5 },
+      { ...LINK, evidence: [] },
+      { ...LINK, evidence: id("a4") },
+      { ...LINK, evidence: [5] },
+      { ...LINK, evidence: [""] },
+      { ...LINK, note: "" },
+      { ...LINK, note: "  " },
+      { ...LINK, note: null },
+      { ...LINK, note: 3 },
+    ];
+    for (const shape of shapes) {
+      const read = readDraft(withProposals(shape, { ...EVENT, title: "" }, LINK), ON_DAY);
+      expect({ shape, links: read.links, malformed: read.malformed }).toEqual({
+        shape,
+        links: [shownLink(3)],
+        malformed: [malformedProposal(1, LINK_SHAPE)],
+      });
+      expect([read.proposals, read.proposals_unknown]).toEqual([[], 0]);
+    }
+  });
+});
+
+describe("what a draft's extra tells a reader (dream-day/4 and draft/v1 amendment 2; the reference at 6ee01c2, run)", () => {
+  const FIVE = [
+    { text: "S1", evidence: [id("a1")] },
+    { text: "S2", evidence: [id("a4")] },
+    { text: "S3", evidence: [id("a3")] },
+    { text: "S4", evidence: [id("a4")] },
+    { text: "S5", unsupported: true },
+  ];
+  const withExtra = (extra: JsonValue, segments: JsonValue[] = FIVE) =>
+    readDraft(edit(DRAFT, { segments, extra }), ON_DAY);
+  const parts = (extra: JsonValue, segments: JsonValue[] = FIVE) =>
+    withExtra(extra, segments).segments.map((s) => s.part);
+
+  it("each segment's part, from extra.parts: the day's parts, dream-day/3's and dream-day/4's, and lens:<id>", () => {
+    expect(parts({ parts: ["day", "threads", "questions", "people", "promises"] })).toEqual([
+      "day",
+      "threads",
+      "questions",
+      "people",
+      "promises",
+    ]);
+    expect(parts({ parts: ["story", "decision", "photo", "lens:money", "ideas"] })).toEqual([
+      "story",
+      "decision",
+      "photo",
+      "lens:money",
+      "ideas",
+    ]);
+    expect(
+      parts({ parts: ["learned", "lens:a:b", "lens: x", "lens:x\ny", "lens:Boat X"] }),
+    ).toEqual(["learned", "lens:a:b", "lens: x", "lens:x\ny", "lens:Boat X"]);
+  });
+
+  it("a part the day's draft does not have is null: another unit's, another case, `lens:` alone, not a string", () => {
+    expect(parts({ parts: ["month", "where", "goals", "next_month", "question"] })).toEqual(
+      Array(5).fill(null),
+    );
+    expect(parts({ parts: ["arc", "rule", "held", "closed", "Story"] })).toEqual(
+      Array(5).fill(null),
+    );
+    expect(parts({ parts: ["foo", "lens:", "week", 5, null] })).toEqual(Array(5).fill(null));
+  });
+
+  it("extra.parts is read only when it is a list as long as the segments read", () => {
+    for (const extra of [
+      { parts: ["story", "learned"] },
+      { parts: ["story", "learned", "ideas", "ideas", "photo", "story"] },
+      { parts: "story" },
+      {},
+    ]) {
+      expect(parts(extra)).toEqual(Array(5).fill(null));
+    }
+    // A segment that is not an object is not read, so two parts for one segment read are none.
+    expect(
+      parts({ parts: ["story", "photo"] }, ["x", { text: "b", evidence: [id("a1")] }]),
+    ).toEqual([null]);
+    expect(parts({ parts: ["story", "photo"] }, [{ text: "a" }, FIVE[0] as JsonValue])).toEqual([
+      "story",
+      "photo",
+    ]);
+  });
+
+  it("an ideas segment carries the idea it moved, from extra.ideas by segment number from 1; the last entry wins", () => {
+    const ideas = withExtra({
+      parts: ["ideas", "ideas", "story", "ideas", "ideas"],
+      ideas: [
+        { segment: 0, entity: "E0" },
+        { segment: 1, entity: "E1" },
+        { segment: 3, entity: "E3" },
+        { segment: 4, entity: "first" },
+        { segment: 4, entity: "E4" },
+        { segment: 9, entity: "E9" },
+      ],
+    }).segments;
+    expect(ideas.map((s) => ("entity" in s ? s.entity : "-"))).toEqual(["E1", "-", "-", "E4", "-"]);
+  });
+
+  it("an entry of extra.ideas that is not {segment: an integer, entity: a string} is passed by", () => {
+    const ideas = withExtra({
+      parts: ["ideas", "ideas", "ideas", "ideas", "ideas"],
+      ideas: [
+        { segment: "1", entity: "E1" },
+        { segment: 2, entity: 5 },
+        { segment: 3 },
+        7,
+        { segment: 4, entity: "" },
+        { segment: true, entity: "T" },
+        { segment: 2.5, entity: "F" },
+        { segment: 5, entity: { id: 1 } },
+      ],
+    }).segments;
+    expect(ideas.map((s) => ("entity" in s ? s.entity : "-"))).toEqual(["-", "-", "-", "", "-"]);
+    expect(
+      withExtra({ parts: Array(5).fill("ideas"), ideas: { segment: 1, entity: "X" } }).segments.map(
+        (s) => "entity" in s,
+      ),
+    ).toEqual(Array(5).fill(false));
+  });
+
+  it("the evening: extra.evening true and read_until the moment read up to, else false and read_until as written", () => {
+    expect(withExtra({ evening: true, read_until: "2026-06-13T18:00:00Z" })).toMatchObject({
+      evening: true,
+      read_until: "2026-06-13T18:00:00Z",
+      malformed: [],
+    });
+    expect(withExtra({ read_until: "x" })).toMatchObject({
+      evening: false,
+      read_until: "x",
+      malformed: [],
+    });
+    expect(withExtra({})).toMatchObject({ evening: false, read_until: null, malformed: [] });
+    for (const read_until of [
+      "2026-06-13T18:00:00.123456Z",
+      "2026-02-30T18:00:00Z",
+      "2026-06-13T24:00:00Z",
+    ]) {
+      expect(withExtra({ evening: true, read_until }).malformed).toEqual([]);
+    }
+  });
+
+  it("extra.evening is true when present; an evening draft's read_until is UTC with a Z", () => {
+    for (const evening of [false, null, 1, "true"]) {
+      expect(withExtra({ evening, read_until: "2026-06-13T18:00:00Z" })).toMatchObject({
+        evening: false,
+        read_until: "2026-06-13T18:00:00Z",
+        malformed: ["extra.evening is true when present"],
+      });
+    }
+    for (const read_until of [
+      undefined,
+      5,
+      "yesterday",
+      "2026-06-13T18:00:00+00:00",
+      "2026-06-13T18:00Z",
+      "2026-06-13t18:00:00z",
+      "2026-06-13 18:00:00Z",
+    ]) {
+      const read = withExtra(
+        read_until === undefined ? { evening: true } : { evening: true, read_until },
+      );
+      expect({ read_until, evening: read.evening, malformed: read.malformed }).toEqual({
+        read_until,
+        evening: true,
+        malformed: [
+          "an evening draft's extra.read_until is the moment it read up to, UTC with a Z",
+        ],
+      });
+      expect(read.read_until).toBe(typeof read_until === "string" ? read_until : null);
+    }
+  });
+
+  it("extra, when the key is there, is an object; null is not one", () => {
+    for (const extra of ["x", [], 5, null]) {
+      expect(withExtra(extra).malformed).toEqual(["extra must be an object"]);
+    }
+  });
+
+  it("what the writer marked and dropped, by why, as written when it is an object", () => {
+    const read = withExtra({
+      marked: { "a number beside a person": 2 },
+      dropped: { questions: 1 },
+      dropped_links: { "an id the material did not give": 1 },
+      dropped_segments: { x: 3 },
+    });
+    expect([read.marked, read.dropped, read.dropped_links, read.dropped_segments]).toEqual([
+      { "a number beside a person": 2 },
+      { questions: 1 },
+      { "an id the material did not give": 1 },
+      { x: 3 },
+    ]);
+    const odd = withExtra({
+      marked: [1],
+      dropped: "x",
+      dropped_links: { a: "b", c: -1, d: 1.5, e: true },
+      dropped_segments: null,
+    });
+    expect([odd.marked, odd.dropped, odd.dropped_links, odd.dropped_segments]).toEqual([
+      {},
+      {},
+      { a: "b", c: -1, d: 1.5, e: true },
+      {},
+    ]);
+  });
+
+  it("hands back copies: changing what it read never changes the line", () => {
+    const draft = edit(DRAFT, {
+      proposals: [EVENT, LINK],
+      extra: {
+        marked: { a: 1 },
+        dropped: { b: 2 },
+        dropped_links: { c: 3 },
+        dropped_segments: { d: 4 },
+      },
+    });
+    const before = JSON.stringify(draft);
+    const read = readDraft(draft, ON_DAY);
+    for (const counts of [read.marked, read.dropped, read.dropped_links, read.dropped_segments]) {
+      counts.x = 99;
+    }
+    read.proposals[0]?.evidence.push("x");
+    read.links[0]?.evidence.push("x");
+    read.segments[0]?.evidence.push("x");
+    expect(JSON.stringify(draft)).toBe(before);
+  });
+
+  it("names every problem in the reference's order, extra's last", () => {
+    const read = readDraft(
+      edit(DRAFT, {
+        read_head: "x",
+        read_count: -1,
+        language: "english",
+        segments: [{ text: "x" }],
+        supersedes: 5,
+        proposals: [{ kind: "link" }],
+        extra: { evening: 1 },
+      }),
+      ON_DAY,
+    );
+    expect(read.malformed).toEqual([
+      "read_head must be the record's head, 64 lowercase hex characters",
+      "read_count must be how many lines of the unit the model read",
+      "language must be a BCP 47 tag, en or nb",
+      malformedSegment(1),
+      "supersedes must be the id of the earlier draft",
+      malformedProposal(1, LINK_SHAPE),
+      "extra.evening is true when present",
+    ]);
+    expect(
+      readDraft(edit(DRAFT, { supersedes: 5, proposals: "x", extra: "x" }), ON_DAY).malformed,
+    ).toEqual([
+      "supersedes must be the id of the earlier draft",
+      "proposals must be a list",
+      "extra must be an object",
     ]);
   });
 });
@@ -596,6 +997,27 @@ describe("the row show prints for a draft, as the reference prints it (run)", ()
       expect(row({ supersedes: value })).toBe(
         "draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported",
       );
+    }
+  });
+
+  it("the proposals it holds, events and links, each counted when there is one (the reference at 6ee01c2, run)", () => {
+    const event = { kind: "event" };
+    const link = { kind: "link" };
+    const head = "draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported";
+    expect(row({ proposals: [event] })).toBe(`${head} · 1 proposed event`);
+    expect(row({ proposals: [link] })).toBe(`${head} · 1 proposed link`);
+    expect(row({ proposals: [link, event, link] })).toBe(
+      `${head} · 1 proposed event · 2 proposed links`,
+    );
+    // Every entry that is not a link counts as an event, whatever its kind or shape.
+    expect(row({ proposals: [{ kind: "task" }, 5, {}, { kind: "Link" }, link] })).toBe(
+      `${head} · 4 proposed events · 1 proposed link`,
+    );
+    expect(row({ proposals: [event, link, link], supersedes: id("d0") })).toBe(
+      `${head} · 1 proposed event · 2 proposed links · supersedes an earlier draft`,
+    );
+    for (const none of [[], "x", { kind: "event" }, null]) {
+      expect(row({ proposals: none as JsonValue })).toBe(head);
     }
   });
 

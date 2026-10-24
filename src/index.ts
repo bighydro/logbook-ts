@@ -76,6 +76,7 @@ export { distanceText, durationText, healthText, renderDay, sleptText } from "./
 export {
   DRAFT_KIND,
   DRAFT_SCHEMA,
+  type DraftLink,
   type DraftProposal,
   type DraftRead,
   type DraftSegment,

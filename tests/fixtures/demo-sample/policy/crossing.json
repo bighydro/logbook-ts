@@ -1,5 +1,5 @@
 {
-  "hermes": {
-    "max_tier": 2
+  "mcp": {
+    "max_tier": 1
   }
 }

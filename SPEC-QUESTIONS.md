@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1314,6 +1314,16 @@ cross-implementation job runs it at a86787c).
        in a finer fraction are taken as equal and the event as malformed.
     e. The changelog fragment and the RFC date the amendment 19 October 2026; it landed on the reference's
        main on 21 October (a86787c, its #342).
+    *Answered in part (the reference's main at 6ee01c2, 2026-10-22, run on synthetic drafts; draft/v1
+    amendment 2).* a: the reference's words are `proposal N is malformed: a proposal is {kind: event, title,
+    start, end, place, people, evidence}: start before end, both UTC with a Z, people and evidence lists of
+    ids, evidence not empty` for every malformed proposal that is not a link (not an object, no kind, an
+    event of another shape), and `… a link is {kind: link, entity, text, evidence, note?}: …` for a link;
+    `proposals must be a list` was already its own. This implementation now writes the same sentences. b:
+    an event or a link whose evidence names a line not on the unit is not malformed; it is shown with
+    `supported: false` and the segment's why, as a segment is. c: a `kind` of only blanks is malformed, not
+    unknown; so it is here now. d: an empty list is not malformed there either. f: the reference compares
+    `start` and `end` to the last digit of the fraction; so does this implementation now. e stays open.
 
 118. **The route's text, learned from the reference's output at a86787c (fa41791, its #343).** Its changelog
     says an unnamed stay is `near <place>, x km` or the nearest airport's city, "the coordinates only
@@ -1324,3 +1334,85 @@ cross-implementation job runs it at a86787c).
     their coordinates, one alike only with a named neighbour keeps them alone, two alike with
     another stop between them both drop them. `routeText` does the same from the JSON's labels.
     Should SPEC §3.2.6 say it, since the text is a reader's own?
+
+## Found while catching up with the reference at its main of 22 October (6ee01c2; rfcs/0036-draft-v1.md and its amendment 2, docs/dream.md *The dream learns*, docs/rfcs/0027-reflection.md's amendment of 2026-10-21, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5)
+
+Learned by running the reference at 6ee01c2 on synthetic records, beside its docs; no source was read.
+Each entry says where its docs and its output part, or what is left open; nothing here is decided.
+
+119. **What the Day reads beside a draft.** The reference's `day --json` gives a day's draft with fields
+    read from the record around the line: `lenses` (the questions of `policy/questions.json` marked
+    `"ask": "day"`, each `{id, text, answered}`), `closing` (the story's last line, from the next day's
+    timed entries), `since_signed` and `signed_seq`, `kept` and `confirmed` on a proposal, an event's
+    `start_local`, `end_local`, `where` and its `people` named (`{id, name}`), and `earlier`, `dreamed` and
+    `last`. `readDraft` reads the line alone (with the ids of its unit): its segments and each one's part,
+    the events and links, `evening`, `read_until`, `marked`, `dropped`, `dropped_links` and
+    `dropped_segments`; the Day here does not show a draft, so none of the others is read, and
+    `policy/questions.json` is not read at all. Which fields of a draft's JSON is a second implementation
+    compared on? SPEC §6.1 names none of them.
+
+120. **A link's `entity` and its evidence.** RFC 0036's amendment 2 says `entity` is "a canonical entity id,
+    an idea's or an org's, that the material named", and the reader's own sentence says "entity an entity
+    id"; the reader takes any string that is not blank (`"crew"`). Its evidence is "the line ids it rests
+    on, non-empty, each a line of the unit": a link whose evidence names another line is shown unsupported,
+    not malformed, and an id is any non-empty string, so `"  "` is read as an id (and is on no unit) while
+    `""` makes the link malformed. The same holds for an event's `people` and `evidence`. This
+    implementation does as the reference does. Should a reader hold `entity` to an id of RFC 0037's form,
+    and an id to something that is not blank?
+
+121. **An event's `place`, and an impossible instant.** The RFC's table and the reader's sentence both list
+    `place` among an event's keys, yet the reader shows an event with no `place` (as `null`). And an event
+    whose `start` or `end` is not a real instant (`2026-02-30T12:00:00Z`, `…T24:00:00Z`) does not make the
+    proposal malformed: `logbook day` exits 2 (`day: day is out of range for month`, `day: hour must be in
+    0..23`) and prints nothing,
+    against "a reader is lenient". Here `place` may be left out, as there, and such an event is malformed
+    and the Day goes on. Is `place` optional, and is the exit the reference's bug?
+
+122. **`extra.evening` and `extra.read_until`.** Amendment 2 item 2 says `read_until` is RFC 3339 UTC with a
+    `Z` and is "absent on every other draft" than an evening one, and that `false` is not written. The
+    reader calls `evening` other than `true` malformed (`extra.evening is true when present`), and an
+    evening draft's `read_until` that is not `YYYY-MM-DDTHH:MM:SS[.f]Z` (`an evening draft's
+    extra.read_until is the moment it read up to, UTC with a Z`), but takes `2026-02-30T18:00:00Z` and
+    `…T24:00:00Z` as instants, and says nothing of a `read_until` on a draft that is not an evening's
+    (its JSON gives it as written). A null `extra` is `extra must be an object`. This implementation does
+    the same. Should a reader hold `read_until` to a real instant, and its absence elsewhere?
+
+123. **A stay at the edge of a reader's window.** §3.2.1 rule 4 ends a cluster at "the subject's next point"
+    when that point comes `merge_gap_s` or more later within a walk, and §3.2.2 gives a reader the lines
+    from the first day's midnight to the end of the last day's night window. The reference looks the next
+    point up past the window: on a record whose points stop at 22:40 at home and resume at 16:00 the next
+    day, its Day shows `00:00–24:00 stay Home · 24 h`; this implementation reads the window only and shows
+    `00:00–22:40`. Found by this catch-up's company cases (tests/with-cases.ts), the same at a86787c, so
+    older than it, and not changed here: `day`, `days`, `trips` and the rollups would all need the next
+    point, and the spec says which lines a window holds but not whether rule 4 may look past it. Which is
+    meant?
+
+124. **A segment's part, and an idea's entity.** docs/dream.md names the parts of a day's draft (`story`,
+    `lens:<id>`, `threads`, `learned`, `decision`, `ideas`, `questions`, `people`, `promises`, `photo`, and
+    dream-day/3's `day`) and those of a month (`month`, `where`, `goals`, `next_month`, `question`) and of a
+    chapter (`arc`, `rule`, `held`, `closed`). The reference's Day reads `extra.parts` only when it is a list
+    exactly as long as the segments it reads, and a part outside the day's as none, so a month's parts on a
+    day's draft are `null`; how it reads the parts of a month's or a chapter's draft no command shows, so
+    `readDraft` reads the day's set for every unit. `lens:` takes any id that is not empty (`lens:a b`,
+    `lens:a:b`, a line break), and RFC 0027 does not say what a question's id may hold. docs/dream.md says
+    each `ideas` segment carries `entity`; the reader gives it only to the segment an `extra.ideas` entry
+    names (`{segment, entity}`, the segment counted from 1, an integer and a string, the last entry
+    winning, an empty string kept), and an `ideas` segment no entry names has no `entity` key at all.
+
+125. **Who a note says was there.** SPEC §3.2.5 rule 3: "whose text says `with <Name>`, the names
+    capitalised and joined by `and`, `og` or `&`, … by rule 2's name match; `with US`, an acronym, a
+    country or a name the record does not know names nobody." This implementation read every person's full
+    label anywhere after a `with` in the sentence, so `not-with: Ola Nordmann, …` (the reference's #351
+    writes such notes) and `with friends, Ola Nordmann` named Ola, and `with Kari` (a first name) named
+    nobody. It now reads the rule as the reference does, learned from its output on 81 notes
+    (tests/with-cases.ts): `with` in lower case at the start of a word (`not-with Ola` and `co-with Ola`
+    name Ola; `With Ola` names nobody), white space, then names of capitalised words (letters, digits,
+    `_`, `'`, `-`) joined by `and`, `og` or `&` with white space on both sides, the first word that is not
+    one ending the list. Two points the text does not settle: the name match is case aside, so `with OLA`
+    names Ola Nordmann, and on the records run an acronym named nobody because no label's first word
+    was it (whether `with US` names a person labelled `Us Berg` was not run); and the owner, who is never company, does not end the list
+    (`with Ola and Ines and Per` names Ola and Per), though a first name the owner shares makes a name
+    ambiguous (with Ines Berg in the record, `with Ines` names nobody). A typographic apostrophe is not a
+    name's character (`with Per’s boat` names Per Hansen, `with Per's boat` nobody). Should the rule say
+    so?
+

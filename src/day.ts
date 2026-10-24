@@ -1255,24 +1255,32 @@ function heldAt(event: Entry, stays: Stay[], ctx: PeopleContext): boolean {
   );
 }
 
-/** A note's `with <name>`: every person the record names who follows a `with` in one sentence. */
-function namedWith(body: string, ctx: PeopleContext): Array<Someone & { index: number }> {
-  const out: Array<Someone & { index: number }> = [];
-  const people = ctx.resolver.people();
-  let offset = 0;
-  for (const sentence of body.split(/(?<=[.!?;\n])/)) {
-    const m = /\bwith\b/i.exec(sentence);
-    if (m !== null) {
-      for (const [id, name] of people) {
-        if (ctx.owner.ids.has(id) || ctx.owner.names.has(name.toLowerCase())) continue;
-        const at = sentence.indexOf(name, m.index + m[0].length);
-        if (at === -1) continue;
-        if (!out.some((o) => o.id === id)) out.push({ id, name, index: offset + at });
-      }
+/** A name a note gives: a capitalised word, then more of them, each its letters, digits, `_`, `'` or `-`. */
+const NAME_WORD = "\\p{Lu}[\\p{L}\\p{N}_'-]*";
+const NAME = `${NAME_WORD}(?:\\s+${NAME_WORD})*`;
+/** `with` in lower case at the start of a word, then the names, joined by `and`, `og` or `&` between spaces. */
+const WITH_NAMES = new RegExp(
+  `(?<![\\p{L}\\p{N}_])with\\s+(${NAME}(?:\\s+(?:and|og|&)\\s+${NAME})*)`,
+  "gu",
+);
+const JOINER = /\s+(?:and|og|&)\s+/u;
+
+/**
+ * A note's `with <Name>` (SPEC §3.2.5 rule 3): the names capitalised and joined by `and`, `og` or `&`,
+ * each the person rule 2's name match finds (`personByName`), in the order the note gives them; the
+ * first word that is not a name ends the list, so `with friends, Ola` and the notes of who was there
+ * (`not-with: Ola Nordmann, …`) name nobody. As the reference reads it at its main of 6ee01c2 (run on
+ * tests/with-cases.ts; SPEC-QUESTIONS 125).
+ */
+function namedWith(body: string, ctx: PeopleContext): Someone[] {
+  const out: Someone[] = [];
+  for (const m of body.matchAll(WITH_NAMES)) {
+    for (const name of (m[1] as string).split(JOINER)) {
+      const who = personByName(name, ctx);
+      if (who !== undefined && !out.some((o) => o.id === who.id)) out.push(who);
     }
-    offset += sentence.length;
   }
-  return out.sort((a, b) => a.index - b.index);
+  return out;
 }
 
 /** The evidence attached to a stay or a run aboard that can say who was there. */
