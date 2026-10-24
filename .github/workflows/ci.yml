@@ -164,8 +164,8 @@ jobs:
     # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
     # reference beside ours on payload variants, on synthetic records and on that record.
     #
-    # Since 2026-10-24 `REFERENCE` is 5f9426b7, the reference's main of that day, thirty-five commits
-    # past 6ee01c20 (the catch-up of 2026-10-22, #27) and sixty-four past its release 0.7.0
+    # Since 2026-10-24 `REFERENCE` is f82f2b7e, the reference's main of that day, thirty-six commits
+    # past 6ee01c20 (the catch-up of 2026-10-22, #27) and sixty-five past its release 0.7.0
     # (b82a11c4); of them four change what is compared here: #374, what can be kept of a day's
     # draft is numbered (`keep`); #406, a payment and its receipt counted once on the Day
     # (tests/receipts-cases.ts); #355, `show`'s row of `heard/v1` under the rfc0046 flag
