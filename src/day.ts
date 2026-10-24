@@ -1128,14 +1128,15 @@ function buildTimeline(
 
 const rank = (t: TimelineEntry): number => (t.kind === "flight" ? 1 : 0);
 
-/** `→ Ola Nordmann, 15 min`: the call as a row prints it. */
+/** `15 min → Ola Nordmann`, `→ Ola Nordmann, no answer`: the call as a row prints it. */
 export function callText(call: AttachedCall): string {
   const outgoing = call.direction === "outgoing";
-  const parts = [`${outgoing ? "→" : "←"} ${call.who}`];
-  if (!call.answered) parts.push(outgoing ? "no answer" : "missed");
-  else if (call.duration_s >= 60) parts.push(`${Math.floor(call.duration_s / 60)} min`);
-  else parts.push(`${call.duration_s} s`);
-  return parts.join(", ");
+  const who = `${outgoing ? "→" : "←"} ${call.who}`;
+  if (!call.answered) return `${who}, ${outgoing ? "no answer" : "missed"}`;
+  // The length first, so no number stands beside a name (the reference's #394): `15 min → Ola Nordmann`.
+  const length =
+    call.duration_s >= 60 ? `${Math.floor(call.duration_s / 60)} min` : `${call.duration_s} s`;
+  return `${length} ${who}`;
 }
 
 // ---------------------------------------------------------------------------------------------

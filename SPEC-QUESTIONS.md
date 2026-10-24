@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125, and at a6ee131 (2026-10-24; docs/receipts.md, docs/signed-day.md, rfcs/0046-what-you-heard.md) for 126–130.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125, and at a6ee131 and ef4d72e (2026-10-24; docs/receipts.md, docs/signed-day.md, rfcs/0046-what-you-heard.md, changelog.d/no-count-beside-a-contact.md) for 126–131.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1469,4 +1469,14 @@ records, beside its docs; no source was read. Nothing here is decided.
     here; a flight with no `end` is printed at its departure padded to a span's width there
     (`20:00        flight XY 1`) and unpadded here. Should the spec's company rule (§3.2.5) name the
     machine mark?
+
+131. **No number beside a name, and where it still stands (the reference's #394, ef4d72e).** Its changelog:
+    "The readers of a day, a week, an org and an idea set no number beside a person's name": a call on the
+    Day reads `19 min ← Ola Nordmann`, a recording's voices are named "in the order of who spoke most,
+    without their minutes, `you · Kari Nordmann and 1 unnamed`". Run at ef4d72e: the Day's rows do so
+    (and this implementation now does), but `show` still prints a call as `→ +447700900123, 1 min` and a
+    transcript as `Middag — Ola Nordmann; 2 min`, the Day's `with` row still `Ola Nordmann (transcript) ·
+    1 unnamed`, and an unanswered call `→ Ola Nordmann, no answer`, as before. Two voices that spoke
+    equally long keep their line's order, and a voice with no length comes after every voice with one.
+    Is `show`, a list of lines, meant to keep its numbers, and should the rule be written for every reader?
 

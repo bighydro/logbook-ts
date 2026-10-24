@@ -5,7 +5,7 @@
 
   timeline      nothing logged
 
-  unplaced      08:00  transcript Idé, hørt igjen · S1 2 min
+  unplaced      08:00  transcript Idé, hørt igjen · S1
 
   health        no lines
   sources       transcription 1 line, last 08:00

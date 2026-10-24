@@ -12,7 +12,7 @@
       10:05–13:00  move   9.7 km · 2 h 55 min · boat
       13:00–24:00  stay   59.8500,10.6000 · 11 h
       note         Cast off at ten with Ola Nordmann and Anders Vik. Light wind from the s…
-      call         → Ola Nordmann, 15 min
+      call         15 min → Ola Nordmann
       with         Ola Nordmann (note), Anders Vik (note)
 
   health        6,671 steps · resting 54 bpm

@@ -172,7 +172,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     ],
     expected: {
       rows: [
-        "unplaced      19:00  transcript Middag · Kari Nordmann 10 min · Ola Nordmann 5 min · Gjest 1 min · you 30 s · 1 unnamed · recorded with consent: unknown",
+        "unplaced      19:00  transcript Middag · Kari Nordmann · Ola Nordmann · Gjest · you and 1 unnamed · recorded with consent: unknown",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000002": [
@@ -243,7 +243,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     ],
     expected: {
       rows: [
-        "unplaced      19:00  transcript Middag · Ola Nordmann 1 min · Kari Nordmann 30 s · 1 unnamed · recorded with consent: no",
+        "unplaced      19:00  transcript Middag · Ola Nordmann · Kari Nordmann and 1 unnamed · recorded with consent: no",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000001": [
@@ -294,7 +294,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
       speaker(1, "S1", OWNER, { consent: "no" }),
     ],
     expected: {
-      rows: ["unplaced      19:00  transcript Middag · you 10 min · Kari Nordmann 5 min"],
+      rows: ["unplaced      19:00  transcript Middag · you · Kari Nordmann"],
       speakers: {
         "00000000-0000-4000-8000-000000000001": [
           {
@@ -337,7 +337,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     ],
     expected: {
       rows: [
-        "unplaced      19:00  transcript Middag · you 10 min · Kari Nordmann 5 min · S3 2 min · recorded with consent: unknown",
+        "unplaced      19:00  transcript Middag · you · Kari Nordmann · S3 · recorded with consent: unknown",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000001": [
@@ -386,8 +386,8 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     ],
     expected: {
       rows: [
-        "unplaced      13:00  transcript Lunsj · Ola Nordmann 50 s · S2 40 s · recorded with consent: unknown",
-        "unplaced      19:00  transcript Middag · you 10 min · Ola Nordmann 5 min · recorded with consent: unknown",
+        "unplaced      13:00  transcript Lunsj · Ola Nordmann · S2 · recorded with consent: unknown",
+        "unplaced      19:00  transcript Middag · you · Ola Nordmann · recorded with consent: unknown",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000002": [
@@ -447,7 +447,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
       speaker(1, "S2", OLA, { label: "Ola Nordmann" }),
     ],
     expected: {
-      rows: ["unplaced      19:00  transcript Middag igjen · you 10 min · B 5 min"],
+      rows: ["unplaced      19:00  transcript Middag igjen · you · B"],
       speakers: {
         "00000000-0000-4000-8000-000000000002": [
           {
@@ -593,7 +593,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     lines: [transcript("Middag", [voice("S1", 60), voice("T1")]), text(1, "T1", OLA)],
     expected: {
       rows: [
-        "unplaced      19:00  transcript Middag · S1 1 min · Ola Nordmann · recorded with consent: unknown",
+        "unplaced      19:00  transcript Middag · S1 · Ola Nordmann · recorded with consent: unknown",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000001": [
@@ -652,7 +652,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     ],
     expected: {
       rows: [
-        "unplaced      19:00  transcript Middag · you 10 min · S2 5 min · Kari Nordmann 2 min · Kari Nordmann 50 s · Per Nordmann 7 s · recorded with consent: unknown",
+        "unplaced      19:00  transcript Middag · you · S2 · Kari Nordmann · Kari Nordmann · Per Nordmann · recorded with consent: unknown",
       ],
       speakers: {
         "00000000-0000-4000-8000-000000000001": [
@@ -732,7 +732,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     places: true,
     expected: {
       rows: [
-        "transcript   Middag · you 10 min · Kari Nordmann 5 min · Ola Nordmann 2 min · Ola Nordmann 1 min · recorded with consent: unknown",
+        "transcript   Middag · you · Kari Nordmann · Ola Nordmann · Ola Nordmann · recorded with consent: unknown",
         "with         Kari Nordmann (transcript)",
       ],
       speakers: {
@@ -813,7 +813,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     places: true,
     expected: {
       rows: [
-        "transcript   Middag · Ola Nordmann 5 min · recorded with consent: unknown",
+        "transcript   Middag · Ola Nordmann · recorded with consent: unknown",
         "with         Ola Nordmann (transcript)",
       ],
       speakers: {
@@ -866,7 +866,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     places: true,
     expected: {
       rows: [
-        "transcript   Middag · Ola Nordmann 3 min · 2 unnamed · recorded with consent: unknown",
+        "transcript   Middag · Ola Nordmann and 2 unnamed · recorded with consent: unknown",
         "with         Ola Nordmann (transcript), Kari Nordmann (transcript) · 2 unnamed",
       ],
       speakers: {
@@ -946,7 +946,7 @@ export const SPEAKER_CASES: SpeakerCase[] = [
     places: true,
     expected: {
       rows: [
-        "transcript   Middag · Ola Nordmann · 1 unnamed · recorded with consent: unknown",
+        "transcript   Middag · Ola Nordmann and 1 unnamed · recorded with consent: unknown",
         "with         Ola Nordmann (transcript) · 1 unnamed",
       ],
       speakers: {
