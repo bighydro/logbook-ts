@@ -662,6 +662,8 @@ describe.skipIf(!ready)(
     }, 300_000);
 
     it("read a day's draft alike: the malformed list, each segment supported or not, and why, and the proposals", () => {
+      // `show` prints the draft's row under the flag, as the reference prints it.
+      vi.stubEnv(FLAGS_ENV, "rfc0036");
       // The day's lines get the ids 00000000-0000-4000-8000-00000000000N, N their seq.
       const lineId = (n: number): string =>
         `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -702,7 +704,15 @@ describe.skipIf(!ready)(
         people: [],
         evidence: [lineId(1), lineId(2)],
       };
-      const link = { kind: "link", from: lineId(2), to: lineId(3) };
+      // A kind no amendment names: what a newer writer might write (`link` was this stand-in until
+      // draft/v1's amendment 2 of 2026-10-21 named it; a link of that old shape is now malformed).
+      const unknown = { kind: "merge", from: lineId(2), to: lineId(3) };
+      const link = {
+        kind: "link",
+        entity: "019cadd3-6bc0-7dcd-9133-000000000aaa",
+        text: "Crew list",
+        evidence: [lineId(3)],
+      };
       const variants: Array<Record<string, unknown>> = [
         {},
         { segments: [good[0], { text: "x", evidence: [lineId(2)], unsupported: true }] },
@@ -728,9 +738,43 @@ describe.skipIf(!ready)(
         { read_count: true, language: "zh-Hant-TW", supersedes: null },
         // draft/v1, forward compatibility (2026-10-19): a kind the reader does not know is counted,
         // not malformed, and a known one keeps its number.
+        { proposals: [unknown] },
+        { proposals: [event, unknown] },
+        { proposals: [unknown, unknown, event] },
+        // draft/v1 amendment 2 (2026-10-21): a link is a known kind, numbered among all the
+        // proposals; one of the wrong shape is malformed; `extra.evening` and `extra.read_until`.
         { proposals: [link] },
         { proposals: [event, link] },
-        { proposals: [link, link, event] },
+        { proposals: [link, unknown, event, { ...link, note: "from the pontoon" }] },
+        { proposals: [{ ...link, text: " Crew list ", entity: "crew" }] },
+        { proposals: [{ ...link, evidence: [lineId(3), "019cadd3-6bc0-7dcd-9133-0000000009ff"] }] },
+        {
+          proposals: [{ ...event, evidence: [lineId(1), "019cadd3-6bc0-7dcd-9133-0000000009ff"] }],
+        },
+        { proposals: [{ kind: "link", from: lineId(2), to: lineId(3) }, link] },
+        { proposals: [{ ...link, note: "" }] },
+        { proposals: [{ ...link, evidence: [] }] },
+        { proposals: [{ ...link, ref: "x" }] },
+        { proposals: ["x", link] },
+        { proposals: [{ ...event, title: "" }, link] },
+        { proposals: [{ ...link, kind: "Link" }] },
+        { proposals: "text" },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00Z" } },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00.5Z" } },
+        { extra: { evening: true, read_until: "2026-06-13T20:00:00+02:00" } },
+        { extra: { evening: true } },
+        { extra: { evening: false } },
+        { extra: { evening: 1, read_until: "2026-06-13T18:00:00Z" } },
+        { extra: { read_until: "yesterday" } },
+        { extra: "x" },
+        { extra: { other: 1 } },
+        {
+          read_count: -1,
+          segments: [{ text: "x" }],
+          supersedes: 5,
+          proposals: [{ kind: "link" }],
+          extra: { evening: false },
+        },
       ];
       const readBoth = (variant: Record<string, unknown>) => {
         const payload: Record<string, unknown> = {
@@ -771,8 +815,11 @@ describe.skipIf(!ready)(
               malformed: string[];
               segments: Array<Record<string, unknown>>;
               unsupported: number;
-              proposals?: unknown[] | null;
+              proposals?: Array<Record<string, unknown>> | null;
               proposals_unknown: number;
+              links: Array<Record<string, unknown>>;
+              evening: boolean;
+              read_until: string | null;
             };
           }
         ).draft;
@@ -786,6 +833,47 @@ describe.skipIf(!ready)(
           variant,
           unknown: theirs.proposals_unknown,
           shown: theirs.proposals?.length ?? null,
+        });
+        // What a line says of each proposal shown, and of the evening (amendment 2); the Day's own
+        // additions (where, start_local, confirmed, kept, keep) are the Day's, not ported here.
+        expect({
+          variant,
+          proposals: ours.proposals.map(({ number, supported, why }) => ({
+            number,
+            supported,
+            why,
+          })),
+          links: ours.links,
+          evening: ours.evening,
+          read_until: ours.read_until,
+        }).toEqual({
+          variant,
+          proposals: (theirs.proposals ?? []).map(({ number, supported, why }) => ({
+            number,
+            supported,
+            why,
+          })),
+          links: theirs.links.map(
+            ({ number, kind, entity, text, note, evidence, supported, why }) => ({
+              number,
+              kind,
+              entity,
+              text,
+              note,
+              evidence,
+              supported,
+              why,
+            }),
+          ),
+          evening: theirs.evening,
+          read_until: theirs.read_until,
+        });
+        // The row `show` prints for the draft line, its proposals counted.
+        const shown = referenceAll(root, ["show", "2026-06-14"]);
+        expect(shown.status).toBe(0);
+        expect({ variant, row: showDay(root, { day: "2026-06-14", raw: false }).text }).toEqual({
+          variant,
+          row: shown.out,
         });
         return { ours, theirs };
       };
@@ -805,11 +893,11 @@ describe.skipIf(!ready)(
           })),
         );
       }
-      // A known kind of the wrong shape is still malformed in both; the sentence is each one's own
-      // (SPEC-QUESTIONS 117), so only that there is one is held alike.
+      // A known kind of the wrong shape is still malformed in both, in the reference's words since
+      // the catch-up of 24 Oct (SPEC-QUESTIONS 117a), so the sentence itself is held alike above.
       const { ours, theirs } = readBoth({ proposals: [{ ...event, title: "" }, link] });
       expect([ours.malformed.length > 0, theirs.malformed.length > 0]).toEqual([true, true]);
-    }, 300_000);
+    }, 600_000);
   },
 );
 

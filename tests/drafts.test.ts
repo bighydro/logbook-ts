@@ -316,6 +316,9 @@ describe("a draft read on its unit (draft/v1 rules 3 and 6; the reference's Day,
       unsupported: 1,
       proposals: [],
       proposals_unknown: 0,
+      links: [],
+      evening: false,
+      read_until: null,
       supersedes: null,
       malformed: [],
     });
@@ -388,12 +391,23 @@ const EVENT = {
   people: [],
   evidence: [id("a2"), id("a3")],
 };
-/** A kind no amendment names yet (RFC 0043 proposes `link`): what a newer writer might write. */
-const LINK = { kind: "link", from: id("a3"), to: id("a4") };
+/** An event as a reader shows it, numbered, its evidence on the day. */
+const shown = (number: number, event: Record<string, JsonValue> = EVENT) => ({
+  number,
+  ...event,
+  supported: true,
+  why: null,
+});
+/**
+ * A kind no amendment names yet: what a newer writer might write. (`link` was this stand-in until
+ * draft/v1's amendment 2 of 2026-10-21 named it.)
+ */
+const LINK = { kind: "merge", from: id("a3"), to: id("a4") };
 const withProposals = (...proposals: JsonValue[]) => edit(DRAFT, { proposals });
+/** The reference's sentence for a proposal that is not an event of the table's shape and not a link (its output at d053f78). */
 const EVENT_SHAPE =
-  "an event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start before end, nothing else";
-const NO_KIND = "a proposal is an object that names its kind";
+  "a proposal is {kind: event, title, start, end, place, people, evidence}: start before end, both UTC with a Z, people and evidence lists of ids, evidence not empty";
+const NO_KIND = EVENT_SHAPE;
 const malformedProposal = (n: number, why: string): string => `proposal ${n} is malformed: ${why}`;
 
 describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward compatibility of 2026-10-19)", () => {
@@ -404,14 +418,14 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
 
   it("an unknown kind beside a valid event: the event is shown, one is counted, the line is not malformed", () => {
     const read = readDraft(withProposals(EVENT, LINK), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    expect(read.proposals).toEqual([shown(1)]);
     expect(read.proposals_unknown).toBe(1);
     expect(read.malformed).toEqual([]);
   });
 
   it("numbers do not move: a proposal keeps its place in the array, the unknown ones counted in it", () => {
     const read = readDraft(withProposals(LINK, { ...LINK, kind: "goal" }, EVENT), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 3, ...EVENT }]);
+    expect(read.proposals).toEqual([shown(3)]);
     expect(read.proposals_unknown).toBe(2);
     expect(read.malformed).toEqual([]);
   });
@@ -419,7 +433,7 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
   it("a malformed event is still malformed: the valid ones are shown and the line is said to be malformed", () => {
     const bad = { ...EVENT, title: "" };
     const read = readDraft(withProposals(EVENT, bad, LINK), ON_DAY);
-    expect(read.proposals).toEqual([{ number: 1, ...EVENT }]);
+    expect(read.proposals).toEqual([shown(1)]);
     expect(read.proposals_unknown).toBe(1);
     expect(read.malformed).toEqual([malformedProposal(2, EVENT_SHAPE)]);
   });
@@ -457,7 +471,7 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
 
   it("an event with a place and people is shown with them", () => {
     const named = { ...EVENT, place: "Vollen", people: [id(501)] };
-    expect(readDraft(withProposals(named)).proposals).toEqual([{ number: 1, ...named }]);
+    expect(readDraft(withProposals(named)).proposals).toEqual([shown(1, named)]);
   });
 
   it("a proposal that is not an object, or names no kind, is malformed, not unknown", () => {
@@ -491,19 +505,215 @@ describe("a draft's proposals (draft/v1, amendment of 2026-10-13, and forward co
   it("the writer stays strict: draftProblems refuses a kind it does not know, as a writer does", () => {
     expect(draftProblems(withProposals(EVENT))).toEqual([]);
     expect(draftProblems(withProposals(EVENT, LINK))).toEqual([
-      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, link, not 'merge'",
     ]);
     expect(draftProblems(withProposals({ ...EVENT, title: "" }, LINK, { kind: "goal" }))).toEqual([
       malformedProposal(1, EVENT_SHAPE),
-      "proposal 2 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, link, not 'merge'",
     ]);
     // In the field table's order: `supersedes`, then `proposals`, then amendment 1's `read_policy`.
     expect(
       draftProblems(edit(DRAFT, { supersedes: 5, proposals: [LINK], read_policy: "x" })),
     ).toEqual([
       "supersedes must be the id of the earlier draft",
-      "proposal 1 is of a kind a writer may not write: kind must be one of event, not 'link'",
+      "proposal 1 is of a kind a writer may not write: kind must be one of event, link, not 'merge'",
       "read_policy must be { entry, max_tier, sha256 }: the policy entry read through, its ceiling then (0 to 3), and the sha256 of policy/crossing.json as read, 64 lowercase hex characters",
+    ]);
+  });
+});
+
+/** A link proposal of the example's day (draft/v1 amendment 2): an entity, what belongs to it, the lines it rests on. */
+const A_LINK = { kind: "link", entity: id(601), text: "Crew list", evidence: [id("a4")] };
+const LINK_SHAPE =
+  "a link is {kind: link, entity, text, evidence, note?}: entity an entity id, text what it says, evidence a non-empty list of line ids, note a string when given";
+const shownLink = (number: number, link: Record<string, JsonValue> = A_LINK) => ({
+  number,
+  kind: "link",
+  entity: link.entity,
+  text: link.text,
+  note: link.note ?? null,
+  evidence: link.evidence,
+  supported: true,
+  why: null,
+});
+const withExtra = (extra: JsonValue) => edit(DRAFT, { extra });
+
+describe("draft/v1 amendment 2 (2026-10-21): a link, the evening, as the reference reads them at d053f78 (run)", () => {
+  it("a link is a known kind: shown under links, numbered by its place among all the proposals", () => {
+    const read = readDraft(withProposals(EVENT, A_LINK), ON_DAY);
+    expect([read.proposals, read.links, read.proposals_unknown, read.malformed]).toEqual([
+      [shown(1)],
+      [shownLink(2)],
+      0,
+      [],
+    ]);
+    const first = readDraft(withProposals(A_LINK, EVENT, LINK, A_LINK), ON_DAY);
+    expect([first.proposals, first.links, first.proposals_unknown]).toEqual([
+      [shown(2)],
+      [shownLink(1), shownLink(4)],
+      1,
+    ]);
+  });
+
+  it("a link's note is kept when given; its text is shown stripped, its entity and note as written", () => {
+    const noted = { ...A_LINK, note: "from the pontoon" };
+    expect(readDraft(withProposals(noted), ON_DAY).links).toEqual([shownLink(1, noted)]);
+    const padded = { ...A_LINK, entity: " e ", text: " t ", note: " n " };
+    expect(readDraft(withProposals(padded), ON_DAY).links).toEqual([
+      { ...shownLink(1, padded), text: "t" },
+    ]);
+    // Any entity id the line names, not only a canonical id's form; any evidence id but an empty one.
+    const loose = { ...A_LINK, entity: "crew", evidence: [id("a4"), id("a4")] };
+    expect(readDraft(withProposals(loose), ON_DAY).links).toEqual([shownLink(1, loose)]);
+  });
+
+  it("a link resting on a line not of the unit is shown unsupported, and says why, as an event is", () => {
+    const off = { ...A_LINK, evidence: [id("a4"), id("9ff")] };
+    const event = { ...EVENT, evidence: [id("a2"), id("9ff")] };
+    const read = readDraft(withProposals(event, off), ON_DAY);
+    const why = "evidence names a line that is not on the day";
+    expect(read.proposals).toEqual([{ ...shown(1, event), supported: false, why }]);
+    expect(read.links).toEqual([{ ...shownLink(2, off), supported: false, why }]);
+    expect(read.malformed).toEqual([]);
+    // Without the unit's lines the evidence is not checked.
+    expect(readDraft(withProposals(off)).links).toEqual([shownLink(1, off)]);
+  });
+
+  it("a link of the wrong shape is malformed, in the reference's words, and not shown", () => {
+    const bare = A_LINK;
+    const shapes: JsonValue[] = [
+      { kind: "link" },
+      { kind: "link", from: id("a3"), to: id("a4") },
+      { ...bare, entity: "" },
+      { ...bare, entity: " " },
+      { ...bare, entity: 5 },
+      { kind: "link", text: "t", evidence: [id("a4")] },
+      { ...bare, text: "" },
+      { ...bare, text: "  " },
+      { ...bare, text: 5 },
+      { ...bare, evidence: [] },
+      { ...bare, evidence: [""] },
+      { ...bare, evidence: [5] },
+      { ...bare, evidence: id("a4") },
+      { ...bare, note: "" },
+      { ...bare, note: " " },
+      { ...bare, note: null },
+      { ...bare, note: 5 },
+      { ...bare, ref: "x" },
+    ];
+    for (const shape of shapes) {
+      const read = readDraft(withProposals(shape, A_LINK), ON_DAY);
+      expect({ shape, links: read.links, malformed: read.malformed }).toEqual({
+        shape,
+        links: [shownLink(2)],
+        malformed: [malformedProposal(1, LINK_SHAPE)],
+      });
+      expect(read.proposals_unknown).toBe(0);
+    }
+    // `Link` and ` link` are not `link`: kinds it does not know, counted.
+    for (const kind of ["Link", " link"]) {
+      const read = readDraft(withProposals({ ...A_LINK, kind }), ON_DAY);
+      expect([read.links, read.proposals_unknown, read.malformed]).toEqual([[], 1, []]);
+    }
+  });
+
+  it("a proposal that is not an object or names no kind takes the event's sentence; the first malformed is named", () => {
+    const read = readDraft(withProposals("x", { kind: "link" }, A_LINK), ON_DAY);
+    expect([read.links, read.malformed]).toEqual([
+      [shownLink(3)],
+      [malformedProposal(1, EVENT_SHAPE)],
+    ]);
+  });
+
+  it("the writer knows link too: a kind outside event and link is refused", () => {
+    expect(draftProblems(withProposals(EVENT, A_LINK))).toEqual([]);
+    expect(draftProblems(withProposals(A_LINK, LINK))).toEqual([
+      "proposal 2 is of a kind a writer may not write: kind must be one of event, link, not 'merge'",
+    ]);
+  });
+
+  it("extra.evening: true on a draft of the day so far, with extra.read_until, the moment read up to", () => {
+    const read = readDraft(
+      withExtra({ evening: true, read_until: "2026-06-13T18:00:00Z" }),
+      ON_DAY,
+    );
+    expect([read.evening, read.read_until, read.malformed]).toEqual([
+      true,
+      "2026-06-13T18:00:00Z",
+      [],
+    ]);
+    // The reference's form is a pattern: a fraction is one, and the calendar is not checked.
+    for (const at of ["2026-06-13T18:00:00.5Z", "2026-02-30T18:00:00Z", "2026-06-13T25:61:60Z"]) {
+      expect(readDraft(withExtra({ evening: true, read_until: at })).malformed).toEqual([]);
+    }
+    expect(readDraft(DRAFT).evening).toBe(false);
+    expect(readDraft(withExtra({ other: 1 })).malformed).toEqual([]);
+  });
+
+  it("an evening draft's read_until is RFC 3339 UTC with a Z; extra.evening is true when present; extra is an object", () => {
+    const READ_UNTIL =
+      "an evening draft's extra.read_until is the moment it read up to, UTC with a Z";
+    for (const at of [
+      undefined,
+      5,
+      "yesterday",
+      "2026-06-13T18:00Z",
+      "2026-06-13T18:00:00z",
+      "2026-6-13T18:00:00Z",
+      "2026-06-13 18:00:00Z",
+      "2026-06-13T18:00:00.Z",
+      "2026-06-13T20:00:00+02:00",
+      "2026-06-13T18:00:00+00:00",
+      "2026-06-13T18:00:00Z\n",
+    ]) {
+      const read = readDraft(
+        withExtra(at === undefined ? { evening: true } : { evening: true, read_until: at }),
+      );
+      expect({ at, malformed: read.malformed }).toEqual({ at, malformed: [READ_UNTIL] });
+      expect(read.evening).toBe(true);
+      // The value is shown as written when it is a string, else null.
+      expect(read.read_until).toBe(typeof at === "string" ? at : null);
+    }
+    for (const evening of [false, null, 1, "yes"]) {
+      const read = readDraft(withExtra({ evening, read_until: "2026-06-13T18:00:00Z" }));
+      expect([read.evening, read.malformed]).toEqual([
+        false,
+        ["extra.evening is true when present"],
+      ]);
+    }
+    // read_until without evening is not checked, and shown when it is a string.
+    expect(readDraft(withExtra({ read_until: "yesterday" }))).toMatchObject({
+      evening: false,
+      read_until: "yesterday",
+      malformed: [],
+    });
+    expect(readDraft(withExtra({ read_until: 5 })).read_until).toBeNull();
+    for (const extra of [null, "x", [], 5]) {
+      const read = readDraft(withExtra(extra));
+      expect([read.evening, read.read_until, read.malformed]).toEqual([
+        false,
+        null,
+        ["extra must be an object"],
+      ]);
+    }
+  });
+
+  it("names every problem in the reference's order: the reader's fields, segments, supersedes, proposals, then extra", () => {
+    const read = readDraft(
+      edit(DRAFT, {
+        read_count: -1,
+        segments: [{ text: "x" }],
+        supersedes: 5,
+        proposals: [{ kind: "link" }],
+        extra: { evening: false },
+      }),
+    );
+    expect(read.malformed).toEqual([
+      "read_count must be how many lines of the unit the model read",
+      malformedSegment(1),
+      "supersedes must be the id of the earlier draft",
+      malformedProposal(1, LINK_SHAPE),
+      "extra.evening is true when present",
     ]);
   });
 });
@@ -633,5 +843,22 @@ describe("the row show prints for a draft, as the reference prints it (run)", ()
         ],
       }),
     ).toBe("draft of day 2026-06-13 · 5 lines read at bb97e90d · 2 segments, 2 unsupported");
+  });
+
+  it("counts the proposals: a link by its kind, every other proposal as an event, whatever its shape", () => {
+    const base = "draft of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported";
+    expect(row({ proposals: [EVENT] })).toBe(`${base} · 1 proposed event`);
+    expect(row({ proposals: [A_LINK] })).toBe(`${base} · 1 proposed link`);
+    expect(row({ proposals: [EVENT, EVENT, A_LINK, A_LINK, LINK] })).toBe(
+      `${base} · 3 proposed events · 2 proposed links`,
+    );
+    // The row counts the array as written: a malformed link is a link, a non-object an event.
+    expect(row({ proposals: ["x", { kind: "link" }, { kind: 5 }] })).toBe(
+      `${base} · 2 proposed events · 1 proposed link`,
+    );
+    for (const none of [[], {}, "text", null]) expect(row({ proposals: none })).toBe(base);
+    expect(row({ proposals: [A_LINK], supersedes: id("d0") })).toBe(
+      `${base} · 1 proposed link · supersedes an earlier draft`,
+    );
   });
 });

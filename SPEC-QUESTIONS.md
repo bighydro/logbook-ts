@@ -1315,6 +1315,17 @@ cross-implementation job runs it at a86787c).
     e. The changelog fragment and the RFC date the amendment 19 October 2026; it landed on the reference's
        main on 21 October (a86787c, its #342).
 
+    *Answered (a), by running the reference at d053f78, 2026-10-24.* The reference's reader names a
+    malformed proposal `proposal N is malformed: a proposal is {kind: event, title, start, end, place,
+    people, evidence}: start before end, both UTC with a Z, people and evidence lists of ids, evidence
+    not empty`, an event of the wrong shape and a proposal that is not an object or names no kind
+    alike, and since draft/v1's amendment 2 a link of the wrong shape `proposal N is malformed: a link
+    is {kind: link, entity, text, evidence, note?}: entity an entity id, text what it says, evidence a
+    non-empty list of line ids, note a string when given`, the first malformed proposal only. `readDraft`
+    now says the same, and the cross-implementation test holds the whole `malformed` list alike. The
+    writer's sentence for a kind it does not know (`kind must be one of event, link, not 'merge'`) stays
+    this implementation's: the reference's writers are its dream's, not run here.
+
 118. **The route's text, learned from the reference's output at a86787c (fa41791, its #343).** Its changelog
     says an unnamed stay is `near <place>, x km` or the nearest airport's city, "the coordinates only
     where nothing names it or where two stays side by side would read the same", and the JSON keeps
@@ -1324,3 +1335,46 @@ cross-implementation job runs it at a86787c).
     their coordinates, one alike only with a named neighbour keeps them alone, two alike with
     another stop between them both drop them. `routeText` does the same from the JSON's labels.
     Should SPEC §3.2.6 say it, since the text is a reader's own?
+
+## Found while catching up with the reference at its main of 24 Oct (openlogbook main at d053f78, 2026-10-24; rfcs/0036-draft-v1.md amendment 2, rfcs/0046-what-you-heard.md, docs/day.md, docs/dream.md, docs/heard.md, docs/adapters/agents.md, changelog.d/)
+
+Read from those files and from the reference's output, run at d053f78 on synthetic records (a person
+in Oslo who does not exist); no source was read. Each entry is a place where the documents and the
+output disagree, or where neither says; nothing is decided here.
+
+119. **`show` counts every proposal that is not a link as an event.** draft/v1's forward compatibility
+    (rule 5) says a reader shows the proposals of the kinds it knows and counts the others as
+    `proposals_unknown`, and the Day does: its draft row says `1 proposed event · 1 proposed link` for
+    the proposals it shows. The row `show` prints for the same draft line counts the array as written:
+    a proposal whose `kind` is `link` is a link whatever its shape, and every other one an event, a
+    kind it does not know (`merge`), a malformed event, a proposal with no kind and one that is not an
+    object among them (`[{kind: merge}]` prints `· 1 proposed event`). `draftRow` does the same, to
+    agree. Is `show`'s count meant to be of the proposals a reader shows, or of the array?
+
+120. **A link's fields, as the reader holds them.** Amendment 2 says `entity` is "a canonical entity id,
+    an idea's or an org's, that the material named", `evidence` "the line ids it rests on, non-empty,
+    each a line of the unit", and `note` "a non-empty string". The reader takes any `entity` with a word
+    in it (`crew` is shown), keeps `entity` and `note` as written and shows `text` stripped
+    (` t ` reads `t`), refuses a `note` of only whitespace and an evidence id that is the empty string
+    but not one of only spaces, and shows a link whose evidence names a line not of the unit as
+    unsupported (`evidence names a line that is not on the day`), not malformed, as it does an event
+    and a segment. `readDraft` does the same. Should `entity` be held to an id's form, and is a link
+    off its unit unsupported or malformed?
+
+121. **`extra.read_until`'s form.** The amendment says "RFC 3339 UTC with a `Z`" and "absent on every
+    other draft". The reader holds it to a pattern only: `2026-02-30T18:00:00Z` and
+    `2026-06-13T25:61:60Z` pass, `2026-06-13T18:00:00.Z` and any offset, `+00:00` included, are refused;
+    and on a draft that is not an evening's it checks nothing and still gives the value under
+    `read_until` (`yesterday`). `readDraft` does the same. Should a reader check the calendar, and is a
+    `read_until` without `extra.evening` malformed?
+
+122. **A segment's keys beyond the shape rule.** RFC 0036's evidence rule, and draft/v1's segment rule,
+    say "a segment is {text, evidence} or {text, unsupported: true}, nothing else", and the
+    reference's sentence for a malformed segment says so. Since dream-day/4 the documents name a
+    segment's `part` (docs/day.md, `segments` each with `text`, `evidence`, `supported`, `why` and
+    `part`) and an `ideas` segment's `entity` (docs/dream.md). The reader calls neither key malformed
+    (`{text, evidence, part: "learned"}` is supported), and gives `part: null` for a segment that
+    carries one: where `part` is read from is not written. This implementation's reader, which checks
+    `text`, `evidence` and `unsupported` only, agrees; it gives no `part`. Which keys may a segment
+    carry, and where does a reader find its part?
+

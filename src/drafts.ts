@@ -12,22 +12,26 @@
  * the amendment of 2026-10-13's `proposals`, MAY; amendment 1 adds `window`, MUST on a person and
  * absent elsewhere, and `read_policy`, SHOULD.
  *
- * A proposal is an object whose `kind` says what it proposes; `event` is the only kind the profile
- * names. Its forward compatibility (the amendment of 2026-10-19): a reader shows the proposals of the
- * kinds it knows, counts the others as `proposals_unknown`, and does not call the line malformed for
- * them; a known kind of the wrong shape, or a proposal with no kind, is still malformed. Writers stay
- * strict: `draftProblems`, the whole field table, refuses a kind it does not know.
+ * A proposal is an object whose `kind` says what it proposes: `event`, and since amendment 2 of
+ * 2026-10-21 `link`, a line of the unit that belongs to a canonical entity. Its forward compatibility
+ * (the amendment of 2026-10-19): a reader shows the proposals of the kinds it knows, counts the others
+ * as `proposals_unknown`, and does not call the line malformed for them; a known kind of the wrong
+ * shape, or a proposal with no kind, is still malformed. Writers stay strict: `draftProblems`, the
+ * whole field table, refuses a kind it does not know. Amendment 2 also adds `extra.evening`, `true` on
+ * a draft of the day so far, with `extra.read_until`, the moment it read up to.
  *
  * The reference reads a day's draft on the Day and prints its row in `show`, and checks five fields as
  * it reads (openlogbook 0.6.1, run on synthetic drafts): `read_head`, `read_count`, `language`,
  * `segments` and `supersedes`. Those sentences are its own, word for word, in its order, and like it
  * the check names the first malformed segment only. The proposals and the rest of the field table
  * (unit, subject, source, window, read_policy) have no reference sentence yet and are checked here in
- * its style (SPEC-QUESTIONS 89, 117). `readDraft` is the reader's view, the reference's `malformed` list and its
+ * its style (SPEC-QUESTIONS 89); the proposals' and `extra`'s sentences are the reference's, from its
+ * output at d053f78 (SPEC-QUESTIONS 117a, 119). `readDraft` is the reader's view, the reference's `malformed` list and its
  * reading of each segment; `draftRow` is the row `show` prints under the `rfc0036` flag. Nothing here
  * writes a draft, and the Day does not show one yet.
  */
 
+import { pyStrip } from "./entities.js";
 import {
   envelopeProblems,
   type Fields,
@@ -111,13 +115,18 @@ function segmentIs(segment: unknown): "supported" | "unsupported" | "malformed" 
   return isIdList(segment.evidence) ? "supported" : "malformed";
 }
 
-/** The kinds of proposal this implementation knows (draft/v1, the amendment of 2026-10-13). */
-export const PROPOSAL_KINDS = ["event"] as const;
+/** The kinds of proposal this implementation knows (draft/v1, the amendments of 2026-10-13 and of 2026-10-21). */
+export const PROPOSAL_KINDS = ["event", "link"] as const;
+type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 /** An event proposal's keys, exactly these. */
 const EVENT_KEYS = ["kind", "title", "start", "end", "place", "people", "evidence"];
+/** A link proposal's keys (amendment 2): these, and `note` when given. */
+const LINK_KEYS = ["kind", "entity", "text", "evidence"];
+/** The reference's sentence for a proposal that is not a link of its shape: an event's, or none at all. */
 const EVENT_SHAPE =
-  "an event proposal is {kind, title, start, end, place, people, evidence}, each of its type, start before end, nothing else";
-const NO_KIND = "a proposal is an object that names its kind";
+  "a proposal is {kind: event, title, start, end, place, people, evidence}: start before end, both UTC with a Z, people and evidence lists of ids, evidence not empty";
+const LINK_SHAPE =
+  "a link is {kind: link, entity, text, evidence, note?}: entity an entity id, text what it says, evidence a non-empty list of line ids, note a string when given";
 /** RFC 3339 in UTC with `Z`, on a real calendar day. */
 const UTC = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?Z$/;
 const isUtc = (v: unknown): v is string => {
@@ -125,17 +134,39 @@ const isUtc = (v: unknown): v is string => {
   return m !== null && isDayString(m[1]);
 };
 
+/** A text with a word in it: not only the whitespace Python's `str.strip()` cuts. */
+const hasText = (v: unknown): v is string => typeof v === "string" && pyStrip(v) !== "";
+
+/**
+ * A link of amendment 2's shape, as the reference reads one: `entity` and `text` with a word in them,
+ * `evidence` a non-empty list of ids none of them empty, `note` a text when given, nothing else.
+ */
+function linkShaped(p: Fields): boolean {
+  const keys = Object.keys(p);
+  return (
+    LINK_KEYS.every((key) => key in p) &&
+    keys.every((key) => LINK_KEYS.includes(key) || key === "note") &&
+    hasText(p.entity) &&
+    hasText(p.text) &&
+    Array.isArray(p.evidence) &&
+    p.evidence.length > 0 &&
+    p.evidence.every((named) => typeof named === "string" && named !== "") &&
+    (!("note" in p) || hasText(p.note))
+  );
+}
+
 /**
  * A proposal as a reader takes it (forward compatibility, rules 3 and 4): an event of the table's
- * shape; a kind it does not know, `kind` a non-empty string other than `event`; or malformed, an event
- * of another shape, or not an object naming its kind at all.
+ * shape or a link of amendment 2's; a kind it does not know, `kind` a non-empty string other than
+ * those; or malformed, a known kind of another shape, or not an object naming its kind at all.
  */
-function proposalIs(proposal: unknown): "event" | "unknown" | "malformed" {
+function proposalIs(proposal: unknown): ProposalKind | "unknown" | "malformed" {
   if (!isObject(proposal) || typeof proposal.kind !== "string" || proposal.kind === "") {
     return "malformed";
   }
-  if (!PROPOSAL_KINDS.includes(proposal.kind as (typeof PROPOSAL_KINDS)[number])) return "unknown";
+  if (!PROPOSAL_KINDS.includes(proposal.kind as ProposalKind)) return "unknown";
   const p = proposal;
+  if (p.kind === "link") return linkShaped(p) ? "link" : "malformed";
   const shaped =
     Object.keys(p).length === EVENT_KEYS.length &&
     EVENT_KEYS.every((key) => key in p) &&
@@ -153,6 +184,9 @@ function proposalIs(proposal: unknown): "event" | "unknown" | "malformed" {
 const proposalsOf = (p: Fields): JsonValue[] => (Array.isArray(p.proposals) ? p.proposals : []);
 
 const isCount = (v: unknown): boolean => typeof v === "number" && Number.isInteger(v) && v >= 0;
+
+/** `extra.read_until`'s form as the reference holds it: a pattern, the calendar not checked. */
+const READ_UNTIL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 /**
  * What the reference's reader says is wrong with a draft, in its words and its order: `read_head`,
@@ -187,8 +221,24 @@ function readerProblems(p: Fields): string[] {
     const proposals = proposalsOf(p);
     const first = proposals.findIndex((proposal) => proposalIs(proposal) === "malformed");
     if (first !== -1) {
-      const named = isObject(proposals[first]) && proposals[first].kind === "event";
-      problems.push(`proposal ${first + 1} is malformed: ${named ? EVENT_SHAPE : NO_KIND}`);
+      const link = isObject(proposals[first]) && proposals[first].kind === "link";
+      problems.push(`proposal ${first + 1} is malformed: ${link ? LINK_SHAPE : EVENT_SHAPE}`);
+    }
+  }
+  // Amendment 2: `extra.evening` is `true` when present, and then `extra.read_until` is UTC with a Z.
+  if ("extra" in p) {
+    const extra = p.extra;
+    if (!isObject(extra)) {
+      problems.push("extra must be an object");
+    } else if ("evening" in extra && extra.evening !== true) {
+      problems.push("extra.evening is true when present");
+    } else if (
+      extra.evening === true &&
+      (typeof extra.read_until !== "string" || !READ_UNTIL.test(extra.read_until))
+    ) {
+      problems.push(
+        "an evening draft's extra.read_until is the moment it read up to, UTC with a Z",
+      );
     }
   }
   return problems;
@@ -207,7 +257,7 @@ const isPolicy = (v: unknown): boolean =>
 /**
  * Why a line is not a `draft/v1` line as RFC 0036 and its amendment 1 define one, one sentence per
  * rule broken; empty when it is one. The envelope first, then `unit`, `subject` and `window`, then the
- * five fields the reference's reader checks, in its words, and `proposals`, then a proposal of a kind
+ * five fields the reference's reader checks, in its words, and `proposals` and `extra`, then a proposal of a kind
  * a writer may not write (the first only: writers stay strict), then `read_policy`. The tier is the lines'
  * the model read, so it is not checked here but against them (`draftTierProblems`).
  */
@@ -286,7 +336,10 @@ export interface DraftSegment {
   why: string | null;
 }
 
-/** An event proposal as a reader shows it: its number, its place in the array from 1, and its fields. */
+/**
+ * An event proposal as a reader shows it: its number, its place in the array from 1, its fields, and
+ * whether its evidence is on the unit, as a segment's is.
+ */
 export interface DraftProposal {
   number: number;
   kind: "event";
@@ -296,6 +349,23 @@ export interface DraftProposal {
   place: string | null;
   people: string[];
   evidence: string[];
+  supported: boolean;
+  why: string | null;
+}
+
+/**
+ * A link proposal (amendment 2) as a reader shows it: its number among all the proposals, the entity,
+ * what belongs to it (stripped), the note or null, and whether its evidence is on the unit.
+ */
+export interface DraftLink {
+  number: number;
+  kind: "link";
+  entity: string;
+  text: string;
+  note: string | null;
+  evidence: string[];
+  supported: boolean;
+  why: string | null;
 }
 
 /** A draft as a reader reads it: the line's fields, its segments read, and what the reference's reader says is malformed. */
@@ -319,6 +389,12 @@ export interface DraftRead {
   proposals: DraftProposal[];
   /** How many proposals are of a kind this reader does not know (forward compatibility). */
   proposals_unknown: number;
+  /** The link proposals of their shape (amendment 2), numbered by their place among all the proposals. */
+  links: DraftLink[];
+  /** A draft of the day so far: `extra.evening` is `true` (amendment 2). */
+  evening: boolean;
+  /** `extra.read_until` as written when it is a string, the moment an evening's draft read up to; else null. */
+  read_until: string | null;
   supersedes: string | null;
   malformed: string[];
 }
@@ -338,9 +414,10 @@ const textOf = (v: JsonValue | undefined): string =>
  * the record; without it the ids are not checked); one that names another is shown unsupported and
  * says why. A segment the writer marked `unsupported` is shown so. A malformed segment is treated as
  * unsupported and the line is said to be malformed; one that is not an object is not shown at all. All
- * as the reference's Day reads a day's draft (openlogbook 0.6.1, run). The event proposals of their
- * shape are shown, numbered by their place in the array; those of a kind this reader does not know are
- * counted and nothing more (draft/v1, forward compatibility of 2026-10-19, from the RFC's text).
+ * as the reference's Day reads a day's draft (openlogbook 0.6.1, run). The event and link proposals of
+ * their shape are shown, numbered by their place in the array, each supported or not as a segment is;
+ * those of a kind this reader does not know are counted and nothing more (draft/v1, forward
+ * compatibility of 2026-10-19; amendment 2 of 2026-10-21, as the reference reads it at d053f78, run).
  */
 export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
   const p = fieldsOf(line);
@@ -349,6 +426,11 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
     unit === "person"
       ? "evidence names a line that is not one of the person's lines in the window"
       : `evidence names a line that is not on the ${pyStr(unit)}`;
+  /** Whether evidence rests on the unit's lines, and why not; not checked without them. */
+  const onIt = (evidence: string[]): { supported: boolean; why: string | null } => {
+    const off = onUnit !== undefined && evidence.some((named) => !onUnit.has(named));
+    return { supported: !off, why: off ? elsewhere : null };
+  };
   const segments: DraftSegment[] = [];
   for (const segment of Array.isArray(p.segments) ? p.segments : []) {
     if (!isObject(segment)) continue;
@@ -360,28 +442,43 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
       segments.push({ text, evidence: [], supported: false, why: null });
     } else {
       const evidence = [...(segment.evidence as string[])];
-      const off = onUnit !== undefined && evidence.some((named) => !onUnit.has(named));
-      segments.push({ text, evidence, supported: !off, why: off ? elsewhere : null });
+      segments.push({ text, evidence, ...onIt(evidence) });
     }
   }
   const proposals: DraftProposal[] = [];
+  const links: DraftLink[] = [];
   let unknown = 0;
   proposalsOf(p).forEach((proposal, i) => {
     const shape = proposalIs(proposal);
     if (shape === "unknown") unknown += 1;
-    if (shape !== "event") return;
     const e = proposal as Fields;
-    proposals.push({
-      number: i + 1,
-      kind: "event",
-      title: e.title as string,
-      start: e.start as string,
-      end: e.end as string,
-      place: e.place as string | null,
-      people: [...(e.people as string[])],
-      evidence: [...(e.evidence as string[])],
-    });
+    if (shape === "event") {
+      const evidence = [...(e.evidence as string[])];
+      proposals.push({
+        number: i + 1,
+        kind: "event",
+        title: e.title as string,
+        start: e.start as string,
+        end: e.end as string,
+        place: e.place as string | null,
+        people: [...(e.people as string[])],
+        evidence,
+        ...onIt(evidence),
+      });
+    } else if (shape === "link") {
+      const evidence = [...(e.evidence as string[])];
+      links.push({
+        number: i + 1,
+        kind: "link",
+        entity: e.entity as string,
+        text: pyStrip(e.text as string),
+        note: typeof e.note === "string" ? e.note : null,
+        evidence,
+        ...onIt(evidence),
+      });
+    }
   });
+  const extra = isObject(p.extra) ? p.extra : {};
   const source = String(line.source);
   return {
     line: String(line.id),
@@ -399,6 +496,9 @@ export function readDraft(line: Line, onUnit?: ReadonlySet<string>): DraftRead {
     unsupported: segments.filter((s) => !s.supported).length,
     proposals,
     proposals_unknown: unknown,
+    links,
+    evening: extra.evening === true,
+    read_until: typeof extra.read_until === "string" ? extra.read_until : null,
     supersedes: isText(p.supersedes) ? p.supersedes : null,
     malformed: readerProblems(p),
   };
@@ -452,9 +552,11 @@ const truthy = (v: JsonValue | undefined): boolean =>
 
 /**
  * The row `show` prints for a draft line, as the reference prints it (openlogbook 0.6.1, run): `draft
- * of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`, then ` · supersedes an
- * earlier draft` when it names one. A segment counts as unsupported when it is marked so or malformed;
- * `show` holds no unit to check evidence against.
+ * of day 2026-06-13 · 5 lines read at bb97e90d · 4 segments, 1 unsupported`, then the proposals counted
+ * (` · 1 proposed event · 2 proposed links`: a proposal whose `kind` is `link` is a link, any other an
+ * event, whatever its shape, as the reference counts them at d053f78), then ` · supersedes an earlier
+ * draft` when it names one. A segment counts as unsupported when it is marked so or malformed; `show`
+ * holds no unit to check evidence against.
  */
 export function draftRow(p: Payload): string {
   const subject = Array.isArray(p.subject) ? p.subject.map(pyStr).join(", ") : pyStr(p.subject);
@@ -466,6 +568,11 @@ export function draftRow(p: Payload): string {
   let row = `draft of ${pyStr(p.unit)} ${subject} · ${pyStr(count)} line${one ? "" : "s"} read at ${head}`;
   row += ` · ${segments.length} segment${segments.length === 1 ? "" : "s"}`;
   if (unsupported > 0) row += `, ${unsupported} unsupported`;
+  const proposals = Array.isArray(p.proposals) ? p.proposals : [];
+  const linked = proposals.filter((q) => isObject(q) && q.kind === "link").length;
+  const events = proposals.length - linked;
+  if (events > 0) row += ` · ${events} proposed event${events === 1 ? "" : "s"}`;
+  if (linked > 0) row += ` · ${linked} proposed link${linked === 1 ? "" : "s"}`;
   if (truthy(p.supersedes)) row += " · supersedes an earlier draft";
   return row;
 }
