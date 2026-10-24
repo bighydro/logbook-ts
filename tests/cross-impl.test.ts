@@ -28,6 +28,7 @@ import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
 import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
+import { heardLines } from "./heard-cases.js";
 import {
   cleanup,
   comparableDayJson,
@@ -968,6 +969,26 @@ describe.skipIf(!ready)(
         expect(ours.malformed).toHaveLength(1);
       }
     }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "heard/v1 (RFC 0046), under the rfc0046 flag: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("show prints every case of tests/heard-cases.ts alike, and the Day reads them alike", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0046");
+      const root = writeBareRecord(heardLines());
+      expect(showDay(root, { day: "2026-10-03" }).text).toBe(
+        referenceShow(root, "2026-10-03", false),
+      );
+      expect(renderDay(readDay(root, { day: "2026-10-03" }))).toBe(
+        comparableDayText(reference(root, ["day", "2026-10-03"])),
+      );
+    }, 120_000);
   },
 );
 
