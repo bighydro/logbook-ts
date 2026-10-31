@@ -252,6 +252,17 @@ describe("logbook-ts trips and rollup countries", () => {
     expect(JSON.parse(json.out)).toEqual(expectedCountries("2025")?.json);
   });
 
+  it("prints the nights rollup as the reference does, an asset by its registered name, and the same rollup as JSON", () => {
+    const nights = (name: string) => expectedWindows(root, "nights").find((w) => w.name === name);
+    const text = run(["rollup", "nights", root]);
+    expect(text.code).toBe(0);
+    expect(text.out).toBe(nights("all")?.text);
+    expect(text.out).toContain("2 nights aboard Solvind");
+    const json = run(["rollup", "nights", root, "--json", "--year=2026"]);
+    expect(json.code).toBe(0);
+    expect(JSON.parse(json.out)).toEqual(nights("2026")?.json);
+  });
+
   it("says so when the window has no days, and exits 0", () => {
     expect(run(["trips", root, "--year", "2024"]).out).toBe("no trips: the record has no days\n");
     expect(run(["rollup", "countries", root, "--year", "2024"]).out).toBe(

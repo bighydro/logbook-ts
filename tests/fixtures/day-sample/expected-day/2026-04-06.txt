@@ -10,12 +10,12 @@
   09:10–09:15  stay   59.9120,10.7560 near Home, 0.3 km · 5 min
   09:15–09:20  move   315 m · 5 min · walk
   09:20–14:00  stay   Office · 4 h 40 min · 1 event, 1 transcript, 1 note, 1 mail thread, 2 calls, 2 messages, 1 photo, 1 keeper
-      event        Weekly planning 10:00–10:45
+      event        Weekly planning, from 10:00 to 10:45
       transcript   Standup
       note         Lunch with Ola Nordmann and Kari at the office. Ines came by.
       mail         Berth (2 messages)
       call         → Ola Nordmann, no answer
-      call         ← Ines Holm, 45 s
+      call         45 s ← Ines Holm
       keeper       IMG_0406.HEIC (memory)
       with         Ola Nordmann (calendar, transcript, note, photo), Ines Holm (transcript), Per (calendar) · proposed immich:f_99 (photo)
   14:00–18:00  gap    4 h · no points · 4.7 km

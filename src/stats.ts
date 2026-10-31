@@ -203,7 +203,7 @@ export function collectStats(root: string): Stats {
 
 /** The screen, as the reference prints it, with the tier and month tables added after the years. */
 export function statsText(stats: Stats): string {
-  const out: string[] = [`${stats.format}  head ${stats.head}`];
+  const out: string[] = [`record format ${stats.format}  head ${stats.head}`];
   if (stats.first === null || stats.last === null) out.push(`${withCommas(stats.lines)} lines`);
   else out.push(`${withCommas(stats.lines)} lines  first ${stats.first}  last ${stats.last}`);
   out.push("");

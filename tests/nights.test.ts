@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { type NightsYear, NO_HOME_NIGHTS, renderNights, rollupNights } from "../src/nights.js";
+import { readAssets } from "../src/settings.js";
 import { verifyLogbook } from "../src/store.js";
 import { cleanup, expectedWindows, FIXTURES } from "./helpers.js";
 
@@ -32,7 +33,7 @@ describe("rollup nights, as the reference's `logbook rollup nights` prints it", 
       it(`prints ${name} (${expected.name}) as the reference does, as text and as JSON`, () => {
         const nights = rollupNights(root, expected.options);
         expect(JSON.parse(JSON.stringify(nights))).toEqual(expected.json);
-        expect(renderNights(nights)).toBe(expected.text);
+        expect(renderNights(nights, readAssets(root))).toBe(expected.text);
       });
     }
   }
@@ -59,9 +60,9 @@ describe("what the nights rollup counts", () => {
 
   it("names no longest trip in a year whose every night is at home", () => {
     expect(year(NIGHTS_SAMPLE, "2025")).toMatchObject({ home: 3, away: 0, longest_trip: null });
-    expect(renderNights(rollupNights(NIGHTS_SAMPLE, { year: "2025" }))).toBe(
-      "nights 2025-12-29 – 2025-12-31\n  2025  3 home · 0 away · 0 in transit\n",
-    );
+    expect(
+      renderNights(rollupNights(NIGHTS_SAMPLE, { year: "2025" }), readAssets(NIGHTS_SAMPLE)),
+    ).toBe("nights 2025-12-29 – 2025-12-31\n  2025  3 home · 0 away · 0 in transit\n");
   });
 
   it("takes the longest run of nights not at home, the earlier of two as long, nights in transit counted in", () => {
@@ -99,10 +100,10 @@ describe("what the nights rollup counts", () => {
     expect(year(TRIPS_SAMPLE, "2026").lines).toHaveLength(22);
   });
 
-  it("lists the nights aboard by asset id in the text, and says `night` for one", () => {
-    expect(renderNights(rollupNights(NIGHTS_SAMPLE, { year: "2026" }))).toContain(
-      " · 2 nights aboard alpha · 1 night aboard zeta · longest trip ",
-    );
+  it("lists the nights aboard by the asset's registered name in the text, ordered by id, and says `night` for one (the reference's #429)", () => {
+    expect(
+      renderNights(rollupNights(NIGHTS_SAMPLE, { year: "2026" }), readAssets(NIGHTS_SAMPLE)),
+    ).toContain(" · 2 nights aboard Alpha · 1 night aboard Zeta · longest trip ");
   });
 
   it("counts every night as away without a place of kind home, says so, and still keeps nights in transit apart", () => {
@@ -115,7 +116,7 @@ describe("what the nights rollup counts", () => {
       nights: 8,
       lines: [],
     });
-    expect(renderNights(sample)).toBe(
+    expect(renderNights(sample, [])).toBe(
       "nights 2026-03-01 – 2026-03-08\n  (no place of kind home in places.json: every night counts as away)\n  2026  0 home · 0 away · 8 in transit · longest trip 2026-03-01 – 2026-03-08 (8 nights)\n",
     );
   });
@@ -127,6 +128,6 @@ describe("what the nights rollup counts", () => {
       window: { since: null, until: null, days: [] },
       years: [],
     });
-    expect(renderNights(empty)).toBe("nights\n  nothing in the window\n");
+    expect(renderNights(empty, [])).toBe("nights\n  nothing in the window\n");
   });
 });

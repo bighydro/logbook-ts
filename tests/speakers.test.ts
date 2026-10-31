@@ -19,8 +19,9 @@ import {
 /**
  * A transcript's voices (RFC 0038 §2; RFC 0004's amendment of 2026-10-14) where `show` and the Day
  * print a transcript, under the rfc0038 flag. Every expected row and object below is what the
- * reference (main at 7bcf728) printed for the same lines in a record of its own; the seqs are the
- * same, the ids are this test record's. The people are synthetic.
+ * reference (main at 7bcf728) printed for the same lines in a record of its own, and its rows of
+ * voices what it prints at ef4d72e (its #394: who spoke most first, no length beside a name), run on
+ * these test records; the seqs are the same, the ids are this test record's. The people are synthetic.
  */
 
 afterEach(() => {
@@ -109,21 +110,21 @@ const PROBE: Draft[] = [
 ];
 
 const SHOWN = [
-  "A · you 3 min · Ola Nordmann 3 min",
-  "B · S1 0 s · S2 59 s · S3 60 s · S4 1 min · S5 1 min · S6 2 min",
-  "C · S1 60 min · S2 60 min · S3 61 min · S4 120 min · S5 0 s · S6 2 min",
+  "A · you · Ola Nordmann",
+  "B · S6 · S5 · S4 · S3 · S2 · S1",
+  "C · S4 · S3 · S2 · S1 · S6 · S5",
   "D · S1 · Kari Nordmann",
   "E · you",
-  "F · mic.1 30 s · you 40 s",
+  "F · you · mic.1",
   "G",
   "H",
-  "I · S1 12 s",
-  "J; 2 min · S1 12 s",
+  "I · S1",
+  "J; 2 min · S1",
   "K; 7 turns, 2 min",
   "L; 0 turns, 2 s",
   "M · S1 · S2 · S3",
-  "N · you 12 s",
-  "O — Ola Nordmann · S1 12 s",
+  "N · you",
+  "O — Ola Nordmann · S1",
 ];
 
 const rowsOf = (text: string): string[] => text.split("\n").slice(1, -1);
@@ -310,7 +311,7 @@ describe("a transcript heard again, under the rfc0038 flag, as the reference rea
     const root = writeRecord(supersession());
     expect(rowsOf(showDay(root, { day: DAY }).text)).toEqual([
       "  09:00  transcript granola        superseded by #2",
-      "  09:00  transcript granola        T2 heard again · S1 10 min",
+      "  09:00  transcript granola        T2 heard again · S1",
       "  10:00  transcript granola        superseded by #4",
       "  11:00  transcript granola        T1c",
       "  11:05  note       manual         a note superseding a transcript",
@@ -336,7 +337,7 @@ describe("a transcript heard again, under the rfc0038 flag, as the reference rea
         .split("\n")
         .filter((r) => r.startsWith("  unplaced")),
     ).toEqual([
-      "  unplaced      09:00  transcript T2 heard again · S1 10 min",
+      "  unplaced      09:00  transcript T2 heard again · S1",
       "  unplaced      10:00  transcript T1b",
       "  unplaced      11:00  transcript T1c",
       "  unplaced      11:05  note   a note superseding a transcript",
@@ -372,21 +373,21 @@ describe("the Day names a transcript's voices under the rfc0038 flag, as the ref
         .filter((r) => r.startsWith("  unplaced")),
     ).toEqual(
       [
-        "A · you 3 min · Ola Nordmann 3 min",
-        "B · S1 0 s · S2 59 s · S3 60 s · S4 1 min · S5 1 min · S6 2 min",
-        "C · S1 60 min · S2 60 min · S3 61 min · S4 120 min · S5 0 s · S6 2 min",
+        "A · you · Ola Nordmann",
+        "B · S6 · S5 · S4 · S3 · S2 · S1",
+        "C · S4 · S3 · S2 · S1 · S6 · S5",
         "D · S1 · Kari Nordmann",
         "E · you",
-        "F · mic.1 30 s · you 40 s",
+        "F · you · mic.1",
         "G",
         "H",
-        "I · S1 12 s",
-        "J · S1 12 s",
+        "I · S1",
+        "J · S1",
         "K",
         "L",
         "M · S1 · S2 · S3",
-        "N · you 12 s",
-        "O · S1 12 s",
+        "N · you",
+        "O · S1",
       ].map((s, n) => `  unplaced      ${clockOf(n)}  transcript ${s}`),
     );
     const json = JSON.parse(JSON.stringify(day)) as { unplaced: Array<Record<string, unknown>> };
@@ -463,7 +464,7 @@ describe("the Day names a transcript's voices under the rfc0038 flag, as the ref
     const day = readDay(root, { day: DAY });
     const text = renderDay(day);
     expect(text).toContain("· 2 transcripts\n");
-    expect(text).toContain("      transcript   Middag · S1 31 min · Kari 42 s · you\n");
+    expect(text).toContain("      transcript   Middag · S1 · Kari · you\n");
     expect(text).toContain("      transcript   Kveld · you\n");
     const attached = day.timeline.flatMap((e) =>
       "attached" in e && e.attached ? e.attached.transcripts : [],

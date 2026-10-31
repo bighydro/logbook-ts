@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, posix } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { localOf } from "../src/clock.js";
 import { renderCountries, rollupCountries } from "../src/countries.js";
 import { readDay } from "../src/day.js";
 import { readDayStart } from "../src/dayStart.js";
@@ -19,15 +20,19 @@ import { readDayRows, renderDayRows } from "../src/days.js";
 import { renderDay } from "../src/dayText.js";
 import { draftRow, readDraft } from "../src/drafts.js";
 import { FLAGS_ENV } from "../src/flags.js";
+import { eachLine, monthFiles, parseLine } from "../src/lines.js";
 import { renderNights, rollupNights } from "../src/nights.js";
 import { readPeople, renderPeople } from "../src/people.js";
 import { readAssets } from "../src/settings.js";
 import { showDay } from "../src/show.js";
+import { pageDigest, pageOf, signedDayProblems } from "../src/signing.js";
 import { gapsText, sourceGaps } from "../src/sources.js";
 import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
+import type { Line } from "../src/types.js";
 import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
+import { heardLines } from "./heard-cases.js";
 import {
   cleanup,
   comparableDayJson,
@@ -48,10 +53,22 @@ import {
   writeMeta,
   writeRecord,
 } from "./helpers.js";
+import {
+  EXPECTED_PEOPLE,
+  EXPECTED_WITH,
+  DAY as MACHINE_DAY,
+  machineRecord,
+} from "./machine-cases.js";
 import { MARKS_CASES, DAY as MARKS_DAY, marksRecord } from "./marks-cases.js";
-import { observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
+import { NIGHT_TEXT_CASES } from "./night-text-cases.js";
+import { NOTE_TEXTS, DAY as NOTES_DAY, notesRecord } from "./note-text-cases.js";
+import { DAY as OCTOBER_DAY, octoberRecord } from "./october-cases.js";
+import { RECEIPT_CASES } from "./receipts-cases.js";
+import { REFLECTION_CASES, DAY as REFLECTION_DAY, reflectionRows } from "./reflection-cases.js";
+import { lineId, OWNER, observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
 import { caseDay, WITH_CASES, withRecord } from "./with-cases.js";
+import { DAY as WRITTEN_DAY, writtenRecord } from "./written-cases.js";
 
 /**
  * The two implementations must print the same day. This test runs the reference implementation
@@ -478,7 +495,7 @@ describe.skipIf(!ready)(
           expect(text).toBe(expected.text);
           expect(json).toEqual(expected.json);
           const ours = rollupNights(root, expected.options);
-          expect(renderNights(ours)).toBe(text);
+          expect(renderNights(ours, readAssets(root))).toBe(text);
           expect(JSON.parse(JSON.stringify(ours))).toEqual(json);
         }
       }, 600_000);
@@ -510,7 +527,9 @@ describe.skipIf(!ready)(
           JSON.parse(reference(demo, ["rollup", "countries", ...flags, "--json"])),
         );
         const nights = rollupNights(demo, options);
-        expect(renderNights(nights)).toBe(reference(demo, ["rollup", "nights", ...flags]));
+        expect(renderNights(nights, readAssets(demo))).toBe(
+          reference(demo, ["rollup", "nights", ...flags]),
+        );
         expect(JSON.parse(JSON.stringify(nights))).toEqual(
           JSON.parse(reference(demo, ["rollup", "nights", ...flags, "--json"])),
         );
@@ -809,10 +828,30 @@ describe.skipIf(!ready)(
         },
         { extra: { evening: true, read_until: "2026-06-13T18:00:00Z" } },
         { extra: { evening: true, read_until: "2026-06-13T18:00:00+00:00" } },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00.5Z" } },
+        { extra: { evening: true, read_until: "2026-06-13T18:00:00Z\n" } },
+        { extra: { evening: true, read_until: "٢٠٢٦-06-13T18:00:00Z" } },
+        { extra: { evening: true, read_until: "2026-02-30T18:00:00Z" } },
         { extra: { evening: true } },
         { extra: { evening: false, read_until: "x" } },
         { extra: { read_until: "x" } },
         { extra: "x" },
+        // What can be kept, numbered after every proposal (the reference at a6ee131).
+        {
+          segments: five,
+          extra: { parts: ["learned", "decision", "story", "ideas", "photo"] },
+          proposals: [event, link, goal],
+        },
+        {
+          segments: [{ text: "held: a number beside a name", unsupported: true }, ...five.slice(1)],
+          extra: { parts: ["learned", "day", "photo", "photo", "decision"] },
+          proposals: [{ ...link, text: "" }],
+        },
+        {
+          segments: five,
+          extra: { parts: ["learned", "learned", "ideas", "decision", "photo"] },
+          proposals: "x",
+        },
         { extra: null },
         {
           extra: {
@@ -917,7 +956,7 @@ describe.skipIf(!ready)(
         expect(ours.unsupported).toBe(theirs.unsupported);
         expect({ variant, segments: ours.segments }).toEqual({
           variant,
-          segments: theirs.segments,
+          segments: theirs.segments.map(lineOnly),
         });
         expect({ variant, proposals: ours.proposals, links: ours.links }).toEqual({
           variant,
@@ -951,6 +990,145 @@ describe.skipIf(!ready)(
         expect(ours.malformed).toHaveLength(1);
       }
     }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "heard/v1 (RFC 0046), under the rfc0046 flag: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("show prints every case of tests/heard-cases.ts alike, and the Day reads them alike", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0046");
+      const root = writeBareRecord(heardLines());
+      expect(showDay(root, { day: "2026-10-03" }).text).toBe(
+        referenceShow(root, "2026-10-03", false),
+      );
+      expect(renderDay(readDay(root, { day: "2026-10-03" }))).toBe(
+        comparableDayText(reference(root, ["day", "2026-10-03"])),
+      );
+    }, 120_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "a signature whose confirmed names the day's draft (the reference's #374 refuses to write one): both read it alike",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("the Day's signed and show, with the note alone, with the draft too, and with the draft disposed of", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0036");
+      const D = "2026-10-03";
+      const lines = [
+        {
+          at: `${D}T08:00:00Z`,
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text: "hei" },
+        },
+        {
+          at: `${D}T16:00:00Z`,
+          source: "model:m",
+          kind: "draft",
+          tier: 2 as const,
+          payload: {
+            schema: "draft/v1",
+            unit: "day",
+            subject: D,
+            read_head: "b".repeat(64),
+            read_count: 1,
+            language: "en",
+            segments: [{ text: "You wrote hei.", evidence: [lineId(1)] }],
+            extra: { evening: true, read_until: `${D}T16:00:00Z` },
+          },
+        },
+      ];
+      const read: Line[] = [];
+      for (const m of monthFiles(writeBareRecord(lines)))
+        for (const { raw, row } of eachLine(m.file)) {
+          const parsed = parseLine(raw, `${m.rel} line ${row}`);
+          if (!("error" in parsed)) read.push(parsed.line);
+        }
+      const page = pageOf(read, D, "Europe/Oslo");
+      for (const [confirmed, dispositions] of [
+        [[1], {}],
+        [[1, 2], {}],
+        [[1], { [lineId(2)]: "confirmed" }],
+      ] as const) {
+        const root = writeBareRecord([
+          ...lines,
+          {
+            at: `${D}T20:00:00Z`,
+            source: "manual",
+            kind: "signed-day",
+            tier: 1 as const,
+            payload: {
+              schema: "signed-day/v1",
+              day: D,
+              subject: OWNER,
+              confirmed: confirmed.map(lineId),
+              page: {
+                sha256: pageDigest(
+                  D,
+                  "Europe/Oslo",
+                  page.map((l) => l.hash),
+                ),
+                lines: page.length,
+              },
+              dispositions,
+            },
+          },
+        ]);
+        mkdirSync(join(root, "policy"), { recursive: true });
+        writeFileSync(
+          join(root, "policy", "crossing.json"),
+          `${JSON.stringify({ dream: { max_tier: 2 } })}\n`,
+          "utf-8",
+        );
+        const theirs = JSON.parse(reference(root, ["day", D, "--json"])) as { signed: unknown };
+        expect({
+          confirmed,
+          signed: JSON.parse(JSON.stringify(readDay(root, { day: D }).signed)),
+        }).toEqual({
+          confirmed,
+          signed: theirs.signed,
+        });
+        expect(showDay(root, { day: D }).text).toBe(referenceShow(root, D, false));
+      }
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "a payment and its receipt counted once (the reference's #406): the reference and logbook-ts agree",
+  () => {
+    for (const c of RECEIPT_CASES) {
+      it(c.name, () => {
+        const root = writeBareRecord(c.lines);
+        for (const day of Object.keys(c.expected)) {
+          const theirs = JSON.parse(reference(root, ["day", day, "--json"])) as { spend: unknown };
+          const text = reference(root, ["day", day]);
+          const ours = readDay(root, { day });
+          expect({ day, spend: JSON.parse(JSON.stringify(ours.spend)) }).toEqual({
+            day,
+            spend: theirs.spend,
+          });
+          const row = (t: string) => t.split("\n").find((l) => l.startsWith("  spend ")) ?? "";
+          expect({ day, row: row(renderDay(ours)) }).toEqual({
+            day,
+            row: row(comparableDayText(text)),
+          });
+          expect(
+            { day, json: theirs.spend, text: row(text).trim() },
+            "the reference moved; tests/receipts-cases.ts holds its output",
+          ).toEqual({ day, ...(c.expected[day] as { json: unknown; text: string }) });
+        }
+      }, 120_000);
+    }
   },
 );
 
@@ -1183,6 +1361,216 @@ describe.skipIf(!ready)(
   },
 );
 
+describe.skipIf(!ready)("a note's text: the reference and logbook-ts print it alike", () => {
+  // tests/note-text-cases.ts: a note of each text, blank, padded, not a string, of many lines;
+  // `show` and the Day of both implementations, and the reference's the ones held there.
+  it("show and the Day, text and JSON, on a note of each text", () => {
+    const root = writeRecord(notesRecord());
+    const show = reference(root, ["show", NOTES_DAY]);
+    expect(
+      show
+        .split("\n")
+        .slice(2, 2 + NOTE_TEXTS.length)
+        .map((row) => row.slice(35)),
+      "the reference moved; tests/note-text-cases.ts holds its output",
+    ).toEqual(NOTE_TEXTS.map(([, row]) => row));
+    expect(showDay(root, { day: NOTES_DAY }).text).toBe(show);
+    const text = reference(root, ["day", NOTES_DAY]);
+    const json = JSON.parse(reference(root, ["day", NOTES_DAY, "--json"])) as unknown;
+    const ours = readDay(root, { day: NOTES_DAY });
+    expect(renderDay(ours)).toBe(comparableDayText(text));
+    expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+  }, 120_000);
+});
+
+describe.skipIf(!ready)(
+  "the Day's reflection: the reference and logbook-ts show the same one alike",
+  () => {
+    // Each record of tests/reflection-cases.ts: the reference's Day beside ours, text and JSON whole,
+    // and its reflection the one held there.
+    for (const c of REFLECTION_CASES) {
+      it(c.name, () => {
+        const root = writeRecord(c.lines);
+        const text = reference(root, ["day", REFLECTION_DAY]);
+        const json = JSON.parse(reference(root, ["day", REFLECTION_DAY, "--json"])) as {
+          reflection?: unknown;
+        };
+        expect(
+          { rows: reflectionRows(text), json: json.reflection ?? null },
+          "the reference moved; tests/reflection-cases.ts holds its output",
+        ).toEqual(c.expected);
+        const ours = readDay(root, { day: REFLECTION_DAY });
+        expect(renderDay(ours)).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours))).toEqual(comparableDayJson(json));
+      }, 120_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)("the lines the reference writes since 21 October read alike", () => {
+  // tests/october-cases.ts: the notes of keep-and-sign (the reference's #374) and a mail line with
+  // Gmail's tab and the list headers (its #341). Nothing here was changed for them; `show`, the Day,
+  // `days` and `people` of both implementations agree on them, text and JSON.
+  it("show, the Day, days and people agree", () => {
+    vi.stubEnv(FLAGS_ENV, "rfc0036");
+    const root = writeRecord(octoberRecord());
+    expect(showDay(root, { day: OCTOBER_DAY }).text).toBe(reference(root, ["show", OCTOBER_DAY]));
+    const text = reference(root, ["day", OCTOBER_DAY, "--no-dream"]);
+    const json = JSON.parse(
+      reference(root, ["day", OCTOBER_DAY, "--json", "--no-dream"]),
+    ) as unknown;
+    const day = readDay(root, { day: OCTOBER_DAY });
+    expect(renderDay(day)).toBe(comparableDayText(text));
+    expect(JSON.parse(JSON.stringify(day))).toEqual(comparableDayJson(json));
+    const window = ["--from", OCTOBER_DAY, "--to", OCTOBER_DAY];
+    const rows = readDayRows(root, { from: OCTOBER_DAY, to: OCTOBER_DAY });
+    expect(renderDayRows(rows)).toBe(reference(root, ["days", ...window]));
+    expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+      reference(root, ["days", ...window, "--json"])
+        .split("\n")
+        .filter((line) => line !== "")
+        .map((line) => JSON.parse(line) as unknown),
+    );
+    const people = readPeople(root, {});
+    expect(renderPeople(people, {})).toBe(reference(root, ["people"]));
+    expect(JSON.parse(JSON.stringify(people))).toEqual(
+      JSON.parse(reference(root, ["people", "--json"])),
+    );
+  }, 120_000);
+});
+
+describe.skipIf(!ready)(
+  "the Day's nights and times (the reference's #429 and #430): the reference and logbook-ts agree",
+  () => {
+    // tests/night-text-cases.ts: each day of each record, the reference's Day beside ours, text and
+    // JSON, and its text the one held there.
+    for (const c of NIGHT_TEXT_CASES) {
+      it(c.name, () => {
+        const root = writeRecord(c.lines);
+        for (const [day, held] of Object.entries(c.expected)) {
+          const text = reference(root, ["day", day]);
+          expect(
+            text,
+            `the reference moved; tests/night-text-cases.ts holds its output (${day})`,
+          ).toBe(held);
+          const ours = readDay(root, { day });
+          expect(renderDay(ours), day).toBe(comparableDayText(text));
+          expect(JSON.parse(JSON.stringify(ours)), day).toEqual(
+            comparableDayJson(JSON.parse(reference(root, ["day", day, "--json"]))),
+          );
+        }
+      }, 600_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)("the lines the reference writes since 22 October read alike", () => {
+  // tests/written-cases.ts: the reference writes on the record itself, a receipt accepted and one
+  // rejected (its #406's road), a gift given and one received (its #353) and a day exported to a
+  // folder (its #429's crossing line); then `show` of both days, the Day, `days`, `people`, `stats`
+  // and `sources --gaps` of both implementations agree on it, text and JSON, and the chain verifies.
+  it("show, the Day, days, people, stats and sources agree, and the chain verifies", () => {
+    const root = writeRecord(writtenRecord());
+    const since = ["--since", "2026-03-01"];
+    expect(reference(root, ["review", "receipts", ...since, "--accept", "1"])).toContain(
+      "Chartroom  NOK -1",
+    );
+    expect(reference(root, ["review", "receipts", ...since, "--reject", "1"])).toContain(
+      "Sailshop: not a payment (tier 3), never proposed again",
+    );
+    reference(root, ["add", "gift", WRITTEN_DAY, "Ola Nordmann", "a book about knots"]);
+    reference(root, ["add", "gift", WRITTEN_DAY, "Kari Nordmann", "a jar of jam", "--received"]);
+    const out = join(tempDir(), "june-17");
+    expect(reference(root, ["export", "--day", WRITTEN_DAY, "--out", out])).toContain(
+      "crossing/v1: the folder 'june-17', tier 1",
+    );
+    const written: Line[] = [];
+    for (const month of monthFiles(root))
+      for (const { raw, row } of eachLine(month.file)) {
+        const parsed = parseLine(raw, `${month.rel} line ${row}`);
+        if (!("error" in parsed)) written.push(parsed.line);
+      }
+    written.sort((a, b) => a.seq - b.seq);
+    expect(written.map((l) => l.payload.schema).slice(-5)).toEqual([
+      "transaction/v1",
+      "receipt-review/v1",
+      "note/v1",
+      "note/v1",
+      "crossing/v1",
+    ]);
+    expect(verifyLogbook(root).valid).toBe(true);
+    const crossed = written.at(-1) as Line;
+    const crossingDay = localOf(Date.parse(crossed.at), "Europe/Oslo").day;
+    for (const day of [WRITTEN_DAY, crossingDay])
+      expect(showDay(root, { day }).text, day).toBe(reference(root, ["show", day]));
+    const text = reference(root, ["day", WRITTEN_DAY]);
+    const json = JSON.parse(reference(root, ["day", WRITTEN_DAY, "--json"])) as unknown;
+    const day = readDay(root, { day: WRITTEN_DAY });
+    expect(renderDay(day)).toBe(comparableDayText(text));
+    expect(JSON.parse(JSON.stringify(day))).toEqual(comparableDayJson(json));
+    const rows = readDayRows(root, {});
+    expect(renderDayRows(rows)).toBe(reference(root, ["days"]));
+    expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+      reference(root, ["days", "--json"])
+        .split("\n")
+        .filter((line) => line !== "")
+        .map((line) => JSON.parse(line) as unknown),
+    );
+    const people = readPeople(root, {});
+    expect(renderPeople(people, {})).toBe(reference(root, ["people"]));
+    expect(JSON.parse(JSON.stringify(people))).toEqual(
+      JSON.parse(reference(root, ["people", "--json"])),
+    );
+    expect(comparableStats(statsText(collectStats(root)), true)).toBe(
+      comparableStats(reference(root, ["stats"]), false),
+    );
+    const [gaps, before, after] = bracketed(() => reference(root, ["sources", "--gaps"]));
+    const at = (now: Date) => gapsText(sourceGaps(root, { now }));
+    expect([at(before), at(after)]).toContain(comparableGaps(gaps));
+  }, 300_000);
+});
+
+describe.skipIf(!ready)(
+  "the machine mark: neither implementation takes an agent for a person",
+  () => {
+    // tests/machine-cases.ts: a bot bridged by Beeper (the reference's #396), one through Telegram's
+    // export, an assistant among a call's participants, and marks that are not the literal one. The
+    // reference's `people`, Day, `days` and `show` beside ours, text and JSON, and its output the one
+    // held there.
+    it("people, the Day, days and show agree, and the reference's output is the one held", () => {
+      const root = writeRecord(machineRecord());
+      const people = reference(root, ["people"]);
+      expect(people, "the reference moved; tests/machine-cases.ts holds its output").toBe(
+        EXPECTED_PEOPLE,
+      );
+      const ours = readPeople(root, {});
+      expect(renderPeople(ours, {})).toBe(people);
+      expect(JSON.parse(JSON.stringify(ours))).toEqual(
+        JSON.parse(reference(root, ["people", "--json"])),
+      );
+      const text = reference(root, ["day", MACHINE_DAY]);
+      expect(text.split("\n").filter((row) => row.startsWith("      with "))).toEqual([
+        EXPECTED_WITH,
+      ]);
+      const day = readDay(root, { day: MACHINE_DAY });
+      expect(renderDay(day)).toBe(comparableDayText(text));
+      expect(JSON.parse(JSON.stringify(day))).toEqual(
+        comparableDayJson(JSON.parse(reference(root, ["day", MACHINE_DAY, "--json"]))),
+      );
+      const window = ["--from", MACHINE_DAY, "--to", MACHINE_DAY];
+      const rows = readDayRows(root, { from: MACHINE_DAY, to: MACHINE_DAY });
+      expect(renderDayRows(rows)).toBe(reference(root, ["days", ...window]));
+      expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+        reference(root, ["days", ...window, "--json"])
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => JSON.parse(line) as unknown),
+      );
+      expect(showDay(root, { day: MACHINE_DAY }).text).toBe(reference(root, ["show", MACHINE_DAY]));
+    }, 120_000);
+  },
+);
+
 describe.skipIf(!ready)(
   "a re-sign keeps the standing signature's confirmations (RFC 0034 amendment 4): the reference writes, both read alike",
   () => {
@@ -1259,6 +1647,97 @@ describe.skipIf(!ready)(
       // `--confirm all` is a fresh reading: the whole page not retracted.
       sign("--confirm", "all", "--at", "2026-10-04T10:00:00Z");
       expect(agree()).toMatchObject({ confirmed: 3 });
+      expect(verifyLogbook(root).valid).toBe(true);
+    }, 300_000);
+
+    // RFC 0043 §6 rule 3, the reference's #374: a signature never confirms the dream's draft line.
+    // Its `day sign` leaves the draft out of `confirmed`, `--confirm all` included, and refuses a
+    // `--confirm` that names it; the page digest still covers it. Nothing here signs: the readers
+    // read the signature it writes alike, and the signature holds to `signedDayProblems`.
+    it("a signature never confirms the dream's draft: the reference leaves it out, both read it alike", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0036");
+      const root = writeBareRecord([
+        {
+          at: "2026-10-03T16:00:00Z",
+          end: "2026-10-03T18:00:00Z",
+          source: "sim-cal",
+          kind: "event",
+          tier: 1,
+          payload: { schema: "event/v1", title: "Middag", raw_id: "middag" },
+        },
+        {
+          at: "2026-10-03T16:00:00Z",
+          source: "manual",
+          kind: "note",
+          payload: { schema: "note/v1", text: "god mat" },
+        },
+        {
+          at: "2026-10-03T19:00:00Z",
+          source: "model:qwen2.5-7b-instruct",
+          kind: "draft",
+          tier: 2,
+          payload: {
+            schema: "draft/v1",
+            unit: "day",
+            subject: "2026-10-03",
+            read_head: "a".repeat(64),
+            read_count: 2,
+            language: "en",
+            segments: [{ text: "Dinner.", evidence: ["00000000-0000-4000-8000-000000000001"] }],
+            extra: { evening: true, read_until: "2026-10-03T19:00:00Z" },
+          },
+        },
+      ]);
+      mkdirSync(join(root, "policy"), { recursive: true });
+      writeFileSync(
+        join(root, "policy", "crossing.json"),
+        `${JSON.stringify({ dream: { max_tier: 2 }, mcp: { max_tier: 1 } })}\n`,
+        "utf-8",
+      );
+      const head = (): unknown => readMetaFile(root).head;
+      const before = head();
+      const refused = referenceAll(root, [
+        "day",
+        "sign",
+        "2026-10-03",
+        "--confirm",
+        "1,3",
+        "--at",
+        "2026-10-03T20:00:00Z",
+      ]);
+      expect(refused.status).not.toBe(0);
+      expect(head()).toBe(before);
+      reference(root, [
+        "day",
+        "sign",
+        "2026-10-03",
+        "--confirm",
+        "all",
+        "--at",
+        "2026-10-03T20:00:00Z",
+      ]);
+      const json = JSON.parse(reference(root, ["day", "2026-10-03", "--json"])) as {
+        signed: { confirmed: number };
+      };
+      expect(json.signed.confirmed).toBe(2);
+      expect(JSON.parse(JSON.stringify(readDay(root, { day: "2026-10-03" }).signed))).toEqual(
+        json.signed,
+      );
+      for (const day of ["2026-10-03", "2026-10-04"])
+        expect(showDay(root, { day }).text, day).toBe(reference(root, ["show", day]));
+      const lines = readFileSync(join(root, "logbook", "2026", "10.jsonl"), "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Line);
+      const signature = lines.find((line) => line.kind === "signed-day") as Line;
+      expect(signature.payload?.confirmed).toEqual([
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+      ]);
+      // The page as shown is the three lines, the draft among them; the signature confirms two.
+      const page = lines.filter((line) => line.kind !== "signed-day");
+      expect(signature.payload?.page).toMatchObject({ lines: 3 });
+      expect(signedDayProblems(signature, readMetaFile(root).owner_id as string, page)).toEqual([]);
       expect(verifyLogbook(root).valid).toBe(true);
     }, 300_000);
   },

@@ -199,11 +199,30 @@ export class StatusError extends LogbookError {
 const PY_SPACE =
   "\\t\\n\\v\\f\\r \\x1c-\\x1f\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const PY_SPACES = new RegExp(`[${PY_SPACE}]+`, "g");
-const PY_EDGES = new RegExp(`^[${PY_SPACE}]+|[${PY_SPACE}]+$`, "g");
+
 const PY_SPACE_OR_HYPHEN = new RegExp(`[${PY_SPACE}-]+`, "g");
 
+/** Whether one UTF-16 code unit is Python whitespace (every one of them is in the BMP). */
+const PY_SPACE_ONE = new RegExp(`^[${PY_SPACE}]$`);
+const isPySpace = (unit: string): boolean => PY_SPACE_ONE.test(unit);
+
+/** Where the text ends once Python's whitespace is off its end: a scan, linear in the run's length. */
+function endOf(text: string): number {
+  let end = text.length;
+  while (end > 0 && isPySpace(text.charAt(end - 1))) end -= 1;
+  return end;
+}
+
 /** Python's `str.strip()`: its whitespace off both ends, which is not `trim()`'s (`\x1c`–`\x1f`, `\x85`; never a BOM). */
-export const pyStrip = (text: string): string => text.replace(PY_EDGES, "");
+export function pyStrip(text: string): string {
+  const end = endOf(text);
+  let start = 0;
+  while (start < end && isPySpace(text.charAt(start))) start += 1;
+  return text.slice(start, end);
+}
+
+/** Python's `str.rstrip()`: its whitespace off the end. */
+export const pyRstrip = (text: string): string => text.slice(0, endOf(text));
 
 /** Python's `str.split()`: the runs of its whitespace cut out, nothing empty kept. */
 export const pySplit = (text: string): string[] => text.split(PY_SPACES).filter((w) => w !== "");

@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (its main at 6ee01c2, 2026-10-22, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 0.7.0 and twenty-nine commits past it, among them draft/v1's forward compatibility and amendment 2, the route text of `trips` and the dream that learns) does, matched against the
+the reference implementation (its tag v1.0.0 at 2c3e158, 2026-10-29, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 1.0.0, among what it brought since 0.7.0 draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, a payment counted once with its receipt, honest nights and no number beside a name) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -75,7 +75,7 @@ node dist/bin.js day tests/fixtures/demo-sample 2026-06-15
 #        10:05–13:00  move   9.7 km · 2 h 55 min · boat
 #        13:00–24:00  stay   59.8500,10.6000 · 11 h
 #        note         Cast off at ten with Ola Nordmann and Anders Vik. Light wind from the s…
-#        call         → Ola Nordmann, 15 min
+#        call         15 min → Ola Nordmann
 #        with         Ola Nordmann (note), Anders Vik (note)
 #
 #    health        sleep 6.2 h · 6,671 steps · resting 54 bpm
@@ -133,10 +133,11 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 0.7.0** (bighydro/logbook, tag v0.7.0 at b82a11c, 2026-10-18; pinned since 2026-10-22 at
-6ee01c2 on its main, which adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
-2026-10-21, the route text of `trips`, and twenty PRs more, below), its RFC 0034
-signed-day amendments 1–4, the draft RFCs 0036–0038, 0040 and 0041 and the Day as they stand there. The
+matches: **openlogbook 1.0.0** (bighydro/logbook, tag v1.0.0 at 2c3e158, 2026-10-29, the commit `REFERENCE`
+pins; since 0.7.0 it adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
+2026-10-21, the route text of `trips`, keep and sign, a payment counted once with its receipt, honest
+nights and no number beside a name, among eighty-six commits past 0.7.0, in the tables below), its RFC 0034
+signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041 and 0046 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
 the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
@@ -144,6 +145,36 @@ as the reference does; *verify* means the chain (SPEC §3, every profile hashes 
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+### Coverage at v1.0.0 (the reference's tag of 29 October 2026, 2c3e158)
+
+What changed between 6ee01c2 and 2c3e158 (fifty-seven commits, openlogbook 0.7.1 and 1.0.0 among them;
+SPEC.md, `conformance/` and `schema/` did not change), in the same three words. Held by
+`tests/drafts.test.ts`, `tests/receipts.test.ts`, `tests/heard.test.ts`, `tests/machine.test.ts`,
+`tests/reflection.test.ts`, `tests/notes.test.ts`, `tests/night-text.test.ts` (the Day's nights and times
+on probe records, `tests/night-text-cases.ts`), the re-captured expected files and their cases in
+`tests/cross-impl.test.ts`.
+
+| Change at 2c3e158 | Here | What |
+|---|---|---|
+| `stats` names the record's format (#429) | implemented | `record format logbook/0.3  head …` |
+| The Day: no clock or count touches a name (#430), honest nights (#429) | implemented | an event's title before its time (`Dinner, from 19:30 to 21:00`), `· from 2 sources (ios-calendar, ics)`, an end on a later day kept (`23:30–03:00+1`); a night no stay places `not recorded`, `in transit` only while a move the Day lists or a flight crosses it (SPEC-QUESTIONS 133). Today and the Day page are not ported |
+| An asset by its registered name (#429) | implemented | `rollup nights`' and `people`'s `aboard Nordlys` (SPEC-QUESTIONS 134); `rollup places`, `show year`, `show person`, `show place` and `places propose` are not ported |
+| No number beside a name (#394, #423, #430) | implemented | the Day's call `15 min → Ola Nordmann`; a transcript's voices in `show` and the Day, under `rfc0038`, who spoke most first with no length (`… · you and 1 unnamed`). `rollup people`, `show year`, `show asset`, `show place`, a week's threads, the digest, `show org` and `show idea` are not ported (SPEC-QUESTIONS 131, 135) |
+| Keep and sign (#374, #403, #405): what can be kept of a day's draft is numbered; the notes it writes | implemented, read | `keep` on a link and on a sentence learned, decided, about an idea or the photo; the notes labelled `task`, `learned`, `idea`, `decision`, `word`, `intention` read alike (`tests/october-cases.ts`). `kept`, the Day's reading of what was kept, is not read here (SPEC-QUESTIONS 119, 127) |
+| A signature never confirms pencil (#374, #424) | verified only | the writer's; a signature that confirms the draft, an agent's or a derived note reads alike in both (SPEC-QUESTIONS 128) |
+| The mcp entry's `write` names `add_note` and `promise_done` (#424) | implemented | the validator's tools and sentence; there is no door here |
+| A payment and its receipt counted once (#406); `review receipts` | implemented, read | the Day's spend pairs a receipt with the payment (SPEC-QUESTIONS 126); the lines `review receipts` writes, `transaction/v1` and `receipt-review/v1`, read alike (`tests/written-cases.ts`); the queue itself is not ported |
+| RFC 0046, what you heard (#355): `heard/v1` | implemented, read | under the new `rfc0046` flag: `show`'s row; the Day reads the line as any other. `sync heard`, `show heard` and search are not ported |
+| Beeper's own bots marked as machine text (#396, 0.7.1) | implemented | `extra.machine` and an `extra.counterpart` of kind `agent` are nobody's in `people` and the Day's company, as the reference's readers read them (`tests/machine-cases.ts`) |
+| The Day's reflection (0.7.0, #431) | implemented | its section and `reflection` in `--json`; the tier gate the reference holds it to on a gated page is not ported |
+| Gifts (#353), a day exported to a folder (#429) | verified only | the gift notes and the `crossing/v1` to `folder` the reference writes read alike (`tests/written-cases.ts`); `add gift`, `people gifts` and `export --day` are not ported |
+| A reader never rebuilds the index under a writer (#385), a page kept under the head it read (#411) | not applicable | this implementation keeps no index and reads the month files |
+| Names, dates and sources held to their tier in exports, the dream and gated readers (#409, #412, #422, #425, #431, RFC 0038's `a named voice`) | not implemented | no export, dream or gated reader here |
+| The Library: Today, the doors, the week page, search, the timeline, phone width, built ahead, never hanging, answering only this machine (#404, #417, #414, #376, #363, #361, #428, #382, #383, #384, #387, #379, #421, #405) | not implemented | pages not ported here |
+| Writers, adapters, exports and fetches (#398, #397, #390, #402, #426, #370, #375, #371, #377, #429's doctor and export) | not implemented | not ported here |
+| RFCs 0043's amendment, 0046, 0047 (#369, #380, #413), ADR 0026 | read | nothing here builds on them yet but RFC 0046's row |
+| Releases, tests, CI and dependencies (#419, #420, #433, #434, #381, #400, #408, #432, #366, #367), docs (#365, #372, #427) | not applicable | |
 
 ### Coverage at 6ee01c2 (the reference's main of 22 October 2026)
 
@@ -198,7 +229,7 @@ implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speaker
 | `location/v1` (0001) | yes | chain | — | a `subject` is an asset's run |
 | `photo/v1` (0002) | yes | chain | — | |
 | `retraction/v1` (0003) | yes | chain | — | hides what it names in every reader; a retracted line supersedes nothing (#321, SPEC-QUESTIONS 108) |
-| `transcript/v1` (0004, amended 2026-10-14: `speakers`, `diarization`, RFC 0038 §2) | yes; the voices under the `rfc0038` flag: `show` names them as the source gave them (`Samtale · you 3 min · Ola Nordmann 3 min`), the Day as RFC 0038 §3 binds them (`Middag · Kari Nordmann 10 min · you 30 s · 1 unnamed · recorded with consent: unknown`, `speakers` under `day --json` with `person`, `basis` and `consent`), a line a standing transcript supersedes is `superseded by #N` in `show`, and the Day leaves out a transcript another of the same day supersedes; a transcript without the fields reads as before, flag on or off | chain | — | `src/speakers.ts`; the reference has no validator for the two fields (its JSON Schema is checked by its tests only), so none is here (SPEC-QUESTIONS 95) |
+| `transcript/v1` (0004, amended 2026-10-14: `speakers`, `diarization`, RFC 0038 §2) | yes; the voices under the `rfc0038` flag: `show` names them as the source gave them, who spoke most first and no length beside a name since the reference's #394 (`Samtale · you · Ola Nordmann`), the Day as RFC 0038 §3 binds them (`Middag · Kari Nordmann · Ola Nordmann · Gjest · you and 1 unnamed · recorded with consent: unknown`, `speakers` under `day --json` with `person`, `basis` and `consent`), a line a standing transcript supersedes is `superseded by #N` in `show`, and the Day leaves out a transcript another of the same day supersedes; a transcript without the fields reads as before, flag on or off | chain | — | `src/speakers.ts`; the reference has no validator for the two fields (its JSON Schema is checked by its tests only), so none is here (SPEC-QUESTIONS 95) |
 | `resolution/v1` (0006, amended 2026-10-15: the `speaker` ref) | yes; a `speaker` ref under the `rfc0038` flag: the voice it binds in the Day, its company at a stay and `people` (`spoke_s`, `N voices not yet named · review speakers`, `and N unnamed`) | chain | — | names, aliases, the owner; a retracted resolution supersedes nothing (#321); `spans` is not read |
 | `message/v1` (0008) | yes | chain | — | |
 | `event/v1` (0009) | yes | chain | — | folded across sources, `all_day` |
@@ -236,7 +267,7 @@ implemented**. Every claim is held by `tests/superseded.test.ts`, `tests/speaker
 | `places.json` | yes, the settings' `radius_m` as the default reach | yes | — |
 | `assets.json` | yes, `mmsi`, `icao24`, `registration` included | yes | — |
 | `policy/owner.json` | yes | yes | — (the reference writes the empty file; this reads it as empty) |
-| `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory, `{mcp: {max_tier: 1}}` as the reference's #348 has it, ahead of `REFERENCE`: SPEC-QUESTIONS 83) |
+| `policy/crossing.json` | yes: `max_tier`, `until`, `recipient`; the `mcp` entry's `write` (`sign_day`, `note_day`, `add_note`, `promise_done`) and `write_window_days` (`mcpDoor`) | yes (`PolicyError`) | — (the reference writes the default; this reads it in memory, `{mcp: {max_tier: 1}}` as the reference's #348 has it, ahead of `REFERENCE`: SPEC-QUESTIONS 83) |
 | `policy/crossing.json`, `signed_within_days` (RFC 0036) | draft (RFC 0036), under the flag: `crossingEntry`, and its composition with `max_tier` and `until`, `dayGate` and `lineCrosses` | yes, a positive whole number of days, in this implementation's words: the reference documents the key and does not read it yet (SPEC-QUESTIONS 90) | — |
 | `policy/import.json` | yes (`readDisabledSources`) | yes | — (as above); the Day's `readiness` that consumes it is not read yet, SPEC-QUESTIONS 79 |
 | `policy/circle.json` | — | — | — (`receive` is not ported) |
@@ -306,8 +337,9 @@ code and says so (SPEC-QUESTIONS 98–99).
 0004's dated amendment of 2026-10-14). Off until the RFC is Final. With it on:
 
 - `show` and the Day name a transcript's voices, its optional `speakers` and `diarization`, as the
-  reference prints them: `Samtale · you 3 min · Ola Nordmann 3 min` after the title, the people and the
-  length, the writer's turns left out beside them; the same after a transcript attached to a row of the
+  reference prints them: `Samtale · you · Ola Nordmann` after the title, the people and the
+  length, who spoke most first and no length beside a name (the reference's #394), the writer's turns
+  left out beside them; the same after a transcript attached to a row of the
   Day or unplaced, and under `day --json` a `speakers` list, `{label, person, name, seconds, basis,
   consent, owner}` each, only on a transcript with voices. A voice is `you` when the source says it is
   the owner's microphone (`from_me: true`), else the name the source displayed, else its label. A voice the reader cannot read
@@ -318,8 +350,8 @@ code and says so (SPEC-QUESTIONS 98–99).
   day supersedes, its line still counted among the day's sources;
 - who spoke (RFC 0038 §3, read by the reference since 0.7.0): a voice is bound by the standing
   `resolution/v1` line of its `speaker` ref, `<transcript line id>#<label>`, through RFC 0006's walk.
-  The Day names it (`Middag · Kari Nordmann 10 min · you 30 s · 1 unnamed · recorded with consent:
-  unknown`; `person`, `basis` and `consent` under `speakers`; the owner's own voice is the owner's
+  The Day names it (`Middag · Kari Nordmann · Ola Nordmann · Gjest · you and 1 unnamed · recorded
+  with consent: unknown`, who spoke most first, since the reference's #394; `person`, `basis` and `consent` under `speakers`; the owner's own voice is the owner's
   `owner_id`), counts a voice bound to a person as company at a stay ahead of the participants (never
   the far end of a call; `with  … · 2 unnamed`), and `people` counts the transcript for that person
   with `spoke_s` and says `N voices not yet named · review speakers` and `and N unnamed` in its head.
@@ -337,8 +369,8 @@ prints the owner's no on a scene, `scene-review/v1`, as the reference does: `sce
 
 **`rfc0041`** (RFC 0041, `star/v1`, draft of 2026-10-14). Off until the RFC is Final. With it on, `show`
 prints a star as the reference does (`★ event 019cadd3… · the table by the river`), and the Day marks
-each line it lists that has a standing star with ★, after its disposition (`event        ✓ ★ Middag
-18:00–20:00`), and gives the day's standing stars under `stars` in `--json`, `{line, star, kind, note}`
+each line it lists that has a standing star with ★, after its disposition (`event        ✓ ★ Middag,
+from 18:00 to 20:00`), and gives the day's standing stars under `stars` in `--json`, `{line, star, kind, note}`
 each, only on a day that has one. A photo's star is its keeper (RFC 0024), read flag or not.
 `tests/marks-cases.ts` holds the records and the reference's output; `tests/cross-impl.test.ts` both.
 
@@ -365,7 +397,7 @@ The summary depends on the kind; names come from the record's own `resolution/v1
 | `note` | the first non-blank line, then `… (+N lines)`. |
 | `flight` | `XY 561 OSL → ZRH, arrives 07:24, Airbus A320 LN-XYA, tracked, as pilot`; a line a later flight line supersedes, whatever its kind, is `superseded by #N`. |
 | `call` | `← Ola Nordmann, 7 min, cellular`, `→ Kari Moe, no answer, facetime-audio`, `→ withheld, 30 s, whatsapp`. |
-| `transcript` | `title — participants; 12 turns, 35 min` (`transcript` for no title; the Day says `a recording`), a length under a minute in seconds (`2 s`), half to even; under the `rfc0038` flag its voices after it (`Samtale · you 3 min · Ola Nordmann 3 min`, the turns left out beside them), and a line a standing transcript supersedes is `superseded by #N`. |
+| `transcript` | `title — participants; 12 turns, 35 min` (`transcript` for no title; the Day says `a recording`), a length under a minute in seconds (`2 s`), half to even; under the `rfc0038` flag its voices after it (`Samtale · you · Ola Nordmann`, who spoke most first, the turns left out beside them), and a line a standing transcript supersedes is `superseded by #N`. |
 | `mail` | `✉ subject — from → to, cc (n attachments)`; the owner's own mail is from `me`. |
 | `voice-memo` | `title (m:ss)`, then `, not stored` when the record does not hold the audio or `, audio missing` when there is none. |
 | `highlight` | `“quote” — title · note`; a bookmark is `bookmark — title @ location`. |
@@ -500,7 +532,9 @@ inner stay spent longest at (a move aboard with no stay either side stays a move
 The thresholds are `policy/stays.json`'s, with the reference's defaults when the file is missing.
 
 Then it reads the day: the **night** before and after (the longest stay between 22:00 and 08:00, `home`
-when it lies in a place of kind `home` or within 400 m of one, `in transit` when there is none), the
+when it lies in a place of kind `home` or within 400 m of one; when there is none, `in transit` while a
+move the Day lists or a standing flight crosses the night window, else `not recorded`, the JSON's
+`in_transit` true either way, as the reference prints it since its #429), the
 **country** (a place's own, else the nearest large airport's zone, from the night or from the day's
 longest stay), the day's all-day entries; the **timeline** of the rows that touch the day, clipped to it,
 each with its **attachments** — events (one entry several calendars carry folded), transcripts, notes,
@@ -708,7 +742,7 @@ with the record. Nothing is written; no index is built.
 
 ```bash
 node dist/bin.js stats tests/fixtures/sample-logbook
-#  logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
+#  record format logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
 #  32 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:30:00Z
 #
 #    kind         lines   first       last

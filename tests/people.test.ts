@@ -237,6 +237,27 @@ describe("three things the reference's people does that no fixture showed", () =
     expect(ola?.lines).toEqual(["01a13fb4-841e-700f-b408-b0fc79a3cf10"]);
   });
 
+  it("reads an attendee by its `ref` alone, as RFC 0009 shapes it: an `email` key beside it names nobody", () => {
+    // Run on the reference at 2c3e158 (v1.0.0), and at 6ee01c2 alike: an attendee `{email, name}`
+    // with no `ref` is no calendar evidence for the person that address resolves to.
+    const event = (raw: string, attendee: Record<string, unknown>) => ({
+      at: "2026-06-01T10:00:00Z",
+      end: "2026-06-01T10:30:00Z",
+      source: "sim-cal",
+      kind: "event",
+      tier: 1 as const,
+      payload: { schema: "event/v1", raw_id: raw, title: "Meet", attendees: [attendee] },
+    });
+    const root = writeRecord([
+      ola,
+      event("a", { email: "ola@example.org", name: "Ola" }),
+      event("b", { ref: { kind: "email", value: "ola@example.org" } }),
+    ]);
+    expect(renderPeople(readPeople(root, {}), {})).toBe(
+      "1 person · 2026-06-01 – 2026-06-01 · tier 2\n  Ola Nordmann  calendar 1\n",
+    );
+  });
+
   it("says `person` for one and `people` for none", () => {
     const root = writeRecord([
       {

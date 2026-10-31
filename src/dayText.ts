@@ -11,8 +11,11 @@ import {
   type NightLine,
   type SegmentEntry,
   type TimelineEntry,
+  type TravelAcrossNights,
+  travelAcrossNights,
 } from "./day.js";
 import { coordinates, roundHalfEven } from "./geo.js";
+import { wrapText } from "./reflection.js";
 import { mark, signedStateText } from "./signing.js";
 import { boundVoicesSuffix } from "./speakers.js";
 
@@ -64,8 +67,13 @@ function attachedCounts(a: Attached): string[] {
   return parts;
 }
 
-/** The text of a day, as the reference's `logbook day` prints it. */
-export function renderDay(day: Day): string {
+/**
+ * The text of a day, as the reference's `logbook day` prints it. `travel` says whether a move or a
+ * flight crosses each night (`in transit`, else `not recorded`, for a night no stay places); it is
+ * kept beside a Day `readDay` composed, not in its JSON, so a Day read back from its JSON or copied
+ * passes the `travelAcrossNights` of the Day it came from.
+ */
+export function renderDay(day: Day, travel: TravelAcrossNights = travelAcrossNights(day)): string {
   const tz = day.tz;
   const dayStart = Date.parse(`${day.day}T00:00:00Z`);
   /** `HH:MM` on the day's clock; `24:00` at the end of the day. */
@@ -82,8 +90,6 @@ export function renderDay(day: Day): string {
     const days = Math.round((Date.parse(`${local.day}T00:00:00Z`) - dayStart) / 86_400_000);
     return `${local.clock}+${days}`;
   };
-  const span = (start: string, end: string | null): string =>
-    end === null ? clock(start) : `${clock(start)}${DASH}${clock(end)}`;
 
   // The header says whether the owner signed the day (RFC 0034 rule 6), after the weekday. On a
   // signed day, the disposition's symbol prints before each line the signature gave one
@@ -93,9 +99,9 @@ export function renderDay(day: Day): string {
   // A starred line (RFC 0041) is marked ★ after its disposition, wherever the Day lists it.
   const starred = new Set((day.stars ?? []).map((s) => s.line));
   const marks = { dispositions, starred };
-  lines.push(header("night before", nightText(day.nights.before)));
+  lines.push(header("night before", nightText(day.nights.before, travel.before)));
   if (day.night !== undefined) lines.push(header("night", sleptText(day.night, tz)));
-  lines.push(header("night after", nightText(day.nights.after)));
+  lines.push(header("night after", nightText(day.nights.after, travel.after)));
   lines.push(header("country", countryText(day)));
   if (day.all_day.length) {
     lines.push(
@@ -106,15 +112,26 @@ export function renderDay(day: Day): string {
     );
   }
   lines.push("");
+  // The owner's reflection in a section of its own, wrapped at 76 columns under its row.
+  if (day.reflection !== undefined) {
+    const r = day.reflection;
+    lines.push(header("reflection", `${localOf(Date.parse(r.at), tz).clock} · ${r.source}`));
+    for (const row of wrapText(r.text)) lines.push(row === "" ? "" : `${" ".repeat(16)}${row}`);
+    lines.push("");
+  }
 
   const under = (indent: string, label: string, value: string): string =>
     `${indent}${pad(label, 12)} ${value}`;
   const attachments = (indent: string, a: Attached, w: Company | undefined): void => {
     for (const e of a.events) {
+      // The title first and its time after a word, so no clock touches a name at either end of it
+      // (the reference's #430): `Dinner with Ola Nordmann, from 19:30 to 21:00`.
       const when =
-        e.end === null ? clock(e.start) : `${clock(e.start)}${DASH}${clockAcross(e.end)}`;
+        e.end === null
+          ? `from ${clock(e.start)}`
+          : `from ${clock(e.start)} to ${clockAcross(e.end)}`;
       lines.push(
-        under(indent, "event", `${marked(marks, e.line)}${e.title} ${when}${sourcesText(e)}`),
+        under(indent, "event", `${marked(marks, e.line)}${e.title}, ${when}${sourcesText(e)}`),
       );
     }
     for (const t of a.transcripts)
@@ -154,7 +171,13 @@ export function renderDay(day: Day): string {
   const row = (indent: string, entry: TimelineEntry, inside = false): void => {
     if (entry.kind === "flight") {
       const text = `${marked(marks, entry.line)}${flightText(entry)}`;
-      lines.push(`${indent}${span(entry.start, entry.end)}  ${pad("flight", 6)} ${text}`);
+      // A flight's end on a later day keeps its clock and says the day (`23:30–03:00+1`), and a
+      // flight with no end keeps the column (`22:00        flight`), as the reference prints them.
+      const when =
+        entry.end === null
+          ? clock(entry.start)
+          : `${clock(entry.start)}${DASH}${clockAcross(entry.end)}`;
+      lines.push(`${indent}${pad(when, 12)} ${pad("flight", 6)} ${text}`);
       return;
     }
     const when = `${clock(entry.within_day.start)}${DASH}${clock(entry.within_day.end)}`;
@@ -172,7 +195,9 @@ export function renderDay(day: Day): string {
     lines.push("");
     for (const u of day.unplaced) {
       const text = `${marked(marks, u.line)}${u.title}${boundVoicesSuffix(u.speakers ?? [])}${sourcesText(u)}`;
-      lines.push(header("unplaced", `${span(u.at, u.end)}  ${pad(u.kind, 6)} ${text}`));
+      // An unplaced line's end on a later day keeps its clock and says the day (`17:00–02:00+1`).
+      const when = u.end === null ? clock(u.at) : `${clock(u.at)}${DASH}${clockAcross(u.end)}`;
+      lines.push(header("unplaced", `${when}  ${pad(u.kind, 6)} ${text}`));
     }
   }
 
@@ -201,15 +226,21 @@ export function renderDay(day: Day): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** ` · ×N sources` for a calendar entry several sources carry; nothing for one source. */
+/**
+ * ` · from 2 sources (ios-calendar, ics)` for a calendar entry several sources carry, never `×2`
+ * beside a name (the reference's #430); nothing for one source.
+ */
 function sourcesText(item: { sources?: string[] }): string {
-  const n = item.sources?.length ?? 0;
-  return n > 1 ? ` · ×${n} sources` : "";
+  const sources = item.sources ?? [];
+  return sources.length > 1 ? ` · from ${sources.length} sources (${sources.join(", ")})` : "";
 }
 
-/** `Home · home`, `aboard Solvind · 60.3000,5.2000 · away`, `in transit`. */
-function nightText(night: DayNight): string {
-  if (night.in_transit || night.where === null) return "in transit";
+/**
+ * `Home · home`, `aboard Solvind · 60.3000,5.2000 · away`; a night no stay places is `in transit`
+ * when a move or a flight crosses it, else `not recorded` (the reference's #429).
+ */
+function nightText(night: DayNight, travelled: boolean): string {
+  if (night.in_transit || night.where === null) return travelled ? "in transit" : "not recorded";
   const parts = [night.where];
   if (night.aboard !== null && night.position !== null)
     parts.push(coordinates(night.position.lat, night.position.lon));
@@ -271,6 +302,9 @@ function spendText(spend: DaySpend): string {
     .map((c) => `${c} ${money((spend.totals[c] as { net: number }).net)}`);
   parts.push(plural(spend.count, "transaction"));
   if (spend.deleted) parts.push(`${spend.deleted} deleted`);
+  const receipts = spend.receipts?.length ?? 0;
+  if (receipts === 1) parts.push("1 with its receipt");
+  else if (receipts > 1) parts.push(`${receipts} with their receipts`);
   if (spend.merchants.length) {
     const rest = spend.merchants.length - MERCHANTS_SHOWN;
     parts.push(

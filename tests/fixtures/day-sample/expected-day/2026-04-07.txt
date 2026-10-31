@@ -6,17 +6,17 @@
   00:00–07:00  stay   Home · 7 h
   07:00–07:40  move   36.6 km · 40 min · car
   07:40–08:40  stay   OSL, Oslo · 1 h · 1 event
-      event        Flight to Bergen (XY 123) 08:00–09:05
+      event        Flight to Bergen (XY 123), from 08:00 to 09:05
   08:12–09:03  flight XY 123  OSL → BGO · tracked
   08:40–10:00  move   325 km · 1 h 20 min · flight · OSL → BGO · 1 event
-      event        Flight to Bergen (XY 123) 08:00–09:05
+      event        Flight to Bergen (XY 123), from 08:00 to 09:05
   10:00–10:20  stay   BGO, Bergen · 20 min
   10:20–10:50  move   12.1 km · 30 min · car
   10:50–24:00  stay   60.3900,5.3200 near Berth, 0.8 km · 13 h 10 min · 4 events
-      event        Coffee 11:00–11:30
-      event        Site visit 12:00–13:00
-      event        Boat talk 14:00–15:00
-      event        Dinner 19:00–21:00
+      event        Coffee, from 11:00 to 11:30
+      event        Site visit, from 12:00 to 13:00
+      event        Boat talk, from 14:00 to 15:00
+      event        Dinner, from 19:00 to 21:00
       with         Ines Holm (calendar)
   17:00–19:00  flight None None  BGO → ENGM · inferred
 
