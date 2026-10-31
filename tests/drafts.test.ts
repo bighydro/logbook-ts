@@ -424,6 +424,7 @@ const shownLink = (number: number, link: Record<string, JsonValue> = LINK) => ({
   evidence: link.evidence,
   supported: true,
   why: null,
+  keep: number,
 });
 /** A kind no amendment names yet: what a newer writer might write. */
 const GOAL = { kind: "goal", from: id("a3"), to: id("a4") };
@@ -715,6 +716,49 @@ describe("what a draft's extra tells a reader (dream-day/4 and draft/v1 amendmen
     expect(parts({ parts: ["foo", "lens:", "week", 5, null] })).toEqual(Array(5).fill(null));
   });
 
+  it("what can be kept is numbered after the proposals: a link by its own number, then each sentence learned, decided, about an idea and the photo (the reference at a6ee131, run)", () => {
+    const keeps = (
+      extra: JsonValue,
+      more: Record<string, JsonValue> = {},
+      segments: JsonValue[] = FIVE,
+    ) =>
+      readDraft(edit(DRAFT, { segments, extra, ...more }), ON_DAY).segments.map((s) =>
+        "keep" in s ? s.keep : "-",
+      );
+    const parts = { parts: ["learned", "decision", "story", "ideas", "photo"] };
+    expect(keeps(parts)).toEqual([1, 2, "-", 3, 4]);
+    // After every entry of the list, the unknown and the malformed among them.
+    expect(keeps(parts, { proposals: [EVENT, LINK, GOAL] })).toEqual([4, 5, "-", 6, 7]);
+    expect(keeps(parts, { proposals: [EVENT, { ...LINK, text: "" }] })).toEqual([3, 4, "-", 5, 6]);
+    expect(keeps(parts, { proposals: "x" })).toEqual([1, 2, "-", 3, 4]);
+    // Supported or not, malformed or held: a keepable part is numbered.
+    expect(
+      keeps({ parts: ["learned", "decision", "ideas", "photo", "learned"] }, {}, [
+        { text: "held: a number beside a name", unsupported: true },
+        { text: "s2", evidence: [id(301)] },
+        FIVE[2] as JsonValue,
+        { text: "m" },
+        FIVE[4] as JsonValue,
+      ]),
+    ).toEqual([1, 2, 3, 4, 5]);
+    expect(keeps({ parts: ["day", "learned", "photo", "photo", "learned"] })).toEqual([
+      "-",
+      1,
+      2,
+      3,
+      4,
+    ]);
+    expect(keeps({ parts: ["threads", "questions", "people", "promises", "lens:x"] })).toEqual(
+      Array(5).fill("-"),
+    );
+    expect(keeps({})).toEqual(Array(5).fill("-"));
+    const read = readDraft(edit(DRAFT, { proposals: [LINK, GOAL, LINK] }), ON_DAY);
+    expect(read.links.map((l) => [l.number, l.keep])).toEqual([
+      [1, 1],
+      [3, 3],
+    ]);
+  });
+
   it("extra.parts is read only when it is a list as long as the segments read", () => {
     for (const extra of [
       { parts: ["story", "learned"] },
@@ -787,6 +831,8 @@ describe("what a draft's extra tells a reader (dream-day/4 and draft/v1 amendmen
       "2026-06-13T18:00:00.123456Z",
       "2026-02-30T18:00:00Z",
       "2026-06-13T24:00:00Z",
+      // Any decimal digit, as Python's `\d` takes them (the reference, run at 2c3e158).
+      "٢٠٢٦-06-13T18:00:00Z",
     ]) {
       expect(withExtra({ evening: true, read_until }).malformed).toEqual([]);
     }
@@ -808,6 +854,7 @@ describe("what a draft's extra tells a reader (dream-day/4 and draft/v1 amendmen
       "2026-06-13T18:00Z",
       "2026-06-13t18:00:00z",
       "2026-06-13 18:00:00Z",
+      "2026-06-13T18:00:00Z\n",
     ]) {
       const read = withExtra(
         read_until === undefined ? { evening: true } : { evening: true, read_until },

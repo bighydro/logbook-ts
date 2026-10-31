@@ -142,8 +142,8 @@ describe("policy/crossing.json (ADR 0016, ADR 0022): the ceiling per destination
 });
 
 describe("the mcp entry's write tools (ADR 0022, RFC 0034 amendment 3): `write` and `write_window_days`", () => {
-  it("names the two tools and the default window", () => {
-    expect(WRITE_TOOLS).toEqual(["sign_day", "note_day"]);
+  it("names the four tools and the default window (add_note and promise_done since the reference's #424)", () => {
+    expect(WRITE_TOOLS).toEqual(["sign_day", "note_day", "add_note", "promise_done"]);
     expect(WRITE_WINDOW_DAYS).toBe(60);
   });
 
@@ -163,6 +163,12 @@ describe("the mcp entry's write tools (ADR 0022, RFC 0034 amendment 3): `write` 
     expect(door.writes).toEqual(["note_day", "sign_day"]);
     expect(door.window_days).toBe(7);
     expect(door.max_tier).toBe(1);
+    // The reference's #424: an agent's note and a promise kept go through the door only by name.
+    const agent = mcpDoor(
+      policy({ mcp: { max_tier: 1, write: ["promise_done", "add_note", "sign_day"] } }),
+      TODAY,
+    ) as Ceiling;
+    expect(agent.writes).toEqual(["promise_done", "add_note", "sign_day"]);
     // A window of zero days is today only, and allowed.
     expect(
       (mcpDoor(policy({ mcp: { max_tier: 1, write_window_days: 0 } }), TODAY) as Ceiling)
@@ -182,11 +188,11 @@ describe("the mcp entry's write tools (ADR 0022, RFC 0034 amendment 3): `write` 
     expect(door.max_tier).toBe(0);
   });
 
-  it("refuses a write that is not a list of the two tools, and a window that is not a whole number of days, naming the file", () => {
-    for (const write of ["sign_day", ["sign_day", "add_note"], [1], {}]) {
+  it("refuses a write that is not a list of the four tools, and a window that is not a whole number of days, naming the file", () => {
+    for (const write of ["sign_day", ["sign_day", "add_notes"], ["foo"], [1], {}]) {
       const broken = policy({ mcp: { max_tier: 1, write } });
       expect(() => mcpDoor(broken, TODAY)).toThrow(
-        `${file(broken)}: 'mcp' has a write that is not a list of write tools; the tools it may name are sign_day, note_day`,
+        `${file(broken)}: 'mcp' has a write that is not a list of write tools; the tools it may name are sign_day, note_day, add_note, promise_done`,
       );
       // ceilings reads every entry's keys the same way.
       expect(() => ceilings(broken, TODAY)).toThrow(PolicyError);

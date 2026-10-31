@@ -240,7 +240,9 @@ export function main(argv: string[], io: Io, options: MainOptions = {}): number 
         const { json, ...window } = flags;
         if (root === "nights") {
           const nights = rollupNights(rollupRoot, window);
-          io.stdout(json ? `${JSON.stringify(nights)}\n` : renderNights(nights));
+          io.stdout(
+            json ? `${JSON.stringify(nights)}\n` : renderNights(nights, readAssets(rollupRoot)),
+          );
           return 0;
         }
         const countries = rollupCountries(rollupRoot, window);

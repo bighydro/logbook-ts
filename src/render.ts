@@ -1,4 +1,6 @@
 import { draftRow } from "./drafts.js";
+import { pyRstrip, pyStrip } from "./entities.js";
+import { HEARD_KIND, HEARD_SCHEMA, heardRow } from "./heard.js";
 import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import { sceneReviewRow } from "./sceneReviews.js";
@@ -24,6 +26,8 @@ export interface RenderContext {
   rfc0040?: boolean;
   /** A star's row, `star/v1` (the `rfc0041` flag). */
   rfc0041?: boolean;
+  /** A heard text's row, `heard/v1` (the `rfc0046` flag). */
+  rfc0046?: boolean;
   /** For a line a standing transcript line supersedes, whatever its kind: that line's seq. */
   supersededByTranscript?: Map<string, number>;
   /** For a goal, chapter or scene-review line a later line of its kind replaces: that line's seq. */
@@ -76,6 +80,10 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return `hero photo (${pyStr(p.lane)}): ${keeperPhoto(p)}${truthy(p.note) ? ` · ${pyStr(p.note)}` : ""}`;
     case "star":
       return ctx.rfc0041 === true ? starRow(p) : fallback(line.kind, p);
+    case HEARD_KIND:
+      return ctx.rfc0046 === true && p.schema === HEARD_SCHEMA
+        ? heardRow(p)
+        : fallback(line.kind, p);
     case "scene-review": {
       if (ctx.rfc0040 !== true) return fallback(line.kind, p);
       // A no a later no on the scene replaces is `superseded by #N`, the whole row (rule 3).
@@ -165,7 +173,7 @@ export function transcriptTitle(p: Payload, fallback: string): string {
 }
 
 /** Python's truth of a JSON value: null, false, 0, "", [] and {} are false. */
-function truthy(value: JsonValue | undefined): boolean {
+export function truthy(value: JsonValue | undefined): boolean {
   if (value === undefined || value === null || value === false || value === 0 || value === "")
     return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -269,10 +277,11 @@ function event(p: Payload, ctx: RenderContext): string {
 }
 
 function note(p: Payload, ctx: RenderContext): string {
-  const body = typeof p.text === "string" ? p.text : "";
-  if (ctx.raw) return body;
-  const rows = splitLines(body);
-  while (rows.length && (rows[0] as string).trim() === "") rows.shift();
+  if (ctx.raw) return typeof p.text === "string" ? p.text : "";
+  // Python's `str()` of the text, nothing for none (as the reference prints it at d053f78), its end
+  // stripped, so a trailing blank line is no line.
+  const rows = splitLines(pyRstrip(truthy(p.text) ? pyStr(p.text as JsonValue) : ""));
+  while (rows.length && pyStrip(rows[0] as string) === "") rows.shift();
   const first = rows[0] ?? "";
   const more = rows.length - 1;
   return more > 0 ? `${first} … (+${plural(more, "line")})` : first;

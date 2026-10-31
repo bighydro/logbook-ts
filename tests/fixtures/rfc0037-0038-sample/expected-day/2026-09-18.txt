@@ -1,6 +1,6 @@
 2026-09-18  Friday · unsigned
-  night before  in transit
-  night after   in transit
+  night before  not recorded
+  night after   not recorded
   country       unknown
 
   09:00–10:00  flight XY 562  None → None · tracked

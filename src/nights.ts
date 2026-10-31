@@ -1,5 +1,6 @@
 import { isHome } from "./day.js";
 import { openWindow, type ReadingStats, readDays, type WindowOptions } from "./reading.js";
+import type { Asset } from "./settings.js";
 
 /** The longest run of consecutive nights not at home in one year, the nights in transit counted in. */
 export interface LongestTrip {
@@ -103,7 +104,9 @@ const DASH = "–";
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** The text of the rollup, as the reference prints it. */
-export function renderNights(n: Nights): string {
+export function renderNights(n: Nights, assets: Asset[]): string {
+  // An asset by its registered name, as the reference prints it since its #429; the JSON keeps the id.
+  const name = (id: string): string => assets.find((a) => a.id === id)?.name ?? id;
   if (n.window.since === null || n.window.until === null)
     return "nights\n  nothing in the window\n";
   const lines = [`nights ${n.window.since} ${DASH} ${n.window.until}`];
@@ -111,7 +114,7 @@ export function renderNights(n: Nights): string {
   for (const year of n.years) {
     const parts = [`${year.home} home`, `${year.away} away`, `${year.in_transit} in transit`];
     for (const id of Object.keys(year.aboard).sort()) {
-      parts.push(`${plural(year.aboard[id] as number, "night")} aboard ${id}`);
+      parts.push(`${plural(year.aboard[id] as number, "night")} aboard ${name(id)}`);
     }
     const trip = year.longest_trip;
     if (trip !== null) {

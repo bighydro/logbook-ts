@@ -1,11 +1,11 @@
 2026-10-07  Wednesday · unsigned
   night before  59.9139,10.7522 near Båtplassen, 1.3 km · away
-  night after   in transit
+  night after   not recorded
   country       unknown
 
   timeline      nothing logged
 
-  unplaced      08:00  transcript Idé, hørt igjen · S1 2 min
+  unplaced      08:00  transcript Idé, hørt igjen · S1
 
   health        no lines
   sources       transcription 1 line, last 08:00

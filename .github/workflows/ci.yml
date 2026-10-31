@@ -164,14 +164,19 @@ jobs:
     # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
     # reference beside ours on payload variants, on synthetic records and on that record.
     #
-    # Since 2026-10-22 `REFERENCE` is 6ee01c20, the reference's main of that day, twenty PRs past
-    # a86787ca (the catch-up of 2026-10-21) and twenty-nine commits past its release 0.7.0 (b82a11c4);
-    # of them four change what is compared here: #358, draft/v1 amendment 2 (a link proposal, a
-    # segment's part, the evening); #338 and #348, what `logbook demo` writes beside the vendored
-    # demo record; and #351, whose `not-with:` and `lives-with:` notes showed how a note's
-    # `with <Name>` is read (SPEC §3.2.5 rule 3, tests/with-cases.ts). The draft cases and the
-    # with cases run the reference beside ours as well. The file holds the hash alone, as the steps
-    # below read it. The cases of
+    # Since 2026-10-29 `REFERENCE` is 2c3e158b, the commit the reference's tag v1.0.0 names,
+    # fifty-seven commits past 6ee01c20 (the catch-up of 2026-10-22, #27); of them these change what
+    # is compared here: #429 and #430, `stats`' `record format`, the Day's event title before its
+    # time, its sources by name and a night no stay places `not recorded`, and an asset by its name in
+    # `rollup nights` and `people` (the re-captured expected files); #374, what can be kept of a day's
+    # draft is numbered (`keep`); #406, a payment and its receipt counted once on the Day
+    # (tests/receipts-cases.ts); #355, `show`'s row of `heard/v1` under the rfc0046 flag
+    # (tests/heard-cases.ts); #394, no number beside a name in the Day's call and a recording's
+    # voices (tests/speakers-cases.ts); #396, the machine mark (tests/machine-cases.ts); and the lines
+    # its writers add since, which the reference writes and both read (tests/october-cases.ts,
+    # tests/written-cases.ts). The draft cases, tests/with-cases.ts (who a note says was there, SPEC
+    # §3.2.5 rule 3), tests/reflection-cases.ts and tests/note-text-cases.ts run the reference beside
+    # ours as well. The file holds the hash alone, as the steps below read it. The cases of
     # tests/superseded-cases.ts, speakers-cases.ts and marks-cases.ts, and a day the reference signs and
     # signs again, run the reference beside ours as well.
     #
@@ -180,7 +185,7 @@ jobs:
     # re-captures the expected files with tests/fixtures/capture-expected-*.mjs. drift.yml runs these
     # same steps against the reference's main, daily, to show how far it has moved.
     runs-on: ubuntu-latest
-    # A run takes about four minutes; one held by a hung reference ends here, with its log.
+    # A run takes about nine minutes; one held by a hung reference ends here, with its log.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7

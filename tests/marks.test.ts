@@ -38,7 +38,7 @@ describe("the owner's marks under the rfc0040 and rfc0041 flags, as the referenc
     expect(text).toContain("star       manual         kind=event, line=");
     expect(text).toContain("hero photo (memory): IMG_1003.HEIC · the table by the river");
     const day = readDay(root, { day: DAY });
-    expect(renderDay(day)).toContain("      event        Middag 18:00–20:00\n");
+    expect(renderDay(day)).toContain("      event        Middag, from 18:00 to 20:00\n");
     expect("stars" in day).toBe(false);
   });
 });

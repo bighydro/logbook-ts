@@ -2,7 +2,7 @@
 
 Written against `bighydro/logbook` tag v0.3.0 (SPEC.md format v0.2; ADRs 0002, 0006, 0007, 0014; `conformance/`),
 then against main at b60ae11 and e8ba94a (2026-10-01; RFCs 0001–0024, `conformance/` at v0.5.0) for the sections on `show`,
-at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125.
+at b3cd8c5 (2026-10-02, PR #138) for the answers to 24, 25, 27 and 40, at 996642f (2026-10-02) for `stats` and `sources`, at 36a7d62 (2026-10-02) for the sections on `trips` and `rollup countries`, at 3092b60 (2026-10-08, RFC 0034) for the signed day, at f6bb65b (2026-10-13, RFC 0036 and its amendment 1, PR 269, open) for goals, reviews, drafts, chapters, `day_start` and `signed_within_days`, and at 7bcf728 (2026-10-15; docs/commands.md, docs/recovery.md, its #294) for the writer lock and the repair of a tail, and at b82a11c (0.7.0, 2026-10-18; docs/SPEC-QUESTIONS.md, docs/rfcs/0034, rfcs/0006, 0024, 0030, 0037, 0038, 0040, 0041) for 108–116, at a86787c (2026-10-21) for 117 and 118, and at 6ee01c2 (2026-10-22; rfcs/0036-draft-v1.md amendment 2, docs/dream.md, docs/rfcs/0027-reflection.md, docs/who-was-there.md, SPEC.md §3.2.1, §3.2.2 and §3.2.5) for 119–125, and at a6ee131 and ef4d72e (2026-10-24; docs/receipts.md, docs/signed-day.md, rfcs/0046-what-you-heard.md, changelog.d/no-count-beside-a-contact.md) for 126–131.
 The Python source was not read; an *Answered* paragraph quotes what the reference's commit message, changelog and tests say and what running it shows. Each entry says what is unclear, what this implementation does, and why.
 
 1. **Head of an empty record.** §1 shows `logbook.json` with `seq` and `head` but never says what a record with no lines carries. This implementation expects `seq: 0` and `head` of sixty-four zeros (the same value §2 gives for the first line's `prev`), and `verify` reports `valid — 0 lines, head 000…0` for it. Suggest a sentence in §1 or §3.
@@ -1375,7 +1375,10 @@ Each entry says where its docs and its output part, or what is left open; nothin
     extra.read_until is the moment it read up to, UTC with a Z`), but takes `2026-02-30T18:00:00Z` and
     `…T24:00:00Z` as instants, and says nothing of a `read_until` on a draft that is not an evening's
     (its JSON gives it as written). A null `extra` is `extra must be an object`. This implementation does
-    the same. Should a reader hold `read_until` to a real instant, and its absence elsewhere?
+    the same. Should a reader hold `read_until` to a real instant, and its absence elsewhere? Its digits
+    are any decimal digit, as Python's `\d` takes them (`٢٠٢٦-06-13T18:00:00Z` passes, run at 2c3e158),
+    and nothing may follow the `Z`, a line break included; here the same since this catch-up. Should
+    the form hold the digits to ASCII?
 
 123. **A stay at the edge of a reader's window.** §3.2.1 rule 4 ends a cluster at "the subject's next point"
     when that point comes `merge_gap_s` or more later within a walk, and §3.2.2 gives a reader the lines
@@ -1416,3 +1419,107 @@ Each entry says where its docs and its output part, or what is left open; nothin
     name's character (`with Per’s boat` names Per Hansen, `with Per's boat` nobody). Should the rule say
     so?
 
+## Found while catching up with the reference at its main of 24 October (a6ee131; docs/receipts.md, docs/ledger.md, docs/signed-day.md *Keep and sign*, docs/dream.md, rfcs/0046-what-you-heard.md, docs/heard.md, docs/adapters/agents.md)
+
+Learned by running the reference at a6ee131, and at 6ee01c2 beside it to tell what moved, on synthetic
+records, beside its docs; no source was read. Nothing here is decided.
+
+126. **A payment and its receipt, paired.** docs/receipts.md says every reader that sums the ledger pairs a
+    receipt's line with the payment source's line "by the rule above (the currency, the signed amount,
+    within two days, the merchant)", and that writing the rule into RFC 0021 is an open proposal. The
+    reference's Day, run on 20 records (tests/receipts-cases.ts), pairs a line of source `receipts` (its
+    `provider` aside) with a line of any other source of the same currency and amount to the cent
+    (`-12.904` with `-12.896`), at most 48 hours apart to the second, whose merchants, case-folded as
+    Python's `casefold` folds them (`ß` as `ss`, a final `ς` as `σ`, a dotless `ı` kept; this
+    implementation folds letter by letter with a table of the folds that are not a letter's lower case)
+    with every character that is not a letter or a digit gone (`_` too, accents kept), contain
+    one another; the nearest pairs first, a tie to the earlier receipt (two payments as near to one
+    receipt: the first written), across days; a retracted line pairs with nothing. A deleted or a
+    corrected line, and one with no merchant or a merchant of punctuation only, pairs with nothing. This
+    implementation does the same, over the whole record. Open: "within two days" is written as days and
+    read as 48 hours between the two lines' `at`, and whether a line's `date` (RFC 0021) moves it was not
+    run; and the Day rounds a currency's totals to the cent (it did at a86787c too; this implementation
+    did not until now), which no document says. Should RFC 0021 name the pairing, so that every reader
+    that sums the ledger reads it alike?
+
+127. **What can be kept, numbered.** docs/signed-day.md, *Keep and sign*: "each sentence learned, decided,
+    about an idea, and the photo of the day is numbered after the last proposal". The reference numbers
+    after every entry of `proposals`, a proposal of an unknown kind and a malformed one included, and gives
+    a number to a sentence it shows unsupported, malformed or held (`held: a number beside a name`) as
+    well, though its text row prints `keep N` only beside a supported one (what `day sign --keep` does with
+    such a number was not run). This implementation numbers as the reference's JSON does. Should an
+    unsupported sentence have a number?
+
+128. **A signature that confirms the draft.** docs/signed-day.md and the reference's #374: "a signature never
+    confirms the dream's draft line", and the writer refuses to. A `signed-day/v1` line written otherwise,
+    whose `confirmed` names the day's draft, is read by the reference at a6ee131 as it was at 6ee01c2: `show`
+    prints `2 lines confirmed of 2`, the Day's `signed.confirmed` counts it, `verify` calls the record valid.
+    This implementation reads it the same. Is such a line malformed, or the draft's confirmation simply
+    not counted?
+
+129. **A `heard/v1` row of another schema, and the generic row's `text`.** RFC 0046 gives `show` no row. The
+    reference prints `heard/v1` as tests/heard-cases.ts holds it, and a `heard` line of any other schema
+    as its generic row, which prints a payload's `text` even when it is an object (the SPEC §1.1 reference
+    of the RFC's line, `{'bytes': 52811, …}`); this implementation's generic row takes `text` only as a
+    string, so the two differ on such a line, and did before a6ee131 on any payload whose `text` is an
+    object. Not changed here (older than this catch-up). Should the generic row print an object?
+
+130. **What the reference's readers took no new rule for in this window, and still differ here.** Found
+    while probing, each the same at 6ee01c2 and at a6ee131, so older than this catch-up and not changed
+    here: a line marked `extra.machine: true`, a one-on-one chat with an `extra.counterpart` of kind
+    `agent`, and a transcript participant with `machine: true` are nobody's in the reference's `people`
+    and Day (its Telegram adapters wrote such lines before; Beeper's do since its #396), and are people
+    here; a flight with no `end` is printed at its departure padded to a span's width there
+    (`20:00        flight XY 1`) and unpadded here. Should the spec's company rule (§3.2.5) name the
+    machine mark?
+
+    *Answered here (the catch-up to 2c3e158, v1.0.0).* Both now read as the reference does: the machine
+    mark is nobody's in `people` and the Day's company (ported from the catch-up toward 24 October), and a
+    flight with no `end` keeps the column, one whose end falls on a later day printing it as
+    `23:30–03:00+1`. The spec's company rule still names neither.
+
+131. **No number beside a name, and where it still stands (the reference's #394, ef4d72e).** Its changelog:
+    "The readers of a day, a week, an org and an idea set no number beside a person's name": a call on the
+    Day reads `19 min ← Ola Nordmann`, a recording's voices are named "in the order of who spoke most,
+    without their minutes, `you · Kari Nordmann and 1 unnamed`". Run at ef4d72e: the Day's rows do so
+    (and this implementation now does), but `show` still prints a call as `→ +447700900123, 1 min` and a
+    transcript as `Middag — Ola Nordmann; 2 min`, the Day's `with` row still `Ola Nordmann (transcript) ·
+    1 unnamed`, and an unanswered call `→ Ola Nordmann, no answer`, as before. Two voices that spoke
+    equally long keep their line's order, and a voice with no length comes after every voice with one.
+    Is `show`, a list of lines, meant to keep its numbers, and should the rule be written for every reader?
+
+132. **The Day's reflection: "the latest standing one".** docs/day.md says the Day carries "the latest
+    standing one" of the reflections, and the reference's other readers count a line superseded while
+    a line of its kind that is not retracted names it in `supersedes` (its #321). Its Day passes over a
+    retracted reflection, but not a superseded one: a reflection written later that names an earlier
+    one in `supersedes`, with an earlier `at`, leaves the earlier one shown, the latest by `at` (then by
+    `seq`), and so does a plain note naming it. `latestReflection` does the same. Is a reflection that
+    another names in `supersedes` meant to stand on the Day?
+
+133. **A night no stay places: "in transit only when the Day holds a move or a flight across that night".**
+    The reference's changelog for 1.0.0 (its #429): such a night reads `not recorded` on `logbook day`,
+    "`in transit` only when the Day holds a move or a flight across that night", the Day's JSON unchanged
+    (`in_transit: true` either way). Run on probe records at 2c3e158, a flight the Day does not hold
+    counts too: a flight from 23:30 to 03:00 the evening before makes the next Day's night before `in
+    transit`, though that Day lists no flight and its JSON has none; a flight counts when it starts before
+    the night window ends and ends at or after it begins, so one landing at 22:00 (the window's start)
+    counts and one leaving at 08:00 (its end) does not, and one with no `end` counts by its departure; a
+    move counts only when the Day lists it, so a move from 21:30 to 08:25 is no move of the first day (it
+    lists none) and makes only the second day's night before `in transit`; a gap (no points between two
+    stays) is no move. This implementation does the same, from the Day's moves and the window's standing
+    flights. Is the night travelled across a property of the night, the same on both Days, and should the
+    text and the JSON say the same thing?
+
+134. **An asset by its registered name, and "the JSON SPEC §6.1 compares keeps the id".** The reference's
+    changelog for 1.0.0: `rollup nights`, `people` and the rest read `aboard Nordlys` (were `aboard
+    nordlys`), and "The JSON SPEC §6.1 compares keeps the id". Run at 2c3e158: `rollup nights --json`
+    keeps the id (`"aboard": {"nordlys": 6}`), but `people --json` gives a day together's `where` as the
+    text, `"aboard Solvind"`, where it gave `"aboard solvind"`; this implementation does the same. Is
+    `people`'s `where` meant to keep the id, and which JSON does §6.1 compare?
+
+135. **`×2 sources` beside a title in `show`.** The reference's changelog for 1.0.0 (its #430): "an entry
+    several calendars carry says `from 2 sources (…)` after its title, in `logbook day`, the Day page,
+    `digest` and `tasks`, never `×2` beside a name". Run at 2c3e158, `show` still prints the count in its
+    source column, before the title (`09:00  event      ×2 sources     Dinner with Ola Nordmann`), and
+    this implementation does the same. Is `show`, whose column is the source and not the title, meant to
+    keep it?

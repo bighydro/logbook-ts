@@ -37,7 +37,7 @@ const steady = (text: string): string => text.replace(/^took \d+\.\d{3}s$/m, "to
 
 // What `logbook stats` of the reference prints on the conformance sample (32 lines since RFC 0034; the tier
 // and month tables are this implementation's, SPEC-QUESTIONS 42; `took` varies).
-const SAMPLE_STATS = `logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
+const SAMPLE_STATS = `record format logbook/0.2  head 58bfa9e704e3388d44d74e63f1d84765d24df79e92fce3b522fbef53b765d3df
 32 lines  first 2026-03-01T07:30:00Z  last 2026-03-08T19:30:00Z
 
   kind         lines   first       last
@@ -176,7 +176,7 @@ describe("stats on synthetic records", () => {
     expect(stats.last).toBeNull();
     expect(stats.kinds).toEqual([]);
     expect(steady(statsText(stats))).toBe(
-      `logbook/0.2  head ${"0".repeat(64)}
+      `record format logbook/0.2  head ${"0".repeat(64)}
 0 lines
 
 0 retractions hiding 0 lines
@@ -364,7 +364,7 @@ took
 
   it("reads a logbook/0.3 record, which hashes by the same rule, and prints its format (SPEC §3.1)", () => {
     const root = freshLogbook("Europe/Oslo", "logbook/0.3");
-    expect(statsText(collectStats(root))).toMatch(/^logbook\/0\.3 {2}head 0{64}\n/);
+    expect(statsText(collectStats(root))).toMatch(/^record format logbook\/0\.3 {2}head 0{64}\n/);
   });
 });
 

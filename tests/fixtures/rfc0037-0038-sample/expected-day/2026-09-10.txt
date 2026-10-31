@@ -1,6 +1,6 @@
 2026-09-10  Thursday · unsigned
-  night before  in transit
-  night after   in transit
+  night before  not recorded
+  night after   not recorded
   country       unknown
 
   timeline      nothing logged

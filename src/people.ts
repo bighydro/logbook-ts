@@ -3,9 +3,10 @@ import { addDays, localOf, localToMs, monthKey } from "./clock.js";
 import { isOn, RFC0038 } from "./flags.js";
 import { coordinates, distanceM, roundTo } from "./geo.js";
 import { eachLine, monthFiles, parseLine } from "./lines.js";
+import { isMachineLine, isMachineParticipant } from "./machine.js";
 import { type Opened, openWindow, type ReadingStats, type RowUnit, readDays } from "./reading.js";
 import { payloadOf } from "./render.js";
-import { asRef, type Ref } from "./resolve.js";
+import { asRef, personName, type Ref } from "./resolve.js";
 import type { Asset, Place } from "./settings.js";
 import { isSuperseded } from "./show.js";
 import { bindVoices } from "./speakers.js";
@@ -227,7 +228,8 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
       const day = localOf(ms, opened.timezone).day;
       switch (line.kind) {
         case "message": {
-          if (p.schema !== "message/v1") break;
+          // An agent's line, or a line of a conversation with one, is no one's (the machine mark).
+          if (p.schema !== "message/v1" || isMachineLine(p)) break;
           const chat = obj(p.chat);
           const direct = typeof p.chat === "string" || chat?.type === "direct";
           const chatId = text(chat?.id);
@@ -286,12 +288,9 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
               (o.response === "declined" || o.status === "declined" || o.declined === true)
             )
               continue;
-            const email = text(o?.email);
-            const ref =
-              typeof item === "string"
-                ? { kind: "email", value: item }
-                : (asRef(o?.ref) ??
-                  (email === undefined ? undefined : { kind: "email", value: email }));
+            // An attendee is its `ref` (RFC 0009), or an address written as a string: an `email` key
+            // beside it names nobody, as the reference reads it.
+            const ref = typeof item === "string" ? { kind: "email", value: item } : asRef(o?.ref);
             const who = personOf(ref);
             if (who !== undefined) named.add(who);
           }
@@ -317,7 +316,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
           }
           for (const item of Array.isArray(p.participants) ? p.participants : []) {
             const o = obj(item);
-            if (o === undefined) continue;
+            if (o === undefined || isMachineParticipant(o)) continue;
             let who: string | undefined;
             for (const [kind, key] of [
               ["email", "email"],
@@ -407,11 +406,7 @@ export function readPeople(root: string, options: PeopleOptions, stats?: Reading
   for (const acc of accounts.values()) {
     if (acc.channels.size === 0 && acc.days.size === 0) continue;
     const named = resolver.refsOf(acc.id);
-    const minted = named.find(
-      (r) =>
-        asRef(r.line.payload.alias_of) === undefined && text(r.line.payload.label) !== undefined,
-    );
-    const name = text(minted?.line.payload.label) ?? resolver.people().get(acc.id) ?? acc.id;
+    const name = personName(resolver, acc.id) ?? acc.id;
     let tier = acc.evidenceTier;
     for (const r of named) tier = Math.max(tier, r.line.tier);
     const channels: Partial<Record<ChannelName, Channel>> = {};
@@ -497,11 +492,11 @@ function chatRef(id: string): Ref | undefined {
 
 /** Where a day together was: the stay's named place, `aboard <asset>` for a run aboard or a stay aboard, else the unnamed label. */
 function unitLabel(unit: RowUnit, asset: Asset | undefined, opened: Opened): string {
-  if (unit.whole && asset !== undefined) return `aboard ${asset.id}`;
+  if (unit.whole && asset !== undefined) return `aboard ${asset.name}`;
   const stay = unit.stays[0];
-  if (stay === undefined) return asset === undefined ? "" : `aboard ${asset.id}`;
+  if (stay === undefined) return asset === undefined ? "" : `aboard ${asset.name}`;
   if (stay.place !== undefined) return stay.place.name;
-  if (stay.aboard !== undefined) return `aboard ${stay.aboard.id}`;
+  if (stay.aboard !== undefined) return `aboard ${stay.aboard.name}`;
   return unnamedLabel(stay, opened.places);
 }
 

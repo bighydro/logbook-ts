@@ -11,7 +11,8 @@
  * carry an `until` day (ADR 0022: a ceiling lent for a while, `{"max_tier": 2, "until": "2026-12-31"}`);
  * it holds through that day and from the next counts as `max_tier` 0, so nothing crosses until the
  * owner writes a new date or removes the line. The `mcp` entry may also name the write tools the owner
- * lets through the door by name (ADR 0022, RFC 0034 amendment 3), `"write": ["sign_day", "note_day"]`,
+ * lets through the door by name (ADR 0022, RFC 0034 amendment 3; the reference's #424),
+ * `"write": ["sign_day", "note_day", "add_note", "promise_done"]`,
  * and how far back they may write, `"write_window_days": 60`; none is allowed by default, and none once
  * the entry has expired. A `recipient` (RFC 0029 §7) is the age recipient a crossing package to the
  * destination is resealed to.
@@ -58,8 +59,11 @@ export const UNTIL = "until";
 export const EXPIRED_TIER = 0;
 /** The write tools an entry lets through the door by name (ADR 0022); absent: none. */
 export const WRITE = "write";
-/** The tools `write` may name: the day's signature and its note. */
-export const WRITE_TOOLS = ["sign_day", "note_day"] as const;
+/**
+ * The tools `write` may name: the day's signature and its note, and since the reference's #424 an
+ * agent's note and a promise marked done, each refused unless named (its lines carry source `mcp`).
+ */
+export const WRITE_TOOLS = ["sign_day", "note_day", "add_note", "promise_done"] as const;
 export type WriteTool = (typeof WRITE_TOOLS)[number];
 /** How many days before today a write tool may still write to. */
 export const WINDOW = "write_window_days";

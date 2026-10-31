@@ -20,7 +20,7 @@
  * line). Only a standing transcript's voices are read: its callers pass no other.
  */
 
-import type { Resolver } from "./resolve.js";
+import { personName, type Resolver } from "./resolve.js";
 import type { JsonValue, Line, Payload } from "./types.js";
 
 /** One voice as the reader reads it. */
@@ -132,7 +132,8 @@ export function bindVoices(transcript: Line, resolver: Resolver, owner: Owner): 
       ...voice,
       who: unnamed ? "unnamed" : "person",
       person: entity.id,
-      personLabel: entity.label,
+      // The person's name as `people` gives it, the first label given them, whichever ref gave it.
+      personLabel: personName(resolver, entity.id) ?? entity.label,
       basis,
       consent: given ?? "unknown",
       confidence,
@@ -154,27 +155,47 @@ export function boundSpeakerJson(v: BoundVoice): SpeakerJson {
 }
 
 /**
- * ` · Kari Nordmann 14 min · you 31 min · 1 unnamed · recorded with consent: unknown`, after a
- * transcript's row of the Day, from its `speakers`: the owner's voice is `you`, a person's their
- * name (the label when the person has none), an unnamed voice is counted, never named, and a voice
- * not yet named is the name the source displayed or its label. The consent is said when a voice
- * that is not the owner's was bound with a consent other than `yes`: `no` when any says no.
+ * Who spoke most first, by the seconds each spoke, a voice with no length after them in the line's
+ * order: the order the reference names voices in since its #394 (a6ee131 to ef4d72e, run), which
+ * sets no length beside a name.
+ */
+function bySpeaking<T extends { seconds: number | null }>(voices: readonly T[]): T[] {
+  return voices
+    .map((v, i) => ({ v, i }))
+    .sort(
+      (a, b) =>
+        (a.v.seconds === null ? 1 : 0) - (b.v.seconds === null ? 1 : 0) ||
+        (b.v.seconds ?? 0) - (a.v.seconds ?? 0) ||
+        a.i - b.i,
+    )
+    .map(({ v }) => v);
+}
+
+/**
+ * ` · Kari Nordmann · you and 1 unnamed · recorded with consent: unknown`, after a transcript's row
+ * of the Day, from its `speakers`, as the reference prints it since its #394: who spoke most first,
+ * no length beside a name; the owner's voice is `you`, a person's their name (the label when the
+ * person has none), an unnamed voice is counted, never named, the count joined to the last name,
+ * and a voice not yet named is the name the source displayed or its label. The consent is said when
+ * a voice that is not the owner's was bound with a consent other than `yes`: `no` when any says no.
  */
 export function boundVoicesSuffix(speakers: readonly SpeakerJson[]): string {
   let unnamed = 0;
   const shown: string[] = [];
   const consents = new Set<string>();
-  for (const s of speakers) {
+  for (const s of bySpeaking(speakers)) {
     if (!s.owner && s.consent !== null) consents.add(s.consent);
     // An unnamed voice: a line binds it (so it has a consent, `unknown` at least) and names nobody.
     if (!s.owner && s.person === null && s.consent !== null) {
       unnamed += 1;
       continue;
     }
-    const who = s.owner ? "you" : (s.name ?? s.label);
-    shown.push(s.seconds === null ? who : `${who} ${lengthText(s.seconds)}`);
+    shown.push(s.owner ? "you" : (s.name ?? s.label));
   }
-  if (unnamed > 0) shown.push(`${unnamed} unnamed`);
+  if (unnamed > 0) {
+    if (shown.length > 0) shown.push(`${shown.pop()} and ${unnamed} unnamed`);
+    else shown.push(`${unnamed} unnamed`);
+  }
   const consent = consents.has("no") ? "no" : consents.has("unknown") ? "unknown" : undefined;
   if (consent !== undefined) shown.push(`recorded with consent: ${consent}`);
   return shown.map((t) => ` · ${t}`).join("");
@@ -238,11 +259,16 @@ export function voiceText(voice: Pick<Voice, "label" | "seconds" | "name" | "own
   return voice.seconds === null ? shown : `${shown} ${lengthText(voice.seconds)}`;
 }
 
-/** ` · you 3 min · Ola Nordmann 3 min`, appended to a transcript's row; empty without voices. */
+/**
+ * ` · you · Ola Nordmann`, appended to a transcript's row; empty without voices. Who spoke most first
+ * and no length beside a name, as the reference prints it since its #394.
+ */
 export function voicesSuffix(
   voices: ReadonlyArray<Pick<Voice, "label" | "seconds" | "name" | "owner">>,
 ): string {
-  return voices.map((v) => ` · ${voiceText(v)}`).join("");
+  return bySpeaking(voices)
+    .map((v) => ` · ${v.owner ? "you" : (v.name ?? v.label)}`)
+    .join("");
 }
 
 /**

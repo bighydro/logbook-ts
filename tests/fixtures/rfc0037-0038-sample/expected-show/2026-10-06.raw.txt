@@ -1,22 +1,22 @@
 2026-10-06  unsigned
-  09:15  transcript transcription  Samtale · you 3 min · Ola Nordmann 3 min
-  10:00  transcript transcription  Rom · S1 0 s · S2 60 s · S3 1 min · S4 120 min · Kari Nordmann · you
+  09:15  transcript transcription  Samtale · you · Ola Nordmann
+  10:00  transcript transcription  Rom · S4 · S3 · S2 · S1 · Kari Nordmann · you
   10:30  transcript transcription  Kanter ·  S1  · S2 · S3
   11:00  transcript transcription  Bare tekst
   11:30  transcript transcription  Ingen stemmer
-  12:00  transcript transcription  Med folk — Ola Nordmann; 2 min · S1 12 s
+  12:00  transcript transcription  Med folk — Ola Nordmann; 2 min · S1
   12:30  transcript transcription  Kort; 0 turns, 2 s
   18:00–19:40  location   dawarich       21 points
   19:40  transcript granola        superseded by #129
-  19:40  transcript granola        Middag — Ola Nordmann · S1 31 min · S2 42 s
+  19:40  transcript granola        Middag — Ola Nordmann · S1 · S2
   19:45–21:00  location   dawarich       16 points
   21:00  transcript transcription  superseded by #131
   21:05–21:30  location   dawarich       6 points
   21:30  note       manual         superseded by #130
   21:35  location   dawarich       1 point
-  21:35  transcript transcription  Notatet hørt · you 30 s
+  21:35  transcript transcription  Notatet hørt · you
   21:40–22:00  location   dawarich       5 points
-  22:00  transcript transcription  Hørt feil · S1 31 min · S2 42 s
+  22:00  transcript transcription  Hørt feil · S1 · S2
   22:05  location   dawarich       1 point
   22:05  retracted #133: heard wrong
   22:10–23:00  location   dawarich       11 points

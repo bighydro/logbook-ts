@@ -167,3 +167,22 @@ export function buildResolver(lines: Iterable<Line>): Resolver {
     },
   };
 }
+
+/**
+ * A person's name as `people` gives it: the label of the first line standing, by `seq`, that names the
+ * person by a ref of its own (not an `alias_of`); else the last label any line gave; undefined when
+ * no line labels the person. The Day names a voice bound to the person by it too (RFC 0038 §3), as
+ * the reference does at d053f78, whatever the binding line's own label.
+ */
+export function personName(resolver: Resolver, id: string): string | undefined {
+  const minted = resolver
+    .refsOf(id)
+    .find(
+      (r) =>
+        asRef(r.line.payload.alias_of) === undefined && labelOf(r.line.payload.label) !== undefined,
+    );
+  return labelOf(minted?.line.payload.label) ?? resolver.people().get(id);
+}
+
+const labelOf = (value: JsonValue | undefined): string | undefined =>
+  typeof value === "string" && value !== "" ? value : undefined;
