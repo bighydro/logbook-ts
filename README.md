@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (its tag v1.0.0 at 2c3e158, 2026-10-29, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 1.0.0, among what it brought since 0.7.0 draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, a payment counted once with its receipt, honest nights and no number beside a name) does, matched against the
+the reference implementation (its tag v1.1.0 at 512170e, 2026-11-02, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 1.1.0, among what it brought since 0.7.0 draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, a payment counted once with its receipt, honest nights, no number beside a name and an all-day entry that says all day) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,10 +133,11 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 1.0.0** (bighydro/logbook, tag v1.0.0 at 2c3e158, 2026-10-29, the commit `REFERENCE`
+matches: **openlogbook 1.1.0** (bighydro/logbook, tag v1.1.0 at 512170e, 2026-11-02, the commit `REFERENCE`
 pins; since 0.7.0 it adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
 2026-10-21, the route text of `trips`, keep and sign, a payment counted once with its receipt, honest
-nights and no number beside a name, among eighty-six commits past 0.7.0, in the tables below), its RFC 0034
+nights, no number beside a name and an all-day entry that says all day, among a hundred and two commits
+past 0.7.0, in the tables below), its RFC 0034
 signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041 and 0046 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
@@ -145,6 +146,26 @@ as the reference does; *verify* means the chain (SPEC §3, every profile hashes 
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+### Coverage at v1.1.0 (the reference's tag of 2 November 2026, 512170e)
+
+What changed between 2c3e158 and 512170e (sixteen commits, openlogbook 1.1.0; SPEC.md, `conformance/`
+and `schema/` did not change, and no vendored expected file moved), in the same three words. Held by
+`tests/all-day.test.ts` (the reference's output on 41 synthetic records, `tests/all-day-cases.ts`) and its
+cases in `tests/cross-impl.test.ts`.
+
+| Change at 512170e | Here | What |
+|---|---|---|
+| An all-day entry says all day (#436) | implemented | the Day's `all day` row holds an entry a calendar flags, one from a local midnight to a later one, and one another calendar carries flagged, joined by ` and `; none is in the timeline or held by a stay, and one located at the stay proposes its attendees (`attendee of … (all day)`). With it the fold as the reference's Day and `show` read it: a timed copy leads, a flagged copy folds whatever its end (SPEC-QUESTIONS 136, 137, 139). Today's plan, the week's ribbon and `digest`'s tomorrow are not ported |
+| A draft's evidence ids after a word (#436) | not implemented | the Day shows no draft here (SPEC-QUESTIONS 119, 140); `show trip` is not ported |
+| `digest`'s tomorrow, `tasks` and the ribbon's words (#436) | not implemented | readers and pages not ported |
+| A request counts only when a person wrote it (#439, RFC 0045) | not implemented | no `promises` here |
+| Share holds what crossing holds; reserved destination names; an agent's reflection pencil (#438) | not implemented | no exporter here; `policy/crossing.json` reads as before |
+| The name guard is case-blind; the footer says the gate's tier (#442) | not implemented | the dream writer's and the pages' check; a draft's held segment reads as written |
+| The Library's doors (RFC 0047): Life, People, Places, Ask, the gear, the look, old addresses, Volumes (#407, #410, #401, #415, #418, #416, #441, #386) | not implemented | pages not ported here |
+| The built pages' lab (#437), `doctor`'s install hint, a tier-1 page and the reflection (#436) | not implemented | not ported here |
+| Release, tests and the formula (#449, #448, #434) | not applicable | |
+| The fold's flight designator, a carrier the airlines table knows (older than this window) | not implemented | found by this catch-up's probes and not changed: any two capitals and digits fold here (SPEC-QUESTIONS 138) |
 
 ### Coverage at v1.0.0 (the reference's tag of 29 October 2026, 2c3e158)
 

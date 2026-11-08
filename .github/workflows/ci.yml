@@ -164,7 +164,12 @@ jobs:
     # tests/cross-impl-entities.test.ts runs RFC 0037's validators, tier rules and `status list` of the
     # reference beside ours on payload variants, on synthetic records and on that record.
     #
-    # Since 2026-10-29 `REFERENCE` is 2c3e158b, the commit the reference's tag v1.0.0 names,
+    # Since 2026-11-07 `REFERENCE` is 512170eb, the commit the reference's tag v1.1.0 names, sixteen
+    # commits past 2c3e158b; of them #436 changes what is compared here, an all-day entry on the Day
+    # (tests/all-day-cases.ts, whose cases also hold the fold of one entry several calendars carry in the
+    # Day and `show`, older than #436 and found by this catch-up's probes), and no vendored expected file
+    # moved. Before it:
+    # since 2026-10-29 `REFERENCE` was 2c3e158b, the commit the reference's tag v1.0.0 names,
     # fifty-seven commits past 6ee01c20 (the catch-up of 2026-10-22, #27); of them these change what
     # is compared here: #429 and #430, `stats`' `record format`, the Day's event title before its
     # time, its sources by name and a night no stay places `not recorded`, and an asset by its name in

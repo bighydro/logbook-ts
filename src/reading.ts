@@ -426,10 +426,13 @@ class Machine {
     const people: Company = { confirmed: [], proposed: [] };
     const read: RowUnit[] = [];
     for (const unit of units) {
-      const timed = unit.evidence.filter(
-        (e) => e.line.kind === "event" && payloadOf(e.line).all_day !== true,
-      );
-      const events: Folded[] = foldEvents(timed);
+      // An all-day entry (a copy flagged, or from a local midnight to a later one) is held by no stay.
+      // The Day proposes the attendees of one located at the stay; this reader keeps only who is
+      // confirmed (`days`, `people`, `trips`), so it passes no `allDay` and proposes nobody from one.
+      const events: Folded[] = foldEvents(
+        unit.evidence.filter((e) => e.line.kind === "event"),
+        this.timezone,
+      ).timed;
       const evidence = evidenceOf(
         unit.stays,
         {

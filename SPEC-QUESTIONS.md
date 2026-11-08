@@ -1523,3 +1523,74 @@ records, beside its docs; no source was read. Nothing here is decided.
     source column, before the title (`09:00  event      ×2 sources     Dinner with Ola Nordmann`), and
     this implementation does the same. Is `show`, whose column is the source and not the title, meant to
     keep it?
+
+## Found while catching up with the reference at v1.1.0 (openlogbook 1.1.0, tag v1.1.0 at 512170e, 2026-11-02; its CHANGELOG 1.1.0, docs/digest.md, docs/promises.md, docs/crossing.md, SPEC.md §3.2.1, §3.2.4 and §3.2.5)
+
+136. **What an all-day entry is.** SPEC.md §3.2.4 rule 7: "**All-day** entries are the day's all-day
+    `event/v1` lines, folded"; rules 4 and 5 keep "an all-day one" out of a row and out of `unplaced`, and
+    nothing defines the term beyond RFC 0009's `all_day`. The reference's changelog for 1.1.0 (its #436):
+    "An all-day entry says `all day`, never `from 00:00 to 00:00+1`, whichever calendar carries it: one
+    that another calendar carries timed (a Notion date-only page, a copy of a birthday) and one that runs
+    from a midnight to a later one are all-day too"; docs/digest.md: "whether its calendar flags it
+    all-day or another calendar carries it from midnight to midnight". Run at 512170e on 41 synthetic
+    records (tests/all-day-cases.ts): an entry is all-day when a copy of it in the fold is flagged, or its
+    lead runs from a local midnight to a later one in the record's zone (flag false or absent; a UTC
+    midnight in Oslo is not one, nor is a midnight with no `end`, so a date-only Notion page alone is
+    timed at `00:00`). A copy flagged in another calendar makes a timed entry all-day whatever its hours:
+    `Lunch` 12:00–13:00 in one calendar and flagged at 12:00 in another is one all-day entry, though
+    neither the changelog nor docs/digest.md says midnight to midnight of it. Two or more all-day entries
+    are joined by ` and ` every time (`A and B and C`). This
+    implementation does the same (`isAllDay` in `src/calendar.ts`); in a zone whose clock skips 00:00 (a
+    change at midnight, as Santiago's) a day has no midnight, and what counts there as its start is
+    neither said nor checked against the reference here. Should RFC 0009 or §3.2.4 define an
+    all-day entry, in which zone a midnight is read, and whether a flagged copy decides for its timed
+    copies?
+
+137. **The fold of one entry several calendars carry, against SPEC.md §3.2.1.** §3.2.1: two `event/v1`
+    lines are one entry when "their `at` and `end` denote the same instants (both null is the same end)",
+    and "the row is the first line of the set, in the day's order". Run at 512170e, and already at 2c3e158
+    (v1.0.0), the reference's Day and `show` fold otherwise: a copy flagged all-day folds whatever its
+    `end` (flagged copies ending a day apart fold; a flagged copy with no `end` folds into a timed whole
+    day; two timed copies whose ends differ do not); the set's row is its first *timed* line, else its
+    first line, so `show` prints the set where its timed copy stands (`F0` before the folded `X` when `X`'s
+    flagged copy is the day's first line), with the timed copy's title, and the Day's `line` and `lines`
+    begin with it; and the starts must still be one instant. This implementation folded by §3.2.1's words
+    until this catch-up, and now folds as the reference does (`foldCalendar` in `src/calendar.ts`, shared
+    by the Day and `show`). Which is the rule: §3.2.1's, or the reference's, which §3.2.1 would then need
+    to say?
+
+138. **"The same flight designator" in the fold.** SPEC.md §3.2.1 folds two titles that "name the same
+    flight designator (RFC 0013; `Flight to Zürich (XY 561)` and `Flug XY561`)". Run at 512170e (and at
+    2c3e158), the reference folds `LX 561` with `LX561`, `LX 123` with `LX123` and `SK 4321 to Oslo` with
+    `Oslo SK4321`, but not `XY 561` with `XY561`, `AB 561` with `AB561`, `QQ 561` with `QQ561`, nor
+    `Flight to Bergen (XY 123)` with `XY 123`: it reads a designator as §3.2.2 rule 1 reads a flight
+    candidate's ("a carrier code the airlines table knows followed by one to four digits, or any such code
+    when the title also says `flight`, `Flug` or `✈`"), each title on its own, so §3.2.1's own example
+    (`XY 561`, the synthetic carrier of the conformance sample) does not fold there. This implementation
+    folds any two capital letters and one to four digits (SPEC-QUESTIONS 28), having no airlines table
+    (`src/tables.ts` holds the airports and zones alone), and so folds those four pairs where the
+    reference does not. Not changed here; should §3.2.1 name §3.2.2's rule, and should the airlines table
+    be part of what a reader ships?
+
+139. **A timed entry from midnight to midnight, and company (§3.2.5 rule 1).** §3.2.5 rule 1: "An
+    attendee of a timed `event/v1` held at the stay is confirmed … An all-day entry places nobody unless it
+    is located at the stay, and then its attendees are proposed". Run at 512170e, an entry with
+    `all_day: false` from a local midnight to the next, with no location and overlapping the stay by hours,
+    places nobody (it did confirm its attendee here before this catch-up, as rule 1's "timed" reads), and
+    located at the stay it proposes its attendee (`attendee of Ola visits (all day)`, confidence 0.3), as a
+    flagged one does; neither is attached to the stay (`days` counts `attached: 0`). Two more, run: a
+    flagged entry located at the stay with no `end` proposes nobody (the stay began after its midnight),
+    and a set whose timed copy names no location or attendee, beside a flagged copy that names both,
+    proposes nobody either, the set read by its lead. This implementation does the same. Should rule 1 say "an all-day entry" in #436's sense, so that `timed` excludes it?
+
+140. **Not ported, and so not compared: what 1.1.0 changed in readers this implementation does not have.**
+    For the record of what the two implementations were not held to at 512170e: a request counted only
+    when a person wrote it (its #439, RFC 0045) is `promises`' reading, and there is no `promises` here;
+    `export share day` and `export crossing` refusing a reserved destination name and a day not signed
+    (its #438) are exporters; the case-blind name guard (its #442) is the dream writer's and the pages'
+    check (docs/dream.md: a sentence is held when it is written, and the line carries what was held, which
+    `readDraft` reads as before); a draft's evidence ids after a word (`from […6742a9f5]`, its #436) are
+    printed where the Day prints a draft, which it does not here (SPEC-QUESTIONS 119); `digest`'s and
+    `tasks`' words (its #436) are readers not ported; and the Library's doors (RFC 0047, its #407, #410,
+    #401, #415, #418, #416, #441) are the reference's pages. docs/digest.md and the changelog agree on
+    each; nothing to answer here but whether a second implementation must carry them for 1.1.
