@@ -1,4 +1,5 @@
 import { airportAt, airportCode, countryOfZone, nearestAirport } from "./airports.js";
+import { foldCalendar, isAllDay } from "./calendar.js";
 import {
   addDays,
   checkTimezone,
@@ -347,6 +348,7 @@ function speakersOf(line: Line, ctx: PeopleContext): SpeakerJson[] | undefined {
 const SOURCE_RANK: Record<string, number> = { calendar: 0, transcript: 1, note: 2, photo: 3 };
 const CONFIDENCE: Record<string, number> = {
   calendar: 0.8,
+  allDay: 0.3,
   transcript: 0.9,
   note: 1.0,
   photo: 0.5,
@@ -520,9 +522,17 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
     )
     .map((e) => flightEntry(e, ctx));
 
-  const allDay = foldEvents(
-    dayStanding.filter((e) => e.line.kind === "event" && payloadOf(e.line).all_day === true),
-  ).map(({ title, line, sources, lines }) => ({ title, line, sources, lines }));
+  // The day's calendar entries, folded once: the all-day ones on their row, the timed in the timeline.
+  const calendar = foldEvents(
+    dayStanding.filter((e) => e.line.kind === "event"),
+    timezone,
+  );
+  const allDay = calendar.allDay.map(({ title, line, sources, lines }) => ({
+    title,
+    line,
+    sources,
+    lines,
+  }));
 
   // The rows: the segments of the window, a run aboard one asset folded into one, those that touch
   // the day. A run is folded over the whole window, so one that began the day before is still one
@@ -533,7 +543,14 @@ export function dayOf(reader: DayReader, day: string, entries: Entry[], given?: 
   // heard again, RFC 0038 §2.8) is not listed beside it, as the reference reads it; its line still
   // counts among the day's sources.
   const listed = ctx.rfc0038 ? withoutHeardAgain(dayStanding) : dayStanding;
-  const { timeline, unplaced } = buildTimeline(dayRows, flights, listed, ctx);
+  const { timeline, unplaced } = buildTimeline(
+    dayRows,
+    flights,
+    listed,
+    calendar.timed,
+    calendar.allDay,
+    ctx,
+  );
 
   const nightBefore = nightOf(before, rows, ctx);
   const nightAfter = nightOf(day, rows, ctx);
@@ -827,60 +844,35 @@ function obj(value: JsonValue | undefined): { [key: string]: JsonValue } | undef
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 
-/** An airline designator in a calendar title: `LX 561`, `XY561`. */
-const DESIGNATOR = /\b([A-Z]{2})\s?(\d{1,4})\b/;
-
-function eventKey(e: Entry): { span: string; title: string; flight: string | undefined } {
-  const title = text(payloadOf(e.line).title) ?? "";
-  const m = DESIGNATOR.exec(title);
-  return {
-    span: `${e.ms}|${typeof e.line.end === "string" ? e.line.end : ""}`,
-    title: title.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().trim().replace(/\s+/g, " "),
-    flight: m ? `${m[1]}${m[2]}` : undefined,
-  };
-}
-
 export interface Folded extends AttachedEvent {
   entries: Entry[];
 }
 
 /**
- * One calendar entry several calendars carry is one event: the same start and end, and the same
- * title (case, accents and whitespace aside) or the same flight in the title, from two or more
- * sources (SPEC-QUESTIONS 28). One calendar holding an entry twice is still two events.
+ * The day's calendar entries folded (`foldCalendar`, SPEC-QUESTIONS 28, 136–138) and parted as the
+ * reference's Day parts them at v1.1.0: the all-day ones (a copy flagged, or from a local midnight to
+ * a later one, its #436) for the `all day` row, and the timed ones for the timeline. Each carries its
+ * lead's title, start and end, the lead's id, the sources and the lines folded into it.
  */
-export function foldEvents(events: Entry[]): Folded[] {
-  const out: Folded[] = [];
-  const taken = new Set<string>();
-  for (let i = 0; i < events.length; i++) {
-    const first = events[i] as Entry;
-    if (taken.has(first.line.id)) continue;
-    const key = eventKey(first);
-    const members = [first];
-    for (let j = i + 1; j < events.length; j++) {
-      const other = events[j] as Entry;
-      if (taken.has(other.line.id)) continue;
-      const k = eventKey(other);
-      if (
-        k.span === key.span &&
-        (k.title === key.title || (key.flight !== undefined && k.flight === key.flight))
-      )
-        members.push(other);
-    }
-    const sources = [...new Set(members.map((m) => String(m.line.source)))];
-    const group = sources.length >= 2 ? members : [first];
-    for (const m of group) taken.add(m.line.id);
-    out.push({
-      title: text(payloadOf(first.line).title) ?? "",
-      start: first.line.at,
-      end: typeof first.line.end === "string" ? first.line.end : null,
-      line: first.line.id,
-      sources: sources.length >= 2 ? sources : [String(first.line.source)],
-      lines: group.map((m) => m.line.id),
-      entries: group,
+export function foldEvents(
+  events: Entry[],
+  timezone: string,
+): { allDay: Folded[]; timed: Folded[] } {
+  const allDay: Folded[] = [];
+  const timed: Folded[] = [];
+  for (const group of foldCalendar(events)) {
+    const lead = group.lead;
+    (isAllDay(group, timezone) ? allDay : timed).push({
+      title: text(payloadOf(lead.line).title) ?? "",
+      start: lead.line.at,
+      end: typeof lead.line.end === "string" ? lead.line.end : null,
+      line: lead.line.id,
+      sources: group.sources,
+      lines: group.members.map((m) => m.line.id),
+      entries: group.members,
     });
   }
-  return out;
+  return { allDay, timed };
 }
 
 const emptyAttached = (): Attached => ({
@@ -953,6 +945,8 @@ interface Placed {
   attached: Attached;
   /** The evidence attached, for the company. */
   events: Folded[];
+  /** The all-day entries over the row, attached to nothing: one located at the stay proposes its attendees. */
+  allDay: Folded[];
   transcripts: Entry[];
   notes: Entry[];
   photos: Entry[];
@@ -962,6 +956,8 @@ function buildTimeline(
   rows: Row[],
   flights: FlightEntry[],
   lines: Entry[],
+  events: Folded[],
+  allDay: Folded[],
   ctx: Context,
 ): { timeline: TimelineEntry[]; unplaced: UnplacedEntry[] } {
   const placed: Placed[] = rows.map((row) => ({
@@ -969,6 +965,7 @@ function buildTimeline(
     entry: row.kind === "aboard" ? runEntry(row, ctx) : segmentEntry(row, ctx),
     attached: emptyAttached(),
     events: [],
+    allDay: [],
     transcripts: [],
     notes: [],
     photos: [],
@@ -977,9 +974,10 @@ function buildTimeline(
     !(p.row.kind === "move" && p.row.gap) && overlaps(p.row.startMs, p.row.endMs, startMs, endMs);
   const unplaced: UnplacedEntry[] = [];
 
-  const events = foldEvents(
-    lines.filter((e) => e.line.kind === "event" && payloadOf(e.line).all_day !== true),
-  );
+  for (const event of allDay) {
+    const lead = event.entries[0] as Entry;
+    for (const p of placed) if (holds(p, lead.ms, lead.endMs)) p.allDay.push(event);
+  }
   for (const event of events) {
     const first = event.entries[0] as Entry;
     const attached: AttachedEvent = {
@@ -1271,15 +1269,18 @@ const identity = (who: Someone): string => (who.id === null ? `name:${who.name}`
 /** Names a transcript gives a speaker that are nobody: `Speaker A`, `me`, `Unknown`. */
 const NOBODY = /^(speaker\s+\S+|me|unknown)$/i;
 
+/** Whether an entry's `location` names a place within reach of the stay; false when it names none. */
+function locatedAt(event: Entry, stays: Stay[], ctx: PeopleContext): boolean {
+  const location = text(payloadOf(event.line).location);
+  if (location === undefined) return false;
+  const place = ctx.places.find((pl) => pl.name.toLowerCase() === location.toLowerCase());
+  if (place === undefined) return false;
+  return stays.some((s) => distanceM(place.lat, place.lon, s.lat, s.lon) <= HELD_AT_M);
+}
+
 /** Whether a timed calendar entry was held at the stay: its location, or a long overlap with no location. */
 function heldAt(event: Entry, stays: Stay[], ctx: PeopleContext): boolean {
-  const p = payloadOf(event.line);
-  const location = text(p.location);
-  if (location !== undefined) {
-    const place = ctx.places.find((pl) => pl.name.toLowerCase() === location.toLowerCase());
-    if (place === undefined) return false;
-    return stays.some((s) => distanceM(place.lat, place.lon, s.lat, s.lon) <= HELD_AT_M);
-  }
+  if (text(payloadOf(event.line).location) !== undefined) return locatedAt(event, stays, ctx);
   return stays.some(
     (s) => Math.min(event.endMs, s.endMs) - Math.max(event.ms, s.startMs) > HELD_OVERLAP_S * 1000,
   );
@@ -1316,6 +1317,8 @@ function namedWith(body: string, ctx: PeopleContext): Someone[] {
 /** The evidence attached to a stay or a run aboard that can say who was there. */
 export interface RowEvidence {
   events: Folded[];
+  /** The all-day entries over the stay, when the reader keeps them (the Day does). */
+  allDay?: Folded[];
   transcripts: Entry[];
   notes: Entry[];
   photos: Entry[];
@@ -1379,6 +1382,25 @@ export function evidenceOf(stays: Stay[], p: RowEvidence, ctx: PeopleContext): E
         entry: first,
         confirms: true,
         confidence: CONFIDENCE.calendar as number,
+      });
+    }
+  }
+  // An all-day entry names no hour: located at the stay, its attendees are proposed (SPEC §3.2.5
+  // rule 1), and since the reference's #436 that holds for one from a local midnight to a later one
+  // and one another calendar flags, as for a flagged one.
+  for (const event of p.allDay ?? []) {
+    const lead = event.entries[0] as Entry;
+    if (!locatedAt(lead, stays, ctx)) continue;
+    for (const who of attendees(lead, ctx)) {
+      found.push({
+        person: who.id,
+        name: who.name,
+        source: "calendar",
+        reason: `attendee of ${event.title} (all day)`,
+        line: event.line,
+        entry: lead,
+        confirms: false,
+        confidence: CONFIDENCE.allDay as number,
       });
     }
   }

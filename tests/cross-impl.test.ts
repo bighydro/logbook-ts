@@ -31,6 +31,12 @@ import { collectStats, statsText } from "../src/stats.js";
 import { verifyLogbook } from "../src/store.js";
 import { readTrips, renderTrips } from "../src/trips.js";
 import type { Line } from "../src/types.js";
+import {
+  ALL_DAY_CASES,
+  DAY as ALL_DAY_DAY,
+  ALL_DAY_EXPECTED,
+  allDayRecord,
+} from "./all-day-cases.js";
 import { CROSS_IMPL_BUDGET_MS } from "./budgets.js";
 import { heardLines } from "./heard-cases.js";
 import {
@@ -1127,6 +1133,53 @@ describe.skipIf(!ready)(
             "the reference moved; tests/receipts-cases.ts holds its output",
           ).toEqual({ day, ...(c.expected[day] as { json: unknown; text: string }) });
         }
+      }, 120_000);
+    }
+  },
+);
+
+describe.skipIf(!ready)(
+  "an all-day entry says all day, and one entry many calendars carry is one (the reference's #436): the reference and logbook-ts agree",
+  () => {
+    for (const c of ALL_DAY_CASES) {
+      it(c.name, () => {
+        const root = allDayRecord(c);
+        const json = JSON.parse(reference(root, ["day", ALL_DAY_DAY, "--json"])) as {
+          all_day: unknown;
+          unplaced: unknown;
+          timeline: Array<{ with?: unknown }>;
+        };
+        const theirs: Record<string, unknown> = {
+          text: comparableDayText(reference(root, ["day", ALL_DAY_DAY])),
+          allDay: json.all_day,
+          unplaced: json.unplaced,
+          show: reference(root, ["show", ALL_DAY_DAY]),
+        };
+        const day = readDay(root, { day: ALL_DAY_DAY });
+        const ours: Record<string, unknown> = {
+          text: renderDay(day),
+          ...JSON.parse(JSON.stringify({ allDay: day.all_day, unplaced: day.unplaced })),
+          show: showDay(root, { day: ALL_DAY_DAY }).text,
+        };
+        if (c.home) {
+          const row = (
+            reference(root, ["days", "--json"])
+              .trim()
+              .split("\n")
+              .map((l) => JSON.parse(l)) as Array<{ day: string; stays: unknown; people: unknown }>
+          ).find((d) => d.day === ALL_DAY_DAY);
+          theirs.days = { stays: row?.stays, people: row?.people };
+          theirs.company = json.timeline.map((t) => t.with ?? null);
+          ours.company = JSON.parse(
+            JSON.stringify(day.timeline.map((t) => ("with" in t ? t.with : null) ?? null)),
+          );
+          const read = readDayRows(root, {}).rows.find((d) => d.day === ALL_DAY_DAY);
+          ours.days = JSON.parse(JSON.stringify({ stays: read?.stays, people: read?.people }));
+        }
+        expect(ours).toEqual(theirs);
+        expect(theirs, "the reference moved; tests/all-day-cases.ts holds its output").toEqual(
+          JSON.parse(JSON.stringify(ALL_DAY_EXPECTED[c.name])),
+        );
       }, 120_000);
     }
   },

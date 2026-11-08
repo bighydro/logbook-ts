@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { foldCalendar } from "./calendar.js";
 import { chapterOf, isChapter } from "./chapters.js";
 import {
   checkTimezone,
@@ -124,8 +125,6 @@ export interface ShowRange {
 }
 
 const DASH = "–";
-/** An airline designator in a calendar title: `LX 561`, `XY561`. */
-const DESIGNATOR = /\b([A-Z]{2})\s?(\d{1,4})\b/;
 
 export { checkTimezone, isDay };
 
@@ -582,22 +581,7 @@ function subjectOf(entry: Entry): string | undefined {
   return typeof subject === "string" ? subject : undefined;
 }
 
-/**
- * What two calendar entries must share to be one: the span, and the title (case, accents and
- * whitespace aside: `Zürich` is `zurich`, `ø` stays `ø`) or the flight the title names.
- */
-function eventKeys(entry: Entry): { span: string; title: string; flight: string | undefined } {
-  const raw = payloadOf(entry.line).title;
-  const title = typeof raw === "string" ? raw : "";
-  const m = DESIGNATOR.exec(title);
-  return {
-    span: `${entry.ms}|${typeof entry.line.end === "string" ? entry.line.end : ""}`,
-    title: title.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().trim().replace(/\s+/g, " "),
-    flight: m ? `${m[1]}${m[2]}` : undefined,
-  };
-}
-
-/** A folded entry: the source column (`×N sources`), and the lines folded into the first. */
+/** A folded entry: the source column (`×N sources`), and the lines folded into the lead. */
 interface Fold {
   sources: string;
   lines: Line[];
@@ -605,10 +589,10 @@ interface Fold {
 
 /**
  * One calendar entry that several sources carry prints once, as the reference does: `event/v1`
- * lines with the same start and end, and one title (case, accents and whitespace aside) or naming
- * the same flight, from two or more sources, fold into the first's row with `×N sources` — N the
- * distinct sources — in its source column. One calendar holding an entry twice is still two rows;
- * a retracted line is neither folded nor counted (SPEC-QUESTIONS 28).
+ * lines folded by `foldCalendar` (one start, one title or flight, one end unless a copy is flagged
+ * all-day, two or more sources) print as their lead's row, where the lead stands, with `×N sources`
+ * — N the distinct sources — in its source column. One calendar holding an entry twice is still two
+ * rows; a retracted line is neither folded nor counted (SPEC-QUESTIONS 28, 137, 138).
  */
 function foldEvents(
   entries: Entry[],
@@ -619,29 +603,12 @@ function foldEvents(
   const events = entries.filter(
     (e) => e.line.kind === "event" && ctx.resolver.retractedBy(e.line.id) === undefined,
   );
-  for (let i = 0; i < events.length; i++) {
-    const first = events[i] as Entry;
-    if (hidden.has(first.line.id)) continue;
-    const key = eventKeys(first);
-    const sources = new Set([String(first.line.source)]);
-    const members: Entry[] = [];
-    for (let j = i + 1; j < events.length; j++) {
-      const other = events[j] as Entry;
-      if (other.ms !== first.ms) break;
-      if (hidden.has(other.line.id)) continue;
-      const otherKey = eventKeys(other);
-      const same =
-        otherKey.span === key.span &&
-        (otherKey.title === key.title ||
-          (key.flight !== undefined && otherKey.flight === key.flight));
-      if (!same) continue;
-      members.push(other);
-      sources.add(String(other.line.source));
-    }
-    if (sources.size < 2) continue;
+  for (const group of foldCalendar(events)) {
+    if (group.members.length < 2) continue;
+    const members = group.members.slice(1);
     for (const member of members) hidden.add(member.line.id);
-    groups.set(first.line.id, {
-      sources: `×${sources.size} sources`,
+    groups.set(group.lead.line.id, {
+      sources: `×${group.sources.length} sources`,
       lines: members.map((m) => m.line),
     });
   }

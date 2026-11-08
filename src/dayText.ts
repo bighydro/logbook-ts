@@ -107,7 +107,7 @@ export function renderDay(day: Day, travel: TravelAcrossNights = travelAcrossNig
     lines.push(
       header(
         "all day",
-        day.all_day.map((a) => `${marked(marks, a.line)}${a.title}${sourcesText(a)}`).join(", "),
+        day.all_day.map((a) => `${marked(marks, a.line)}${a.title}${sourcesText(a)}`).join(" and "),
       ),
     );
   }
