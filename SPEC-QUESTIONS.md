@@ -1594,3 +1594,47 @@ records, beside its docs; no source was read. Nothing here is decided.
     `tasks`' words (its #436) are readers not ported; and the Library's doors (RFC 0047, its #407, #410,
     #401, #415, #418, #416, #441) are the reference's pages. docs/digest.md and the changelog agree on
     each; nothing to answer here but whether a second implementation must carry them for 1.1.
+
+## Found while catching up with the reference at v1.2.0 (openlogbook 1.2.0, tag v1.2.0 at 55c6fbd, 2026-11-21; its CHANGELOG 1.2.0, rfcs/0048-social-v1.md, docs/adapters/instagram.md, docs/serve.md *Keep and sign*)
+
+141. **Where a `social/v1` act is said in words.** The reference's changelog for 1.2.0 (its #440): "The
+    Day and `show` say a `social/v1` line in words (`followed by @ola.example`, `liked a post by
+    @sailing.example`)"; docs/adapters/instagram.md: "The Day says the acts in words (`followed by
+    @ola.example`, …, `commented on a post by @ola.example: …`)". RFC 0048, open question 1, at the same
+    tag: "Should a reader show the day's `social` lines at all, and where? Nothing reads them yet". Run
+    at 55c6fbd on the record its own `logbook add instagram` writes from its synthetic export, and on
+    synthetic records (tests/social-cases.ts): `show` prints each act in words, and `logbook day`, text
+    and `--json`, names none of them anywhere (the day's `sources` counts their lines, nothing else),
+    with a handle resolved to a person or not. Whether "the Day" in the changelog and the adapter's page
+    means the Day page of the Library (HTML, not ported here) or `logbook day`, and whether the RFC's
+    open question is still open, is not said. This implementation prints the words in `show` under the
+    `rfc0048` flag and reads the acts in the Day as the reference's `logbook day` does, as company of no
+    one. Should RFC 0048 say which readers show an act, now that one does?
+
+142. **Which draft `superseded by #N` names after a kept line.** The changelog for 1.2.0 (its #452): "A
+    keep made before its draft was superseded stays as it was written, and `logbook show DAY` says which
+    draft it was kept from (`kept from draft #8, superseded by #9`)"; docs/serve.md: "Only the day's
+    current draft is kept from: the latest not retracted and not superseded", and a refusal "naming the
+    current draft". Run at 55c6fbd (tests/kept-cases.ts): `#N` is the draft line's seq; `superseded by
+    #M` names the latest standing draft whose `supersedes` names that draft directly, not the day's
+    current draft (drafts #2 ← #3 ← #4: a line kept from #2 says `superseded by #3`), and a draft of
+    another day that names it counts; a retracted draft says `, retracted`, which no page documents, and
+    wins over a draft that supersedes it; a superseding draft that is itself retracted supersedes
+    nothing. The suffix follows any kind whose `extra.from` names a line of kind `draft` (a note, an
+    event, a mail, a resolution), whatever that line's schema. This implementation does the same under
+    the `rfc0036` flag. Should RFC 0036 rule 3 say what a reader names: the draft that replaced it, or
+    the current one?
+
+143. **Not ported, and so not compared: what 1.2.0 changed in readers and writers this implementation
+    does not have.** For the record of what the two implementations were not held to at 55c6fbd: the
+    Instagram adapter itself (its #440; the lines it writes are read here, tests/cross-impl.test.ts);
+    `imessage`'s per-category skip counts (its #456) and `derive flights` counting a merged draft as no
+    new flight (its #460) are writers' counts, and there is no adapter or `derive` here; the Notion
+    export's `birthday` under the gate (its #462) is an exporter; keep and sign refusing a superseded or
+    retracted draft (its #452) is `day sign --keep` and the Day page's form, not ported (only `show`'s
+    words of it are, 142); `review receipts` reading an address under NFKC (its #454) is a queue not
+    ported; the gate's readers (its #453), one login at a time, every proxy header and no pencil without
+    evidence (its #454), Today's time column and a promise's words (its #451, #454), the old addresses'
+    301 (its #461) and a refusal closed gracefully (its #464) are the Library's pages and server. The
+    changelog and the docs agree on each; nothing to answer here but whether a second implementation
+    must carry them for 1.2.
