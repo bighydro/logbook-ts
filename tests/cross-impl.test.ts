@@ -1857,6 +1857,9 @@ describe.skipIf(!ready)(
           `${name}: the reference moved; tests/kept-cases.ts holds its rows`,
         ).toEqual(expected);
         expect(showDay(root, { day: KEPT_DAY }).text, name).toBe(theirs);
+        expect(showDay(root, { day: KEPT_DAY, raw: true }).text, `${name} --raw`).toBe(
+          referenceShow(root, KEPT_DAY, true),
+        );
       }
     }, 300_000);
   },

@@ -152,7 +152,7 @@ by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and
 What changed between 512170e and 55c6fbd (twenty-five commits, openlogbook 1.2.0; SPEC.md, `conformance/`
 and `schema/` did not change; the seed-1 demo record moved, its #454, and was made again with its
 `make.mjs` and its expected files captured again), in the same three words. Held by `tests/social.test.ts`
-(`tests/social-cases.ts`, 63 payloads run), `tests/kept.test.ts` (`tests/kept-cases.ts`, 17 records run)
+(`tests/social-cases.ts`, 66 payloads run), `tests/kept.test.ts` (`tests/kept-cases.ts`, 17 records run)
 and their cases in `tests/cross-impl.test.ts`, with the record the reference's own `logbook add instagram`
 writes from its synthetic export.
 
@@ -414,6 +414,16 @@ each line it lists that has a standing star with ★, after its disposition (`ev
 from 18:00 to 20:00`), and gives the day's standing stars under `stars` in `--json`, `{line, star, kind, note}`
 each, only on a day that has one. A photo's star is its keeper (RFC 0024), read flag or not.
 `tests/marks-cases.ts` holds the records and the reference's output; `tests/cross-impl.test.ts` both.
+
+**`rfc0048`** (RFC 0048, `social/v1`, draft of 2026-10-30). Off until the RFC is Final. With it on, `show`
+prints a social act in words as the reference does since its #440 (`followed by @ola.example`,
+`commented on a post by @ola.example: Så fint!`): each of the RFC's twelve actions with `@<handle>`, the
+line's own `<network>:` taken off, or without one; any other action by its value. The Day, `days` and
+`people` read the line as any other, flag or not: a handle is nobody's company. `tests/social-cases.ts`
+holds the payloads and the reference's rows; `tests/cross-impl.test.ts` both, and the record the
+reference's `logbook add instagram` writes. Under `rfc0036`, since the same tag, `show` also says
+` · kept from draft #N` (`, superseded by #M`, `, retracted`) after a line kept from a draft
+(`tests/kept-cases.ts`), and prints a line of kind `draft` under another schema as a kind not known.
 
 ## Reading a day
 

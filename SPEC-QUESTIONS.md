@@ -1634,7 +1634,7 @@ records, beside its docs; no source was read. Nothing here is decided.
     retracted draft (its #452) is `day sign --keep` and the Day page's form, not ported (only `show`'s
     words of it are, 142); `review receipts` reading an address under NFKC (its #454) is a queue not
     ported; the gate's readers (its #453), one login at a time, every proxy header and no pencil without
-    evidence (its #454), Today's time column and a promise's words (its #451, #454), the old addresses'
+    evidence (its #454), Today's time column and a promise's words (its #451), the old addresses'
     301 (its #461) and a refusal closed gracefully (its #464) are the Library's pages and server. The
     changelog and the docs agree on each; nothing to answer here but whether a second implementation
     must carry them for 1.2.
