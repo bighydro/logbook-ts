@@ -5,6 +5,7 @@ import { pyStr } from "./pyrepr.js";
 import { asRef, type Ref, type Resolver } from "./resolve.js";
 import { sceneReviewRow } from "./sceneReviews.js";
 import { signedDayRow } from "./signing.js";
+import { SOCIAL_KIND, SOCIAL_SCHEMA, socialRow } from "./social.js";
 import { lengthText, voicesOf, voicesSuffix } from "./speakers.js";
 import { starRow } from "./stars.js";
 import type { JsonValue, Line, Payload } from "./types.js";
@@ -28,6 +29,13 @@ export interface RenderContext {
   rfc0041?: boolean;
   /** A heard text's row, `heard/v1` (the `rfc0046` flag). */
   rfc0046?: boolean;
+  /** A social act's row, `social/v1` (the `rfc0048` flag). */
+  rfc0048?: boolean;
+  /**
+   * For a draft line (kind `draft`), by id: its seq, and the seq of the latest standing draft that
+   * names it in `supersedes`, when one does. Read under the rfc0036 flag for ` · kept from draft #N`.
+   */
+  drafts?: Map<string, { seq: number; supersededBy: number | undefined }>;
   /** For a line a standing transcript line supersedes, whatever its kind: that line's seq. */
   supersededByTranscript?: Map<string, number>;
   /** For a goal, chapter or scene-review line a later line of its kind replaces: that line's seq. */
@@ -51,6 +59,29 @@ export function summarize(line: Line, ctx: RenderContext): string {
         ? byFlight
         : Math.max(byFlight, byTranscript);
   if (by !== undefined) return `superseded by #${by}`;
+  const row = rowOf(line, ctx);
+  return ctx.rfc0036 === true ? `${row}${keptFrom(line, ctx)}` : row;
+}
+
+/**
+ * ` · kept from draft #N` after a line kept from a draft (RFC 0036 rule 3: `extra.from` names the
+ * draft, a line of kind `draft`, whatever its kind and its own), as the reference's `show` prints it
+ * since its #452: `, retracted` when the draft is retracted, else `, superseded by #M` when a standing
+ * draft names it in `supersedes` (the latest such); nothing when `extra.from` names no draft.
+ */
+function keptFrom(line: Line, ctx: RenderContext): string {
+  const extra = obj(payloadOf(line).extra);
+  const from = extra?.from;
+  if (typeof from !== "string") return "";
+  const draft = ctx.drafts?.get(from);
+  if (draft === undefined) return "";
+  const kept = ` · kept from draft #${draft.seq}`;
+  if (ctx.resolver.retractedBy(from) !== undefined) return `${kept}, retracted`;
+  return draft.supersededBy === undefined ? kept : `${kept}, superseded by #${draft.supersededBy}`;
+}
+
+/** The row of a line by its kind, as the reference spells it for each profile. */
+function rowOf(line: Line, ctx: RenderContext): string {
   const p = payloadOf(line);
   switch (line.kind) {
     case "message":
@@ -84,6 +115,10 @@ export function summarize(line: Line, ctx: RenderContext): string {
       return ctx.rfc0046 === true && p.schema === HEARD_SCHEMA
         ? heardRow(p)
         : fallback(line.kind, p);
+    case SOCIAL_KIND:
+      return ctx.rfc0048 === true && p.schema === SOCIAL_SCHEMA
+        ? socialRow(p)
+        : fallback(line.kind, p);
     case "scene-review": {
       if (ctx.rfc0040 !== true) return fallback(line.kind, p);
       // A no a later no on the scene replaces is `superseded by #N`, the whole row (rule 3).
@@ -93,7 +128,9 @@ export function summarize(line: Line, ctx: RenderContext): string {
     case "signed-day":
       return signedDayRow(p);
     case "draft":
-      return ctx.rfc0036 === true ? draftRow(p) : fallback(line.kind, p);
+      // A line of kind `draft` under another schema is printed as a kind not known, as the
+      // reference's `show` prints it (found by this catch-up's probes, tests/kept-cases.ts).
+      return ctx.rfc0036 === true && p.schema === "draft/v1" ? draftRow(p) : fallback(line.kind, p);
     case "goal":
       return ctx.rfc0036 === true ? replaced(goalRow(p), line, ctx) : fallback(line.kind, p);
     case "review":

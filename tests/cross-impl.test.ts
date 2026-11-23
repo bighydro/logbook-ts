@@ -59,6 +59,7 @@ import {
   writeMeta,
   writeRecord,
 } from "./helpers.js";
+import { KEPT_CASES, DAY as KEPT_DAY, keptRows } from "./kept-cases.js";
 import {
   EXPECTED_PEOPLE,
   EXPECTED_WITH,
@@ -71,6 +72,7 @@ import { NOTE_TEXTS, DAY as NOTES_DAY, notesRecord } from "./note-text-cases.js"
 import { DAY as OCTOBER_DAY, octoberRecord } from "./october-cases.js";
 import { RECEIPT_CASES } from "./receipts-cases.js";
 import { REFLECTION_CASES, DAY as REFLECTION_DAY, reflectionRows } from "./reflection-cases.js";
+import { SOCIAL_CASES, DAY as SOCIAL_DAY, socialLines } from "./social-cases.js";
 import { lineId, OWNER, observed, SPEAKER_CASES, speakerRecord } from "./speakers-cases.js";
 import { dayRows, FLIGHT_CASES, PEOPLE_CASES, TRANSCRIPT_CASES } from "./superseded-cases.js";
 import { caseDay, WITH_CASES, withRecord } from "./with-cases.js";
@@ -1792,6 +1794,135 @@ describe.skipIf(!ready)(
       expect(signature.payload?.page).toMatchObject({ lines: 3 });
       expect(signedDayProblems(signature, readMetaFile(root).owner_id as string, page)).toEqual([]);
       expect(verifyLogbook(root).valid).toBe(true);
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "social/v1 (RFC 0048), under the rfc0048 flag: the reference and logbook-ts agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // tests/social-cases.ts: every action of the RFC with and without an account, its text, and the
+    // payloads around them. The reference's rows are the ones held there; `show` of both alike, and
+    // the Day, `days` and `people` read the acts as company of no one, the resolved handle too.
+    it("show prints every case of tests/social-cases.ts alike, and the Day, days and people read them alike", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0048");
+      const root = writeBareRecord(socialLines());
+      const theirs = referenceShow(root, SOCIAL_DAY, false);
+      const rows = theirs
+        .split("\n")
+        .filter((row) => row.includes("  social     instagram      "))
+        .map((row) => row.slice("  08:00  social     instagram      ".length));
+      expect(
+        rows.slice(0, SOCIAL_CASES.length),
+        "the reference moved; tests/social-cases.ts holds its rows",
+      ).toEqual(SOCIAL_CASES.map(([, , row]) => row));
+      expect(showDay(root, { day: SOCIAL_DAY }).text).toBe(theirs);
+      expect(showDay(root, { day: SOCIAL_DAY, raw: true }).text).toBe(
+        referenceShow(root, SOCIAL_DAY, true),
+      );
+      const day = readDay(root, { day: SOCIAL_DAY });
+      expect(renderDay(day)).toBe(comparableDayText(reference(root, ["day", SOCIAL_DAY])));
+      expect(JSON.parse(JSON.stringify(day))).toEqual(
+        comparableDayJson(JSON.parse(reference(root, ["day", SOCIAL_DAY, "--json"]))),
+      );
+      expect(renderDayRows(readDayRows(root, {}))).toBe(reference(root, ["days"]));
+      const people = readPeople(root, {});
+      expect(renderPeople(people, {})).toBe(reference(root, ["people"]));
+      expect(JSON.parse(JSON.stringify(people))).toEqual(
+        JSON.parse(reference(root, ["people", "--json"])),
+      );
+    }, 120_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "a line kept from a draft names it in show (the reference's #452), under the rfc0036 flag: both agree",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // tests/kept-cases.ts: the draft standing, superseded, retracted, and `extra.from` naming no draft.
+    it("show of every case of tests/kept-cases.ts alike, and the reference's rows the ones held", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0036");
+      for (const [name, record, expected] of KEPT_CASES) {
+        const root = writeRecord(record);
+        const theirs = referenceShow(root, KEPT_DAY, false);
+        expect(
+          keptRows(theirs),
+          `${name}: the reference moved; tests/kept-cases.ts holds its rows`,
+        ).toEqual(expected);
+        expect(showDay(root, { day: KEPT_DAY }).text, name).toBe(theirs);
+      }
+    }, 300_000);
+  },
+);
+
+describe.skipIf(!ready)(
+  "the record the reference writes from an Instagram export (its #440) reads alike",
+  () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    // The reference's own synthetic export (tests/fixtures/instagram/archive in its clone, a person in
+    // Oslo who does not exist), added by `logbook add instagram` to an empty record: its messages,
+    // calls, photos and social acts. `show` of every day it wrote on (the social rows under the
+    // rfc0048 flag), the Day, `days`, `people`, `stats` and `sources --gaps` agree, and the chain verifies.
+    it("show, the Day, days, people, stats and sources agree, and the chain verifies", () => {
+      vi.stubEnv(FLAGS_ENV, "rfc0048");
+      const root = writeRecord([]);
+      expect(
+        reference(root, [
+          "add",
+          "instagram",
+          join(REF as string, "tests", "fixtures", "instagram", "archive"),
+        ]),
+      ).toContain("added 27 lines from instagram");
+      const written: Line[] = [];
+      for (const month of monthFiles(root))
+        for (const { raw, row } of eachLine(month.file)) {
+          const parsed = parseLine(raw, `${month.rel} line ${row}`);
+          if (!("error" in parsed)) written.push(parsed.line);
+        }
+      expect(new Set(written.map((l) => l.payload.schema))).toEqual(
+        new Set(["message/v1", "call/v1", "photo/v1", "social/v1"]),
+      );
+      expect(verifyLogbook(root).valid).toBe(true);
+      const days = [
+        ...new Set(written.map((l) => localOf(Date.parse(l.at), "Europe/Oslo").day)),
+      ].sort();
+      for (const day of days) {
+        expect(showDay(root, { day }).text, day).toBe(reference(root, ["show", day]));
+        const text = reference(root, ["day", day]);
+        const json = JSON.parse(reference(root, ["day", day, "--json"])) as unknown;
+        const ours = readDay(root, { day });
+        expect(renderDay(ours), day).toBe(comparableDayText(text));
+        expect(JSON.parse(JSON.stringify(ours)), day).toEqual(comparableDayJson(json));
+      }
+      const rows = readDayRows(root, {});
+      expect(renderDayRows(rows)).toBe(reference(root, ["days"]));
+      expect(rows.rows.map((row) => JSON.parse(JSON.stringify(row)))).toEqual(
+        reference(root, ["days", "--json"])
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => JSON.parse(line) as unknown),
+      );
+      const people = readPeople(root, {});
+      expect(renderPeople(people, {})).toBe(reference(root, ["people"]));
+      expect(JSON.parse(JSON.stringify(people))).toEqual(
+        JSON.parse(reference(root, ["people", "--json"])),
+      );
+      expect(comparableStats(statsText(collectStats(root)), true)).toBe(
+        comparableStats(reference(root, ["stats"]), false),
+      );
+      const [gaps, before, after] = bracketed(() => reference(root, ["sources", "--gaps"]));
+      const at = (now: Date) => gapsText(sourceGaps(root, { now }));
+      expect([at(before), at(after)]).toContain(comparableGaps(gaps));
     }, 300_000);
   },
 );

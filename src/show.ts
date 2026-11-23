@@ -13,7 +13,7 @@ import {
   monthKey,
 } from "./clock.js";
 import { checkDayStart } from "./dayStart.js";
-import { isOn, RFC0036, RFC0038, RFC0040, RFC0041, RFC0046 } from "./flags.js";
+import { isOn, RFC0036, RFC0038, RFC0040, RFC0041, RFC0046, RFC0048 } from "./flags.js";
 import { isGoal } from "./goals.js";
 import { eachLine, type MonthFile, monthFiles, parseLine } from "./lines.js";
 import { pyStr } from "./pyrepr.js";
@@ -196,6 +196,8 @@ export function showRange(root: string, options: ShowRangeOptions): ShowRange {
     rfc0040: isOn(RFC0040),
     rfc0041: isOn(RFC0041),
     rfc0046: isOn(RFC0046),
+    rfc0048: isOn(RFC0048),
+    drafts: judgements.drafts,
     supersededByTranscript: judgements.supersededByTranscript,
     replacedBy: (line) => judgements.supersededSameKind.get(`${line.kind}\u0000${line.id}`),
     goalText: (goalId) => goalText(judgements, goalId),
@@ -386,6 +388,11 @@ export interface Judgements {
   goals: Map<string, Line>;
   /** Every `chapter/v1` line, in file order: the day's chapter is read from the standing ones. */
   chapters: Line[];
+  /**
+   * Every line of kind `draft` by id, retracted or not: its seq, and the seq of the latest standing
+   * draft whose `supersedes` names it, when one does (what ` · kept from draft #N` says, RFC 0036).
+   */
+  drafts: Map<string, { seq: number; supersededBy: number | undefined }>;
   /** Every `signed-day/v1` line (RFC 0034), standing or not, in file order; `standingSignatures` picks per day. */
   signatures: Line[];
   /** The first and last instant a listed line has, as written. */
@@ -420,6 +427,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
   const goals = new Map<string, Line>();
   const chapters: Line[] = [];
   const signatures: Line[] = [];
+  const drafts = new Map<string, { seq: number; supersededBy: number | undefined }>();
   let first: { at: string; ms: number } | undefined;
   let last: { at: string; ms: number } | undefined;
   let firstLine: { at: string; ms: number } | undefined;
@@ -443,6 +451,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
       if (isSignedDay(line)) signatures.push(line);
       if (isGoal(line)) goals.set(line.id, line);
       if (isChapter(line)) chapters.push(line);
+      if (line.kind === "draft") drafts.set(line.id, { seq: line.seq, supersededBy: undefined });
       const earlier = payloadOf(line).supersedes;
       if (typeof earlier === "string") {
         // Who supersedes what is settled once the retractions are all read, below.
@@ -485,6 +494,11 @@ export function readJudgements(files: MonthFile[]): Judgements {
     if (kind === "transcript") supersededByTranscript.set(earlier, seq);
     else if (SAME_KIND.has(kind)) supersededSameKind.set(key, seq);
   }
+  for (const [id, draft] of drafts) {
+    const by = replacing.get(`draft\u0000${id}`);
+    const standing = (by ?? []).filter((b) => resolver.retractedBy(b.id) === undefined);
+    if (standing.length > 0) draft.supersededBy = Math.max(...standing.map((b) => b.seq));
+  }
   return {
     resolver,
     supersededFlights,
@@ -493,6 +507,7 @@ export function readJudgements(files: MonthFile[]): Judgements {
     supersededByTranscript,
     goals,
     chapters,
+    drafts,
     signatures,
     first: first?.at,
     last: last?.at,
