@@ -3,11 +3,11 @@
 2026-06-03  Wed  Home                             4.3 km  5 stays (10 attached) · with 1 · sleep 6.5 h · 8,571 steps · resting 55 bpm
 2026-06-04  Thu  Home                             1.1 km  3 stays (5 attached) · with 2 · sleep 6.2 h · 8,390 steps · resting 59 bpm
 2026-06-05  Fri  Home                             1.3 km  3 stays (4 attached) · with 2 · sleep 7.0 h · 8,140 steps · resting 53 bpm
-2026-06-06  Sat  Cabin NO                         119 km  2 stays (7 attached) · with 1 · sleep 7.3 h · 12,224 steps · resting 53 bpm
-2026-06-07  Sun  Home                             119 km  2 stays (5 attached) · sleep 6.4 h · 12,143 steps · resting 55 bpm
+2026-06-06  Sat  Cabin NO                         118 km  2 stays (7 attached) · with 1 · sleep 7.3 h · 12,224 steps · resting 53 bpm
+2026-06-07  Sun  Home                             118 km  2 stays (5 attached) · sleep 6.4 h · 12,143 steps · resting 55 bpm
 2026-06-08  Mon  47.3769,8.5417 (Zurich) CH     1,471 km  XY 561 OSL→ZRH · 4 stays (6 attached) · sleep 6.1 h · 7,839 steps · resting 57 bpm
-2026-06-09  Tue  47.3769,8.5417 (Zurich) CH       2.3 km  3 stays (5 attached) · with 2 · sleep 6.6 h · 12,001 steps · resting 52 bpm
-2026-06-10  Wed  47.3769,8.5417 (Zurich) CH       3.9 km  4 stays (6 attached) · sleep 6.1 h · 11,131 steps · resting 53 bpm
+2026-06-09  Tue  47.3769,8.5417 (Zurich) CH       1.6 km  3 stays (5 attached) · with 2 · sleep 6.6 h · 12,001 steps · resting 52 bpm
+2026-06-10  Wed  47.3769,8.5417 (Zurich) CH       2.4 km  4 stays (6 attached) · sleep 6.1 h · 11,131 steps · resting 53 bpm
 2026-06-11  Thu  Home                           1,471 km  XY 562 ZRH→OSL · 4 stays (4 attached) · sleep 6.7 h · 8,261 steps · resting 56 bpm
 2026-06-12  Fri  Home                             1.0 km  3 stays (4 attached) · with 2 · sleep 6.8 h · 7,935 steps · resting 60 bpm
 2026-06-13  Sat  Home                             2.7 km  3 stays (8 attached) · with 3 · sleep 7.0 h · 7,928 steps · resting 58 bpm
@@ -22,9 +22,9 @@
 2026-06-22  Mon  Home                             1.1 km  3 stays (3 attached) · with 1 · sleep 7.3 h · 7,878 steps · resting 59 bpm
 2026-06-23  Tue  Home                             4.1 km  5 stays (11 attached) · with 1 · sleep 6.0 h · 7,400 steps · resting 52 bpm
 2026-06-24  Wed  Home                             1.0 km  3 stays (4 attached) · with 2 · sleep 7.3 h · 8,595 steps · resting 60 bpm
-2026-06-25  Thu  55.6850,12.5500 (Copenhagen) DK     564 km  XY 571 OSL→CPH · 5 stays (6 attached) · with 2 · sleep 6.5 h · 8,246 steps · resting 60 bpm
-2026-06-26  Fri  55.6850,12.5500 (Copenhagen) DK     3.4 km  3 stays (6 attached) · with 1 · sleep 6.3 h · 11,612 steps · resting 55 bpm
-2026-06-27  Sat  Home                             563 km  XY 572 CPH→OSL · 4 stays (5 attached) · sleep 7.7 h · 8,479 steps · resting 57 bpm
+2026-06-25  Thu  55.6800,12.5856 (Copenhagen) DK     562 km  XY 571 OSL→CPH · 5 stays (6 attached) · with 2 · sleep 6.5 h · 8,246 steps · resting 60 bpm
+2026-06-26  Fri  55.6800,12.5856 (Copenhagen) DK     1.5 km  3 stays (6 attached) · with 1 · sleep 6.3 h · 11,612 steps · resting 55 bpm
+2026-06-27  Sat  Home                             562 km  XY 572 CPH→OSL · 4 stays (5 attached) · sleep 7.7 h · 8,479 steps · resting 57 bpm
 2026-06-28  Sun  Home                             6.4 km  3 stays (5 attached) · sleep 6.7 h · 10,396 steps · resting 59 bpm
 2026-06-29  Mon  Home                             1.2 km  3 stays (5 attached) · with 2 · sleep 7.1 h · 7,866 steps · resting 59 bpm
 2026-06-30  Tue  Home                             1.3 km  3 stays (3 attached) · with 1 · sleep 7.3 h · 7,837 steps · resting 55 bpm

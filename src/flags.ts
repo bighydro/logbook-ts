@@ -41,12 +41,25 @@
  * `rfc0046` (RFC 0046, *What you heard*, draft, 2026-10-21): `show`'s row of a `heard/v1` line (`Episode
  * 12: the east berth — Havnepodden · feed · nb · 7,012 words`), as the reference prints it since its
  * #355. The Day reads the line as any other, as the reference's does.
+ *
+ * `rfc0048` (RFC 0048, `social/v1`, draft, 2026-10-30): `show`'s row of a social act (`followed by
+ * @ola.example`, `commented on a post by @ola.example: …`), as the reference prints it since its #440.
+ * The Day, `days` and `people` read the line as any other, as the reference's do: a handle is never a
+ * person.
  */
 
 import { LogbookError } from "./store.js";
 
 /** Every flag this implementation knows. */
-export const FLAGS = ["rfc0036", "rfc0037", "rfc0038", "rfc0040", "rfc0041", "rfc0046"] as const;
+export const FLAGS = [
+  "rfc0036",
+  "rfc0037",
+  "rfc0038",
+  "rfc0040",
+  "rfc0041",
+  "rfc0046",
+  "rfc0048",
+] as const;
 export type Flag = (typeof FLAGS)[number];
 /** RFC 0036: goals, reviews, drafts and chapters; `day_start`; `signed_within_days`. */
 export const RFC0036: Flag = "rfc0036";
@@ -60,6 +73,8 @@ export const RFC0040: Flag = "rfc0040";
 export const RFC0041: Flag = "rfc0041";
 /** RFC 0046: what you heard, `heard/v1`, in `show`. */
 export const RFC0046: Flag = "rfc0046";
+/** RFC 0048: a social act, `social/v1`, in `show`. */
+export const RFC0048: Flag = "rfc0048";
 /** The environment variable that turns flags on. */
 export const FLAGS_ENV = "LOGBOOK_TS_FLAGS";
 

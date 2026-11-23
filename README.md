@@ -7,7 +7,7 @@ implementations must agree before v1.0 is frozen. This is the second one. It was
 [SPEC.md](https://github.com/bighydro/logbook/blob/v0.5.0/SPEC.md) alone: no Python was read, and every
 place the spec left a choice is written down in [SPEC-QUESTIONS.md](./SPEC-QUESTIONS.md). Its `show`
 and `day` print a day, and its `trips`, `rollup countries` and `rollup nights` sum a window up, exactly as
-the reference implementation (its tag v1.1.0 at 512170e, 2026-11-02, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 1.1.0, among what it brought since 0.7.0 draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, a payment counted once with its receipt, honest nights, no number beside a name and an all-day entry that says all day) does, matched against the
+the reference implementation (its tag v1.2.0 at 55c6fbd, 2026-11-21, the commit [`REFERENCE`](./REFERENCE) pins: openlogbook 1.2.0, among what it brought since 0.7.0 draft/v1's forward compatibility and amendment 2, the route text of `trips`, the dream that learns, keep and sign, a payment counted once with its receipt, honest nights, no number beside a name, an all-day entry that says all day, Instagram's social acts in words and the draft a kept line came from) does, matched against the
 reference's output on synthetic records, on the conformance sample and on its own demo record, never
 its source, and checked by a cross-implementation test. Three exceptions, each made or accepted on the owner's
 instruction: for the catch-up of 2026-10-13, the validation sentences of the settings and policy files
@@ -133,12 +133,12 @@ Appendix B vectors, and with property tests that any JSON value round-trips thro
 ## Parity
 
 What this implementation reads, verifies and writes, profile by profile, against the reference it
-matches: **openlogbook 1.1.0** (bighydro/logbook, tag v1.1.0 at 512170e, 2026-11-02, the commit `REFERENCE`
+matches: **openlogbook 1.2.0** (bighydro/logbook, tag v1.2.0 at 55c6fbd, 2026-11-21, the commit `REFERENCE`
 pins; since 0.7.0 it adds draft/v1's forward compatibility of 2026-10-19 and its amendment 2 of
 2026-10-21, the route text of `trips`, keep and sign, a payment counted once with its receipt, honest
-nights, no number beside a name and an all-day entry that says all day, among a hundred and two commits
-past 0.7.0, in the tables below), its RFC 0034
-signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041 and 0046 and the Day as they stand there. The
+nights, no number beside a name, an all-day entry that says all day, Instagram's social acts in words
+and the draft a kept line came from, among a hundred and twenty-seven commits past 0.7.0, in the tables
+below), its RFC 0034 signed-day amendments 1–4, the draft RFCs 0036–0038, 0040, 0041, 0046 and 0048 and the Day as they stand there. The
 settings and policy files' sentences were matched to openlogbook 0.6.1 and its PR 252 (2026-10-13) and
 are not compared again by the cross-implementation tests. *Read* means
 the readers (`show`, `day`, `days`, `trips`, the rollups, `people`, `stats`) take the line or the file
@@ -146,6 +146,26 @@ as the reference does; *verify* means the chain (SPEC §3, every profile hashes 
 reference validates a shape, the same validation in the same words; *write* means a command here
 appends it. The nineteen frozen profiles (RFC 0031) are held to the reference's per-profile fixtures
 by `tests/profiles.test.ts`; the envelope and the hash rule are SPEC §2–3 and never move here.
+
+### Coverage at v1.2.0 (the reference's tag of 21 November 2026, 55c6fbd)
+
+What changed between 512170e and 55c6fbd (twenty-five commits, openlogbook 1.2.0; SPEC.md, `conformance/`
+and `schema/` did not change; the seed-1 demo record moved, its #454, and was made again with its
+`make.mjs` and its expected files captured again), in the same three words. Held by `tests/social.test.ts`
+(`tests/social-cases.ts`, 66 payloads run), `tests/kept.test.ts` (`tests/kept-cases.ts`, 17 records run)
+and their cases in `tests/cross-impl.test.ts`, with the record the reference's own `logbook add instagram`
+writes from its synthetic export.
+
+| Change at 55c6fbd | Here | What |
+|---|---|---|
+| Instagram's export as messages, calls, photos and `social/v1` (#440, RFC 0048, draft) | implemented, read | `show` prints a social act in words (`followed by @ola.example`, `commented on a post by @ola.example: …`) behind the new `rfc0048` flag (`socialRow`); the message, call and photo lines it writes, and the acts, read alike in `show`, the Day, `days`, `people`, `stats` and `sources`; a handle is nobody's in `people` and the Day (SPEC-QUESTIONS 141). The adapter itself is not ported |
+| Keep and sign only from the current draft (#452) | implemented, read | `show` says ` · kept from draft #N`, `, superseded by #M` or `, retracted` after a line kept from a draft, under `rfc0036` (SPEC-QUESTIONS 142); the refusal is `day sign --keep`'s and the Day page's, not ported |
+| A line of kind `draft` under another schema (older than this window) | implemented | `show` prints it as a kind it does not know, as the reference does; found by this catch-up's probes |
+| The demo's coordinates (#454) | read | the vendored `demo-seed1` made again; `days`, `people` and `trips` of it re-captured |
+| `imessage`'s skip counts (#456), `derive flights`' merges (#460), the Notion export's birthday (#462) | not implemented | no adapter, `derive` or exporter here (SPEC-QUESTIONS 143) |
+| The gate's readers, one login, every proxy header, no pencil without evidence, receipts under NFKC (#453, #454) | not implemented | the Library's pages and server, and `review receipts`, not ported |
+| Today's time column and a promise's words (#451), old addresses answer 301 (#461), a refusal closed gracefully (#464) | not implemented | pages not ported here |
+| Release, docs, tests, dependencies and the formula (#469, #466, #467, #463, #457, #455, #399, #389, #388, #445, #443, #444, #447, #446, #450) | not applicable | |
 
 ### Coverage at v1.1.0 (the reference's tag of 2 November 2026, 512170e)
 
@@ -394,6 +414,16 @@ each line it lists that has a standing star with ★, after its disposition (`ev
 from 18:00 to 20:00`), and gives the day's standing stars under `stars` in `--json`, `{line, star, kind, note}`
 each, only on a day that has one. A photo's star is its keeper (RFC 0024), read flag or not.
 `tests/marks-cases.ts` holds the records and the reference's output; `tests/cross-impl.test.ts` both.
+
+**`rfc0048`** (RFC 0048, `social/v1`, draft of 2026-10-30). Off until the RFC is Final. With it on, `show`
+prints a social act in words as the reference does since its #440 (`followed by @ola.example`,
+`commented on a post by @ola.example: Så fint!`): each of the RFC's twelve actions with `@<handle>`, the
+line's own `<network>:` taken off, or without one; any other action by its value. The Day, `days` and
+`people` read the line as any other, flag or not: a handle is nobody's company. `tests/social-cases.ts`
+holds the payloads and the reference's rows; `tests/cross-impl.test.ts` both, and the record the
+reference's `logbook add instagram` writes. Under `rfc0036`, since the same tag, `show` also says
+` · kept from draft #N` (`, superseded by #M`, `, retracted`) after a line kept from a draft
+(`tests/kept-cases.ts`), and prints a line of kind `draft` under another schema as a kind not known.
 
 ## Reading a day
 

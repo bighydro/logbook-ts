@@ -328,11 +328,11 @@
       "nights": 1,
       "places": [
         {
-          "where": "55.6850,12.5500 (Copenhagen)",
+          "where": "55.6800,12.5856 (Copenhagen)",
           "days": 1
         },
         {
-          "where": "55.6950,12.5700 (Copenhagen)",
+          "where": "55.6855,12.5795 (Copenhagen)",
           "days": 1
         }
       ],
@@ -433,7 +433,7 @@
       "nights": 0,
       "places": [
         {
-          "where": "47.3700,8.5300 (Zurich)",
+          "where": "47.3697,8.5389 (Zurich)",
           "days": 1
         }
       ],
@@ -490,7 +490,7 @@
       "nights": 1,
       "places": [
         {
-          "where": "47.3700,8.5300 (Zurich)",
+          "where": "47.3697,8.5389 (Zurich)",
           "days": 1
         },
         {

@@ -22,8 +22,8 @@
     ]
   },
   "Cabin": {
-    "lat": 60.6,
-    "lon": 9.1,
+    "lat": 59.8536,
+    "lon": 8.6486,
     "radius_m": 200,
     "kind": "other",
     "tags": [
